@@ -1,0 +1,50 @@
+﻿ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+   RMS SipraHub ΓÇö Automated E2E Visual Verification
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+
+Γû║ Step 1: Loading Login Page
+  PAGE LOG: [vite] connecting...
+  PAGE LOG: [vite] connected.
+  PAGE LOG: %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+  PAGE LOG: [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o
+  ≡ƒô╕ Screenshot saved: C:\Users\parth\rms_screenshots\01_login_page.png
+  Γ£à PASS: Login page loaded with email/password fields
+
+Γû║ Step 2: Logging In
+  PAGE LOG: TypeError: Cannot read properties of undefined (reading 'full_name')
+    at login (http://localhost:5173/src/context/AuthContext.tsx:28:45)
+    at handleSubmit (http://localhost:5173/src/pages/Login.tsx?t=1771588773866:37:7)
+  ΓÜá Failed with admin@siprarms.com, trying next...
+  PAGE LOG: TypeError: Cannot read properties of undefined (reading 'full_name')
+    at login (http://localhost:5173/src/context/AuthContext.tsx:28:45)
+    at handleSubmit (http://localhost:5173/src/pages/Login.tsx?t=1771588773866:37:7)
+  ΓÜá Failed with recruiter@siprarms.com, trying next...
+  ≡ƒô╕ Screenshot saved: C:\Users\parth\rms_screenshots\02_post_login_dashboard.png
+  Γ¥î FAIL: Could not login with any credentials. Check if backend is seeded.
+
+Γû║ Step 3: Verifying Dashboard
+  Γ¥î FAIL: Sidebar not visible
+  ≡ƒô╕ Screenshot saved: C:\Users\parth\rms_screenshots\03_dashboard_loaded.png
+
+Γû║ Step 4: Navigating to Resource Requests
+  PAGE LOG: [vite] connecting...
+  PAGE LOG: [vite] connected.
+  PAGE LOG: %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+  PAGE LOG: Failed to parse user profile SyntaxError: "undefined" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at http://localhost:5173/src/context/AuthContext.tsx:15:22
+    at Object.react_stack_bottom_frame (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=f7e4066d:18567:20)
+    at runWithFiberInDEV (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=f7e4066d:997:72)
+    at commitHookEffectListMount (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=f7e4066d:9411:163)
+    at commitHookPassiveMountEffects (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=f7e4066d:9465:60)
+    at commitPassiveMountOnFiber (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=f7e4066d:11040:29)
+    at recursivelyTraversePassiveMountEffects (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=f7e4066d:11010:13)
+    at commitPassiveMountOnFiber (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=f7e4066d:11201:13)
+    at recursivelyTraversePassiveMountEffects (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=f7e4066d:11010:13)
+  PAGE LOG: [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o
+  ≡ƒô╕ Screenshot saved: C:\Users\parth\rms_screenshots\04_resource_requests_page.png
+  Γ¥î FAIL: Resource Requests heading not found
+  Γ¥î FAIL: "New Request" button not found
+
+Γû║ Step 5: Creating a Resource Request
+  ≡ƒô╕ Screenshot saved: C:\Users\parth\rms_screenshots\05_error_state.png

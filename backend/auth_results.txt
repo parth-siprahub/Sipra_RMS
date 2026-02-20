@@ -1,0 +1,48 @@
+=== STEP 1: Login as Admin ===
+Status: 200
+Response: {
+  "access_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6IjU3ZDIzMmExLTVjOTgtNDg4Yi1iYjg5LWIwOWU2NGQzYWVkNyIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL21udmxscnpocXhma2t2Y2ZqZndkLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiJhNGE1Zjg0NC0zZDAyLTQzNTktYTNmYS1lYWZjNzIwNzUzZjIiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzcxNDg5ODAxLCJpYXQiOjE3NzE0ODYyMDEsImVtYWlsIjoiYWRtaW5Ac2lwcmFodWIuY29tIiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCJdfSwidXNlcl9tZXRhZGF0YSI6eyJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZnVsbF9uYW1lIjoiUk1TIEFkbWluIn0sInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiYWFsIjoiYWFsMSIsImFtciI6W3sibWV0aG9kIjoicGFzc3dvcmQiLCJ0aW1lc3RhbXAiOjE3NzE0ODYyMDF9XSwic2Vzc2lvbl9pZCI6Ijg1NWZiNzMwLTA2ZTgtNGU3MC04MThmLTRlMzQ2MTY3OWJkOCIsImlzX2Fub255bW91cyI6ZmFsc2V9.agNV5O9scwp1rTEm0K7_0QFOvk-KNKeBR04NglPnX7xhPqx93HAvhyEUgjYgMYlo_izgPtCAp40ggmOAvGRO1Q",
+  "token_type": "bearer",
+  "user_id": "a4a5f844-3d02-4359-a3fa-eafc720753f2",
+  "role": "ADMIN",
+  "full_name": "RMS Admin"
+}
+
+=== STEP 2: GET /auth/me (with JWT) ===
+Status: 200
+Response: {
+  "id": "a4a5f844-3d02-4359-a3fa-eafc720753f2",
+  "email": "admin@siprahub.com",
+  "role": "ADMIN",
+  "full_name": "RMS Admin",
+  "avatar_url": null
+}
+
+=== STEP 3: GET /dashboard/metrics (protected) ===
+Status: 200
+Response: {
+  "total_requests": 0,
+  "requests_by_status": {},
+  "requests_by_priority": {},
+  "onboarded": 0,
+  "with_admin": 0,
+  "with_client": 0,
+  "total_candidates": 0,
+  "candidates_by_status": {}
+}
+
+=== STEP 4: GET /auth/me (NO token, expect 401) ===
+Status: 401
+Response: {
+  "detail": "Not authenticated"
+}
+
+=== STEP 5: Login as Recruiter ===
+Status: 200
+Role: RECRUITER
+
+=== STEP 6: POST /job-profiles/ as Recruiter (expect 403) ===
+Status: 403
+Response: {
+  "detail": "Admin access required"
+}

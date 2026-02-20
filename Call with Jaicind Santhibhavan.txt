@@ -1,0 +1,788 @@
+﻿Call with Jaicind Santhibhavan-20260218_103901-Meeting Recording
+February 18, 2026, 5:09AM
+25m 19s
+
+Parth Patojoshi started transcription  
+
+Jaicind Santhibhavan   0:03
+Sharing now.  
+
+Parth Patojoshi   0:04
+I think it is a little lag, sir, I am sharing.
+Are you able to see screen, Sir?  
+
+Jaicind Santhibhavan   0:20
+I'm still not seeing your sharing. Can you stop share and share again?  
+
+Parth Patojoshi   0:25
+Yes, right away.
+I can just share one window also will be better.  
+
+Jaicind Santhibhavan   0:38
+Yeah, now it's coming back.
+Is that?
+Okay, that's also handled, right? You'll add some sections there and then, yeah.  
+
+Parth Patojoshi   0:48
+Yes, Sir, there is a new persona here wherein Prasanna Sir and Senthil Sir and Anant Sir may be whoever requires they can view the dashboards and know what process what stage the resource is in.  
+
+Jaicind Santhibhavan   0:57
+Yeah.
+Yeah.
+Correct.  
+
+Parth Patojoshi   1:07
+Yes.  
+
+Jaicind Santhibhavan   1:10
+Okay, next section: user stories and acceptance criteria.  
+
+Parth Patojoshi   1:14
+Uses to reason acceptance criteria.
+Yes, sir. So the thing was during the meeting you had said that if there is a resource that has left the company and we need to backfill, then the resource ID has to be repeated because the resource ID is connected to the SOW ID.  
+
+Jaicind Santhibhavan   1:41
+Yeah.
+Yeah.
+Correct, correct.  
+
+Parth Patojoshi   1:51
+But I spoke to the HR team and they said that if we have the same resource ID repeating multiple times, then it becomes harder for them to manage. So if you have a unique ID each and every time, then its fine. And then what can be done is the job role can be mapped to the SOW ID.  
+
+Jaicind Santhibhavan   2:00
+Perfect. I understand that. Yeah.
+Done.
+SOW, yeah, see when I started that Excel, I didn't have SOW. Okay, so that is why I made the resource ID unique across a position. But now you have SOW, that that's fine, yeah.  
+
+Parth Patojoshi   2:11
+Yes.
+Okay.
+Yes, sir.
+So any changes here, Sir, in resource investigation?  
+
+Jaicind Santhibhavan   2:28
+No, I am good with that. I am good with that. I wanted to clarify why that, but I am because HR has more experience on handling this.  
+
+Parth Patojoshi   2:35
+Yes, Sir. But then Sir, that meeting that you and Senthil Sir had, it was very, very much in depth and very helpful. It was Sir, very high level idea I got on what the project is supposed to be.  
+
+Jaicind Santhibhavan   2:45
+Okay.
+Okay.
+Yeah.  
+
+Parth Patojoshi   2:51
+So, can we move on to the next field, sir?  
+
+Jaicind Santhibhavan   2:54
+Yeah, you can.  
+
+Parth Patojoshi   2:56
+Candidate addition. Any changes here?  
+
+Jaicind Santhibhavan   2:58
+Yeah, can we set this defaults to new? Yeah, this is all good. I think I'm good with most of this part. Yeah.  
+
+Parth Patojoshi   3:05
+Admin profile review.  
+
+Jaicind Santhibhavan   3:06
+Yeah.  
+
+Parth Patojoshi   3:08
+Client submission.  
+
+Jaicind Santhibhavan   3:15
+Onboarding details, yeah, fine.  
+
+Parth Patojoshi   3:18
+Yes.  
+
+Jaicind Santhibhavan   3:19
+in admin you will.
+Just capture this information like who, what does the L1 review response, L2 response and all those things.  
+
+Parth Patojoshi   3:32
+Yes, sir.  
+
+Jaicind Santhibhavan   3:34
+Okay, because we have L1, L2 interview feedback, just capture those also.  
+
+Parth Patojoshi   3:39
+Sponsors status, no sir. So I spoke to the HR team regarding this as well. So the process that we had, I mean the status that we had new with back office, with admin onboarded, all of these status that we had that the HR team is not having it the same day.  
+
+Jaicind Santhibhavan   3:49
+Yeah.
+Yeah, no.  
+
+Parth Patojoshi   3:58
+They have it is screening done, L1 completed or L1 rejected, L2 completed, L2 rejected, yes. So the status has to be set based on what they said. Yes, responses have to be saved, yes.  
+
+Jaicind Santhibhavan   3:59
+Yeah, that's okay.
+No, that's perfect. That's yeah, that's perfect. Yeah.
+Yeah.
+Yeah, and then it goes to client submission.  
+
+Parth Patojoshi   4:21
+Yes, sir.  
+
+Jaicind Santhibhavan   4:23
+Yeah.
+Perfect.  
+
+Parth Patojoshi   4:27
+Client submission? Any changes, Sir?  
+
+Jaicind Santhibhavan   4:29
+No, that's good. That's good. I read it.  
+
+Parth Patojoshi   4:32
+Okay, onboarding workflow.  
+
+Jaicind Santhibhavan   4:33
+Okay, on the client submission, sometimes client may reject a profile. Okay, so you need to handle that flow.  
+
+Parth Patojoshi   4:42
+Yes, sir, yes.  
+
+Jaicind Santhibhavan   4:44
+Yeah, that's it. yeah.  
+
+Parth Patojoshi   4:51
+But sir, the profile rejection very very as you said in the meeting, in very extremely rare cases, the client will deny it and but other it happens very rarely. First of all, like one out of every 99 people will get rejected either in L1, L2.  
+
+Jaicind Santhibhavan   5:01
+Yeah.
+Correct.
+Exactly.  
+
+Parth Patojoshi   5:09
+Or by the client.  
+
+Jaicind Santhibhavan   5:10
+Yeah, with the client, it is a rare case, but sometimes going through the profile, they say it is not matching, which has happened only once or twice out of this whole set of happening in one year. But I just, you need to just capture that. So when you do that, every.
+It's same like offboarding. The floor should be same like offboarding. You will have an option whether you need a backfill or not. If you need backfill, you need to raise another request and it should continue.  
+
+Parth Patojoshi   5:32
+OK.
+OK.
+So, okay, understood. Yes.  
+
+Jaicind Santhibhavan   5:45
+Yeah, okay, next.  
+
+Parth Patojoshi   5:50
+Onboarding workflow.  
+
+Jaicind Santhibhavan   5:53
+Yeah.  
+
+Parth Patojoshi   5:55
+Exit processing.  
+
+Jaicind Santhibhavan   6:09
+Okay.  
+
+Parth Patojoshi   6:11
+Dashboard visibility.  
+
+Jaicind Santhibhavan   6:16
+Yeah.
+We may add more dashboards later, but at least on the version one, you have to give me these many dashboards, which is good. yeah.  
+
+Parth Patojoshi   6:27
+Yes, sir, more dash problems.  
+
+Jaicind Santhibhavan   6:28
+Okay.
+Organise.  
+
+Parth Patojoshi   6:36
+Yes, and SOW travel.  
+
+Jaicind Santhibhavan   6:39
+Yeah, SOW tracker. OK, when you show that you should initially by default show me the active SOW S.
+OK.  
+
+Parth Patojoshi   6:47
+By default, show active SOWs.  
+
+Jaicind Santhibhavan   6:51
+Yeah, and what I mean by active SOW and inactive SOW is, let's assume you create an SOW for 2 node JS profile, okay, and 2 are active, then we are off putting one of the node JS against that SOW.  
+
+Parth Patojoshi   7:03
+Okay.
+We are offloading Node JS.  
+
+Jaicind Santhibhavan   7:12
+While offboarding, the customer says we don't need a backfill, so now one is active and one is inactive.  
+
+Parth Patojoshi   7:16
+OK.
+Yes.  
+
+Jaicind Santhibhavan   7:22
+OK, so whenever you show SOW, you should have an indication whether it's active or not, and you should also give a filter based on that.  
+
+Parth Patojoshi   7:31
+Yes, sir, understood sir. My understanding is since the SOW is common for both Node GS resources, we have to see how many active instances of that SOW are there.  
+
+Jaicind Santhibhavan   7:33
+Okay.
+Yeah.
+Correct. And you also should give me a filter. So if because I will tell you what number of active SOWs should be equal to the number of people on boarded.  
+
+Parth Patojoshi   7:47
+Yes.
+Instances.
+Okay.  
+
+Jaicind Santhibhavan   8:00
+Okay, except that sometimes he is offloaded and we are waiting for a backfill, but ideally the SOW is our top.  
+
+Parth Patojoshi   8:08
+Yes, sir.
+Okay.  
+
+Jaicind Santhibhavan   8:16
+Yeah.  
+
+Parth Patojoshi   8:17
+Anything else here in SOW, sir?  
+
+Jaicind Santhibhavan   8:20
+No, that's it.  
+
+Parth Patojoshi   8:21
+Okay, done. Backfill automation.  
+
+Jaicind Santhibhavan   8:27
+Yeah, this is what I told you earlier, right? You when you close, when you offboard someone, the default outcome, it will be like something like replacement required. If it is yes, you create a new position and you try to go. Yeah. And the only thing is you will carry forward the same SOW against the new position.  
+
+Parth Patojoshi   8:33
+Yes, sir.
+Yes.
+Yes, sir, the SOW is a constant. The only thing related to SOW that is changing is number of instances.  
+
+Jaicind Santhibhavan   8:48
+Yeah.  
+
+Parth Patojoshi   8:53
+Yes.  
+
+Jaicind Santhibhavan   8:54
+Yeah.
+Go ahead.  
+
+Parth Patojoshi   8:57
+Yes, sir, communication logging now.  
+
+Jaicind Santhibhavan   9:00
+Yeah.  
+
+Parth Patojoshi   9:02
+Yeah.  
+
+Jaicind Santhibhavan   9:02
+Okay, you hold this authentication. How are you planning to do this authentication?  
+
+Parth Patojoshi   9:07
+Sir, so far the plan is Python Fast API, React, and Superbase because Superbase was very convenient and it has authentication option in Superbase itself.  
+
+Jaicind Santhibhavan   9:14
+No, no.
+It's super based, right?  
+
+Parth Patojoshi   9:24
+Yes, sir.  
+
+Jaicind Santhibhavan   9:26
+Can you send me that?  
+
+Parth Patojoshi   9:28
+Yes, one second, sir. I have it logged in, so I'll just show it to you.
+We have a pro subscription, no sir, no, because of the issue that happened with neuro assist. Yeah, so.  
+
+Jaicind Santhibhavan   9:39
+The post request? Yeah, OK, thanks.  
+
+Parth Patojoshi   9:44
+Email shipping.  
+
+Jaicind Santhibhavan   9:48
+How much are we paying for this?  
+
+Parth Patojoshi   9:52
+No idea, sir, it was Sindhu was doing it.
+Get up login.
+One second, sir.  
+
+Jaicind Santhibhavan   10:01
+Yeah.
+Sir.  
+
+Parth Patojoshi   10:13
+I made a little mistake, sir. The thing was I logged in super base as like an experimental thing which Sir had asked me to look into, so I used my personal account on that. so.  
+
+Jaicind Santhibhavan   10:21
+Okay.  
+
+Parth Patojoshi   10:28
+It's a problem.
+Yes.
+Yes, so this is super base and now within we can check prod prod is the one for neuro assist. Yes, so there is an authentication option by default in super base. Can you see my screen, Sir?  
+
+Jaicind Santhibhavan   11:06
+Yeah, I'm seeing, I'm seeing, yeah.  
+
+Parth Patojoshi   11:09
+Yes, sir. So we have OAuth apps here as well, so we can add through here.  
+
+Jaicind Santhibhavan   11:15
+Okay, yeah.  
+
+Parth Patojoshi   11:17
+And email SMTP also can be set through here.  
+
+Jaicind Santhibhavan   11:20
+Okay, fine. So you are planning to use Super Viz. Okay, I told Raja something yesterday, but yeah, then you can you try it out and let me know authentication and authorization how you are planning to do. Okay, yeah, okay.  
+
+Parth Patojoshi   11:23
+Yes, sir, I haven't done it before.
+Yes, sir, done.
+So.  
+
+Jaicind Santhibhavan   11:41
+Yeah, that's good. And then dashboards, real time metrics, yeah.  
+
+Parth Patojoshi   11:48
+Job profile management.  
+
+Jaicind Santhibhavan   11:49
+Your profile resource request workload, yeah.
+Will grow up by plane. I think they call it as ATM, right?  
+
+Parth Patojoshi   12:01
+Sorry, sir, what is it called as?  
+
+Jaicind Santhibhavan   12:03
+I don't know, check with check with HRTI thought they call some reference like ATM.  
+
+Parth Patojoshi   12:07
+OK.
+Yes, sir, I will check.  
+
+Jaicind Santhibhavan   12:12
+yeah.  
+
+Parth Patojoshi   12:15
+Okay, recruiter pipeline, I will check and.
+Admin review client submission.  
+
+Jaicind Santhibhavan   12:22
+Yeah.  
+
+Parth Patojoshi   12:25
+Onboarding workflow, exit management and backfill SOW tracker is manual entry.  
+
+Jaicind Santhibhavan   12:29
+Yeah.
+Correct, yeah.  
+
+Parth Patojoshi   12:33
+Yes, sir, this is Nagle.  
+
+Jaicind Santhibhavan   12:33
+Hey, why did you say SOW tracker is manual?  
+
+Parth Patojoshi   12:37
+Yes Sir, this is manual entry because I spoke to the HR team and they said that right now they cannot fully automate how SOW is being sent and they don't even have a common base template.  
+
+Jaicind Santhibhavan   12:51
+Okay, yeah, okay, so.  
+
+Parth Patojoshi   12:52
+So I had asked them, Sir, if there is a base template, then this SOW tracker can be fully automated, just that the job role has to be changed. But then for every person that they are sending, it has to be maybe a different job role. Maybe the position that they applied for their resume is not matching, but the HR team wants to put them somewhere else where they are required.  
+
+Jaicind Santhibhavan   12:58
+Okay.
+Mhm.  
+
+Parth Patojoshi   13:15
+So in all these cases, manual entry will be required for SOW.  
+
+Jaicind Santhibhavan   13:18
+Okay.  
+
+Parth Patojoshi   13:19
+So they said for now we can leave it as manual and then later we can make it automated.  
+
+Jaicind Santhibhavan   13:23
+Yeah.
+Yeah.  
+
+Parth Patojoshi   13:28
+And they also mentioned that there should be room for change. So everything in the user interface, there should be an option such that the HR team, since they are doing a lot of work manually, they should be able to manually go and change some fields.  
+
+Jaicind Santhibhavan   13:42
+Yeah.  
+
+Parth Patojoshi   13:45
+So as much as possible, I'm adding that as well.  
+
+Jaicind Santhibhavan   13:48
+Yeah.  
+
+Parth Patojoshi   13:52
+Sir, this vendor is required here, sir.  
+
+Jaicind Santhibhavan   13:53
+Yes.
+yes.  
+
+Parth Patojoshi   13:57
+Okay, done. So I didn't know what the vendor is and Sir told me to ignore, so I wanted to ask.  
+
+Jaicind Santhibhavan   13:58
+I'll tell you why. yeah.
+Yeah, see, just leave that field there because right now we have lot of candidates who have come from Anton.  
+
+Parth Patojoshi   14:09
+Okay.  
+
+Jaicind Santhibhavan   14:10
+Okay, and now Sipra Ab is directly sourcing so, but even for the existing candidates, we have to tell they are part of they came from vendor Anton.  
+
+Parth Patojoshi   14:21
+Okay.
+Okay, sir, so I'll.  
+
+Jaicind Santhibhavan   14:24
+So default, yeah, give 2 options, okay? Even if you make it as a drop down for the time being, it's okay.  
+
+Parth Patojoshi   14:33
+Yes, sir, there are only 3 options here right now, so I think it'll work.
+Yes, interview date, candidate name, email, phone, current company, current CTC, expected CTC, current location, work location, notice period, total experience, relevant experience, skills, status, interview time, remarks, yes.  
+
+Jaicind Santhibhavan   14:45
+Yeah, please.
+Yeah, those come from HR, so I know your words.  
+
+Parth Patojoshi   15:00
+Scope and Boundaries Phase One.
+User authentication dashboard.
+Job profile, crude resource request workflow, recruiter pipeline, admin review, client submission, onboarding workflow, exit management, backflow automation, *** tracker, basic reporting, basic reporting. I will have to look into this was not mentioned, I think.
+Okay, fine, look into that as welland responsive UI and Phase 2.
+Out of scope, payroll, time tracking, performance appraisals, learning management system, video interviewing platform.  
+
+Jaicind Santhibhavan   15:41
+Yeah.
+Yeah, payroll, you need to make it in Phase 2.  
+
+Parth Patojoshi   15:49
+Yes, sir, payroll time tracking these both have to be done through Jira, I think.  
+
+Jaicind Santhibhavan   15:50
+Again.
+Are related.
+what we will do is it is happening in Jira. We get a dump from Jira and it will come to you and you need to export that, sorry, import that into the database and then calculate the time and the payroll.  
+
+Parth Patojoshi   16:14
+Understood, Sir. Yes. So we will have to establish connection between the application that we are creating along with Jira.  
+
+Jaicind Santhibhavan   16:15
+Okay.
+Yeah, no, you can't do a connection because client will never allow us to connect to their systems.  
+
+Parth Patojoshi   16:22
+Yes, done.
+Yes, so data has to be imported to database and then it has to be made yes so done. So payroll management, I was asking them if there is a simple logic on how the resource is getting paid. So if it is like $0.8 per hour for a junior developer and for a senior developer it will be $1.2 per hour. Is there any basic system like that? I was asking them and they said right.  
+
+Jaicind Santhibhavan   16:29
+yeah.  
+
+Parth Patojoshi   16:51
+Now, no, we have to leave it manual. We will have to discuss with them, so leave it manual.  
+
+Jaicind Santhibhavan   16:54
+Yeah.
+Yeah, because everybody has different agreements on the pay, so we can't standardise it, that's fine.  
+
+Parth Patojoshi   17:01
+Yes, sir.
+Exit.  
+
+Jaicind Santhibhavan   17:05
+Yeah.  
+
+Parth Patojoshi   17:08
+Stable Internet connection, database hosting infrastructure, available cloud storage, DB infrastructure, Postgres and then cloud storage.  
+
+Jaicind Santhibhavan   17:17
+Yeah, I would leave it to you because I don't want to change technology because you just started with one technology.  
+
+Parth Patojoshi   17:22
+Yes, sir. and.  
+
+Jaicind Santhibhavan   17:24
+Okay, now I want to, I think most of the other things are good. This is the only part I want to tell you now when you start this project.  
+
+Parth Patojoshi   17:29
+Yes, sir.  
+
+Jaicind Santhibhavan   17:34
+Okay, I want you to.
+If a folder for a module, for example, you are doing lets assume job description, OK, the job description should come as one folder. You finish it, you deploy it, and you show it to me.  
+
+Parth Patojoshi   17:51
+Mm.  
+
+Jaicind Santhibhavan   17:56
+You know what I am.  
+
+Parth Patojoshi   17:57
+Sir, that would be very hard, sir.  
+
+Jaicind Santhibhavan   17:59
+Why?  
+
+Parth Patojoshi   18:01
+So this was the same thing during day before yesterdays call when Sentence Sir was there, he asked that we have to separate this into phase one and phase 2.  
+
+Jaicind Santhibhavan   18:11
+Yeah.  
+
+Parth Patojoshi   18:12
+Because of the heavy AI usage things. So main problem is that, sir, unless and until I make all the features, everything will be incomplete because making one small feature at a time, I can't even test it.  
+
+Jaicind Santhibhavan   18:28
+Why?  
+
+Parth Patojoshi   18:28
+So, UI will be there, Sir, logic will be there, but in the interface if it is doing everything right that we will not know, I can do that wherein like I can make small small components and show you, but a little inefficient that would be considering we are doing agent first development.  
+
+Jaicind Santhibhavan   18:51
+I didn't understand the complication, but what I'm still thinking is you will.  
+
+Parth Patojoshi   18:56
+Sir, in simple words, complication is AI does a lot of work very fast, so doing small chunks is inefficient.  
+
+Jaicind Santhibhavan   19:12
+Okay, I will leave it to you. The thing is, yeah, no, why? I will tell you why I asked that, okay?  
+
+Parth Patojoshi   19:15
+Yes, sir, but I understood requirement. I should get review from you.
+Yes, sir.  
+
+Jaicind Santhibhavan   19:23
+See, the way I looked at it is if you show me one screen and if I think of reviewing it and I know it's all tick in the box, I am happy with it. I don't. I want you to freeze that part so that you don't make any changes to that section and then work on the next one.  
+
+Parth Patojoshi   19:38
+Okay, sir, understood.  
+
+Jaicind Santhibhavan   19:40
+But if you give me everything together, it takes me a long time for me to validate every part of it. You know what I'm like?  
+
+Parth Patojoshi   19:45
+ESL.
+Yes, I understand. Yes, sir.  
+
+Jaicind Santhibhavan   19:49
+Yeah, but I will leave it to you. You can handle whichever works better for you. Only thing is if it is.  
+
+Parth Patojoshi   19:57
+Yes, sir, it will, as on a daily basis, whatever modules I have created, I will send them to you for review and I will make sure it is not too much.  
+
+Jaicind Santhibhavan   20:04
+Okay.
+Yeah.  
+
+Parth Patojoshi   20:16
+Hey.  
+
+Jaicind Santhibhavan   20:17
+That part should come in as a PR pull request.  
+
+Parth Patojoshi   20:21
+Okay.  
+
+Jaicind Santhibhavan   20:21
+So that I can, you can share the PR with me and Raja, we can review and then if you have any comments, we can put it on it. You know the typical thing that I wanted you to do.  
+
+Parth Patojoshi   20:31
+Yes, sir, I understood. I will be writing code and then managers will be reviewing, yes.  
+
+Jaicind Santhibhavan   20:33
+so that.
+Reviewing it, yeah, and then we review it, we are confirmed, we approve the PR, and then you can merge it.  
+
+Parth Patojoshi   20:43
+Pull request, then approved by managers, then merge.  
+
+Jaicind Santhibhavan   20:50
+Okay, so that why that it is everyday your check in is reviewed and merged. So any day you think something goes wrong, you can just revert your changes and go back to yesterday's code and work.  
+
+Parth Patojoshi   20:50
+Yes.
+Yes, sir, done.  
+
+Jaicind Santhibhavan   21:06
+Make sense?  
+
+Parth Patojoshi   21:07
+Yes, sir.  
+
+Jaicind Santhibhavan   21:09
+So.
+We should not be losing code. No, few silly mistakes we did last time. I am trying to avoid it. That's all.  
+
+Parth Patojoshi   21:17
+I won't make those mistakes, Sir. Yes, I will try my very best to keep the flow streamlined, not to make mistakes.  
+
+Jaicind Santhibhavan   21:18
+Yeah.
+And baby, once one or 2 instances, once screen is ready, we will try hosting it so that no, your hosting also doesn't end up challenges at the last minute.  
+
+Parth Patojoshi   21:33
+Yes, sir, the HRT mentioned this as well. They said that unless and until they start using the application, we cannot, they cannot tell us what we need, how they need it different. So yes.  
+
+Jaicind Santhibhavan   21:43
+Yeah, that's exactly. So I want to host it. I want to test it so that everything goes in parallel.  
+
+Parth Patojoshi   21:50
+Okay, sir, done.  
+
+Jaicind Santhibhavan   21:51
+Make sense?  
+
+Parth Patojoshi   21:52
+Yes, sir.  
+
+Jaicind Santhibhavan   21:55
+Okay, is Srinath sitting near to you?  
+
+Parth Patojoshi   21:59
+Actually, I am sitting inside the room. Should I?  
+
+Jaicind Santhibhavan   22:02
+Okay, no, he was thinking me. I got it. No, not a problem. Yeah.  
+
+Parth Patojoshi   22:05
+Reenad Sir, busy.
+Jacinto.  
+
+Jaicind Santhibhavan   22:09
+I'm back.  
+
+Parth Patojoshi   22:14
+Jason Sir is on call. Hi Jason, good morning.  
+
+Jaicind Santhibhavan   22:17
+Hey, I saw your message. I was talking to part. So I thought I'll finish and call you. Yeah.  
+
+Parth Patojoshi   22:21
+Okay, thank you so much for that. So just start off. I mean, checking like this any news on this 2 roles that Prakash and Raj Jason?  
+
+Jaicind Santhibhavan   22:32
+No, Raja, you shared yesterday. Oh sorry, 12:00 o'clock. It was bit late in the night. Jonathan told me is very good resource and immediately I shared the profile. Prakash is actually selected, so I didn't send the profile because Nagesh is coming down next week. and.  
+
+Parth Patojoshi   22:42
+Okay.
+Okay.  
+
+Jaicind Santhibhavan   22:52
+Because no little bit sensitive on that profile because Ananth is also there. So just sharing with you. So Prasanna said he will take care of that profile.  
+
+Parth Patojoshi   22:55
+Okay.  
+
+Jaicind Santhibhavan   23:04
+Okay, so both are selected.  
+
+Parth Patojoshi   23:05
+Okay, sure. So then I can.  
+
+Jaicind Santhibhavan   23:07
+So, Raj, I have already shared, yeah.  
+
+Parth Patojoshi   23:10
+And so I can go ahead with the both of them in them, right?  
+
+Jaicind Santhibhavan   23:13
+Yes, just have a word with Krishna and then go ahead to that. And yesterday we spoke to 2 DBA profiles, one is Madhu and second was Ram, if I'm right. Yeah, so both of them sound good.  
+
+Parth Patojoshi   23:19
+Okay.
+Right.
+Okay.  
+
+Jaicind Santhibhavan   23:31
+We gave a little bit weightage because me and Raja was talking to Ram because he is little more younger and felt more dynamic. Okay, but technically both of them are good and what we thought is today there is one more scheduled for today night.  
+
+Parth Patojoshi   23:41
+OK.
+Okay.
+Correct.  
+
+Jaicind Santhibhavan   23:51
+Right, so we'll talk to them because we only have one opening, right? So we thought we'll do, but based on the discussion, both are both are good.  
+
+Parth Patojoshi   23:51
+yes.
+Director.
+Okay, then we can take a finalization after this today's interview, right, Jason?  
+
+Jaicind Santhibhavan   24:01
+OK.
+Yeah, that's what we said. So I think somebody was ringing me on for the response. So I told Raja, let's talk to 3 and then we can decide on one among them.  
+
+Parth Patojoshi   24:13
+Okay, sure. Once this interview is completed, may maybe we can I can circle back with you, then we can take a decision on that.  
+
+Jaicind Santhibhavan   24:14
+Okay, but especially both are good.
+Yeah, we can.  
+
+Parth Patojoshi   24:21
+Okay, thank you. That's the reason I texted you. Thank you so much, Sid. Thank you. Thanks regarding RMS.  
+
+Jaicind Santhibhavan   24:22
+All right.
+Okay, yeah, thanks. All right, thanks.
+Yeah, we no, I asked you to check something with Steve. What was that? You typed it on the document. I forgot suddenly.  
+
+Parth Patojoshi   24:30
+Jason Sir, anything regarding RMS from finance side?
+Yes, sir, I have that noted down.  
+
+Jaicind Santhibhavan   24:41
+Yeah, just check that with Sridhar and HR is the main stakeholder here, so you need to show every screens to them, get it better because whatever we develop, if it is not usable, it doesn't make any sense.  
+
+Parth Patojoshi   24:53
+Yes, sir.
+Yes, sir.  
+
+Jaicind Santhibhavan   24:58
+So they should be, it should make their life easier. That's their main intent. So you need to take that.  
+
+Parth Patojoshi   25:03
+Yes, sir.
+Done.  
+
+Jaicind Santhibhavan   25:07
+Okay, yeah, all right, ****. Just keep an update that we reviewed. Yeah, no, it's back.  
+
+Parth Patojoshi   25:10
+Alright, sir, thank you very much. Yes, sir, I will keep you updated.  
+
+Jaicind Santhibhavan   25:14
+Yeah.  
+
+Parth Patojoshi   25:15
+Thank you, sir. Have a good day.  
+
+Jaicind Santhibhavan   25:16
+Bye bye, you too.  
+
+Parth Patojoshi stopped transcription

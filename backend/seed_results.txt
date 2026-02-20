@@ -1,0 +1,42 @@
+=== Seeding RMS Sample Data ===
+
+Admin: a4a5f844-3d02-4359-a3fa-eafc720753f2
+Recruiter: d8b88305-22bc-4215-9661-b34260eed3ab
+
+--- Job Profiles ---
+  [SKIP] React Developer already exists
+  [OK] Python Backend Engineer -> id=2
+  [OK] DevOps Engineer -> id=3
+
+--- SOWs ---
+  [OK] SOW-2026-001 -> id=1
+  [OK] SOW-2026-002 -> id=2
+
+--- Resource Requests ---
+  [OK] REQ-20260115-001 -> id=1
+  [OK] REQ-20260120-002 -> id=2
+  [OK] REQ-20260201-003 -> id=3
+  [OK] REQ-20260210-004 -> id=4
+  [OK] REQ-20260215-005 -> id=5
+
+--- Candidates ---
+  [OK] Aarav Sharma (WITH_CLIENT) -> id=1
+  [OK] Priya Patel (SUBMITTED_TO_ADMIN) -> id=2
+  [OK] Rohan Gupta (ONBOARDED) -> id=3
+  [OK] Sneha Rao (REJECTED_BY_CLIENT) -> id=4
+  [OK] Karthik Nair (INTERVIEW_SCHEDULED) -> id=5
+  [OK] Anjali Verma (NEW) -> id=6
+  [OK] Vikram Singh (SELECTED) -> id=7
+  [OK] Meera Iyer (ON_HOLD) -> id=8
+
+--- Communication Logs ---
+  [OK] EMAIL: Sent profile to Acme Corp HR team for review...
+  [OK] CALL: Confirmed onboarding date with candidate. Joining ...
+  [OK] MEETING: Technical round scheduled for March 1st at 2 PM IS...
+
+=== Seed Complete ===
+  Job Profiles: 3
+  SOWs: 2
+  Resource Requests: 5
+  Candidates: 8
+  Communication Logs: 3

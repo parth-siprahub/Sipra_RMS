@@ -1,0 +1,319 @@
+# Antigravity Rules & Workflows Reference
+Generated: 2026-02-18
+
+## ⚙️ Workflows (Total: ~55)
+
+### Emergency
+1. Automatic commit message generator
+2. Fix Next.js Hydration Errors
+3. Nuke & Reinstall
+4. Debugging Infinite Re-renders
+
+### Production
+5. Ultimate Next.js SEO Setup
+6. Core Web Vitals Optimizer
+7. Security Hardening Checklist
+8. Implement Rate Limiting
+9. Setup RBAC
+10. Secure API from CSRF
+
+### Integrations
+11. NextAuth.js (Auth.js) v5 Setup
+12. Stripe Checkout Integration
+13. Supabase Row Level Security (RLS)
+14. Setup Local Database (Postgres)
+15. Migrate Redux to Zustand
+16. Setup Supabase Realtime
+
+### Local Dev
+17. Kill Port 3000
+18. Generate .env from Example
+19. Prune Docker System
+20. Update All Dependencies
+21. VS Code Settings Sync
+22. Fix Lint Errors
+23. Pre-Flight Check
+24. Setup Prettier & ESLint from Scratch
+25. Setup Husky Git Hooks
+26. Generate TypeScript Types from API
+27. Setup Environment Variables Per Branch
+28. Create GitHub PR Template
+
+### DevOps
+29. Analyze Bundle Size
+30. Setup Vercel Cron Jobs
+31. Database Migration Rollback
+32. Deploy to Vercel Preview
+33. Check SSL Certificates
+34. Setup Semantic Versioning
+35. Implement Feature Flags
+36. Setup Database Seeding
+37. Setup Preview Deployments
+38. Implement Blue-Green Deployment
+
+### QA/Debugging
+39. React Performance Profiling
+40. Accessibility (a11y) Audit
+41. E2E Testing Setup (Playwright)
+42. Error Boundary Implementation
+43. Simulate Slow Network
+44. Debug Memory Leaks in React
+45. Fix CORS Issues
+46. Debug Module Not Found Errors
+47. Debug API Issues with Network Tab
+48. Debug Slow API Routes (Performance Profiling)
+49. Fix 'Too Many Re-renders' Error
+50. Debug WebSocket Connection Issues
+51. Trace Requests with OpenTelemetry
+
+### Features
+52. Scaffold New Component
+53. Implement Dark Mode
+54. Setup Internationalization (i18n)
+55. Handle File Uploads (S3)
+56. Custom 404/500 Pages
+
+### Performance Optimization
+57. Optimize Images for Web
+58. Setup Redis Caching
+59. Implement Request Deduplication
+60. Debug Webpack/Vite Build Issues
+61. Debug TypeScript 'any' Proliferation
+62. Implement Optimistic UI Updates
+63. Setup Incremental Static Regeneration
+64. Reduce Bundle Size
+65. Setup Service Worker for Offline
+
+### Testing & Monitoring
+66. Setup Sentry Error Tracking
+67. Setup Storybook for Components
+68. Setup API Mocking with MSW
+
+### Developer Experience
+69. Debug 'Module Not Found' After Git Pull
+70. Setup VS Code Multi-Root Workspace
+71. Migrate from Pages Router to App Router
+72. Setup Monorepo with Turborepo
+73. Debug 'Cannot Find Module' TypeScript Errors
+74. Undo a "Bad" Public Push
+75. Bisecting a Bug
+76. Syncing a Fork (The Right Way)
+
+---
+
+## 📜 Rules (Total: ~100+)
+
+### Agentic AI
+1. Strong Reasoner & Planner Agent (Google Template)
+2. AI Prompt Engineer Agent - LLM Expert
+3. Debugging Agent - Systematic Bug Hunter
+4. Code Review Agent - Thorough & Constructive Reviewer
+5. Test Writing Agent - Strategic Test Coverage
+6. Security Audit Agent - Vulnerability Detection
+7. Refactoring Agent - Safe Code Improvement
+8. API Design Agent - RESTful & GraphQL Expert
+9. Database Design Agent - Schema & Query Expert
+10. DevOps & CI/CD Agent - Pipeline Expert
+11. Performance Optimization Agent - Speed Expert
+12. Code Migration Agent - Safe Upgrade Expert
+
+### Python
+13. Python AI/ML Development Expert
+14. Python Backend Development with FastAPI
+15. Python Data Science Expert
+16. Python Automation & Scripting Expert
+17. Python Async Programming Expert
+18. Python Testing Best Practices
+19. Python Web Scraping Expert
+20. Python DevOps & Infrastructure Automation
+21. Python Security Best Practices
+22. Python REST API Development Expert
+23. Python Data Engineering Expert
+24. Python Scientific Computing Expert
+25. Python CLI Development Expert
+26. Python Package Development Expert
+
+### Web Development
+27. Semantic HTML & Accessibility Expert
+28. Modern CSS & Responsive Design Expert
+29. Progressive Web App (PWA) Expert
+30. JavaScript ES6+ Modern Features Expert
+31. Web Performance Optimization Expert
+32. Web Security Best Practices Expert
+33. Browser APIs & Web Platform Expert
+34. Web Animation & Motion Design Expert
+35. Web Components & Custom Elements Expert
+36. WebAssembly (WASM) Development Expert
+37. Cross-Browser Compatibility Expert
+38. Web Fonts & Typography Expert
+39. Web Forms & Validation Expert
+
+### Next.js (Specific)
+40. Next.js App Router Best Practices
+41. Next.js Performance Optimization
+42. Server Actions & Mutations
+43. Next.js Authentication & Authorization Expert
+44. Next.js Database Integration Expert
+45. Next.js API Routes & Route Handlers Expert
+46. Next.js Internationalization (i18n) Expert
+47. Next.js Testing Strategies Expert
+48. Next.js Deployment & DevOps Expert
+49. Next.js State Management Expert
+50. Next.js SEO & Metadata Expert
+51. Next.js Middleware & Edge Functions Expert
+52. Next.js Real-time Features Expert
+
+### TypeScript
+53. TypeScript Strict Mode & Safety
+54. Mastering TypeScript Generics
+55. TypeScript Tooling & Ecosystem
+56. React Native TypeScript Expert
+57. Expo TypeScript Development Expert
+58. Vue 3 + TypeScript Composition API Expert
+59. Angular TypeScript Expert
+60. NestJS TypeScript Backend Expert
+61. TypeScript Monorepo Architecture Expert
+62. GraphQL with TypeScript Expert
+63. TypeScript Design Patterns Expert
+64. TypeScript Testing with Vitest/Jest Expert
+65. TypeScript Node.js Backend Expert
+66. Advanced TypeScript Patterns
+
+### Go (Golang)
+67. Go Fundamentals & Best Practices
+68. Go Concurrency & Goroutines Expert
+69. Go Web Development Expert
+70. Go Microservices Architecture
+71. Go Testing & Benchmarking
+72. Go Database Integration
+73. Go gRPC & Protocol Buffers
+74. Go Performance Optimization
+75. Go Cloud Native Development
+76. Go CLI Development
+
+### Rust
+77. Rust Fundamentals & Ownership
+78. Rust Async Programming with Tokio
+79. Rust Web Development (Axum/Actix)
+80. Rust Systems Programming
+81. Rust Error Handling Patterns
+82. Rust Testing & Benchmarking
+83. Rust Performance Optimization
+84. Rust WebAssembly (WASM) Development
+85. Rust CLI Development with Clap
+86. Rust Embedded & No-Std Programming
+
+### DevOps & Infrastructure
+87. Docker & Containerization Expert
+88. Kubernetes & Container Orchestration
+89. CI/CD Pipelines (GitHub Actions, GitLab CI)
+90. Infrastructure as Code (Terraform, Pulumi)
+91. AWS Cloud Architecture Expert
+92. Azure Cloud Services Expert
+93. Google Cloud Platform Expert
+94. Monitoring & Observability (Prometheus, Grafana)
+95. GitOps & ArgoCD Expert
+96. Security & Compliance in DevOps
+
+### Mobile Development
+97. React Native Expert
+98. Flutter & Dart Development
+99. iOS Swift Development
+100. Android Kotlin Development
+101. Mobile UI/UX Best Practices
+102. Mobile Performance Optimization
+103. Mobile Security Best Practices
+104. Mobile Testing Strategies
+105. App Store Optimization & Deployment
+106. Cross-Platform Development Strategies
+
+### Database & Data
+107. PostgreSQL Expert
+108. MySQL/MariaDB Expert
+109. MongoDB & NoSQL Databases
+110. Redis & Caching Strategies
+111. Database Design & Normalization
+112. SQL Query Optimization
+113. Database Migration Strategies
+114. Time-Series Databases (InfluxDB, TimescaleDB)
+115. Graph Databases (Neo4j)
+116. Vector Databases (Pinecone, Weaviate)
+
+### AI & Machine Learning
+117. Machine Learning Fundamentals
+118. TensorFlow & Keras Deep Learning
+119. PyTorch Deep Learning Expert
+120. LLM Integration & Prompt Engineering
+121. Computer Vision (OpenCV, YOLO)
+122. NLP & Transformers (Hugging Face)
+123. MLOps & Model Deployment
+124. AI Ethics & Responsible AI
+125. LangChain & AI Orchestration
+126. Reinforcement Learning Expert
+
+### Backend Frameworks
+127. Django Python Framework Expert
+128. FastAPI Python Framework Expert
+129. Flask Python Framework Expert
+130. Spring Boot Java Expert
+131. Laravel PHP Framework Expert
+132. Ruby on Rails Framework Expert
+133. ASP.NET Core C# Expert
+134. Express.js Advanced Patterns
+135. GraphQL Server Development Expert
+136. REST API Design Patterns Expert
+
+### Frontend Frameworks
+137. Vue.js 3 Composition API Expert
+138. Angular Modern Development Expert
+139. Svelte & SvelteKit Development
+140. Solid.js Reactive Development
+141. Astro Static Site Generation
+142. Remix Framework Expert
+143. Qwik Resumable Framework
+144. Alpine.js Lightweight Framework
+145. Lit Web Components
+146. Tailwind CSS Expert
+
+### Testing & Quality Assurance
+147. Unit Testing Best Practices
+148. Integration Testing Strategies
+149. E2E Testing (Playwright, Cypress)
+150. Test-Driven Development (TDD)
+151. Behavior-Driven Development (BDD)
+152. Performance Testing (k6, JMeter)
+153. Security & Penetration Testing
+154. Visual Regression Testing
+155. API Testing (Postman, REST Assured)
+156. Test Automation Frameworks
+
+### Cloud & Serverless
+157. AWS Lambda & Serverless Expert
+158. Azure Functions & Serverless
+159. Google Cloud Serverless (Run & Functions)
+160. Serverless Framework & IaC
+161. Cloud Architecture Patterns
+162. Multi-Cloud Strategies
+163. Cloud Cost Optimization (FinOps)
+164. Cloud Security Architecture
+165. Edge Computing & CDN
+166. Advanced AWS Integration (EventBridge, Step Functions)
+
+### Antigravity Workflows (Special)
+167. Antigravity Workflow Fundamentals
+168. Git Feature Branch Workflow
+169. React Component Scaffolding Workflow
+170. Dependency Reset Workflow
+171. React Hook Generator Workflow
+172. Unit Test Generator Workflow
+173. HTML Page Creator Workflow
+174. Production Deployment Workflow
+
+### Javascript/React Extras
+175. React Hooks Best Practices
+176. React Performance Optimization
+177. Advanced React Component Patterns
+178. Chrome extension developer
+179. React and modern JavaScript
+180. Node.js backend development
+181. Modern JavaScript ES6+ Best Practices

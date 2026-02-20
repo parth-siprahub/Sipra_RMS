@@ -1,0 +1,57 @@
+﻿ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+   RMS SipraHub ΓÇö Automated E2E Visual Verification
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+
+Γû║ Step 1: Loading Login Page
+  PAGE LOG: [vite] connecting...
+  PAGE LOG: [vite] connected.
+  PAGE LOG: %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+  PAGE LOG: [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o
+  ≡ƒô╕ Screenshot saved: C:\Users\parth\rms_screenshots\01_login_page.png
+  Γ£à PASS: Login page loaded with email/password fields
+
+Γû║ Step 2: Logging In
+  PAGE LOG: Access to fetch at 'http://localhost:8000/auth/login' from origin 'http://127.0.0.1:5173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+  PAGE LOG: Failed to load resource: net::ERR_FAILED
+  PAGE LOG: TypeError: Failed to fetch
+    at handleSubmit (http://127.0.0.1:5173/src/pages/Login.tsx:28:30)
+    at executeDispatch (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:13622:11)
+    at runWithFiberInDEV (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:997:72)
+    at processDispatchQueue (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:13658:37)
+    at http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:14071:11
+    at batchedUpdates$1 (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:2626:42)
+    at dispatchEventForPluginEventSystem (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:13763:9)
+    at dispatchEvent (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:16784:13)
+    at dispatchDiscreteEvent (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:16765:62)
+  ΓÜá Failed with admin@siprarms.com, trying next...
+  PAGE LOG: Access to fetch at 'http://localhost:8000/auth/login' from origin 'http://127.0.0.1:5173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+  PAGE LOG: Failed to load resource: net::ERR_FAILED
+  PAGE LOG: TypeError: Failed to fetch
+    at handleSubmit (http://127.0.0.1:5173/src/pages/Login.tsx:28:30)
+    at executeDispatch (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:13622:11)
+    at runWithFiberInDEV (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:997:72)
+    at processDispatchQueue (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:13658:37)
+    at http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:14071:11
+    at batchedUpdates$1 (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:2626:42)
+    at dispatchEventForPluginEventSystem (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:13763:9)
+    at dispatchEvent (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:16784:13)
+    at dispatchDiscreteEvent (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=dea27a19:16765:62)
+  ΓÜá Failed with recruiter@siprarms.com, trying next...
+  ≡ƒô╕ Screenshot saved: C:\Users\parth\rms_screenshots\02_post_login_dashboard.png
+  Γ¥î FAIL: Could not login with any credentials. Check if backend is seeded.
+
+Γû║ Step 3: Verifying Dashboard
+  Γ¥î FAIL: Sidebar not visible
+  ≡ƒô╕ Screenshot saved: C:\Users\parth\rms_screenshots\03_dashboard_loaded.png
+
+Γû║ Step 4: Navigating to Resource Requests
+  PAGE LOG: [vite] connecting...
+  PAGE LOG: [vite] connected.
+  PAGE LOG: %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+  PAGE LOG: [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o
+  ≡ƒô╕ Screenshot saved: C:\Users\parth\rms_screenshots\04_resource_requests_page.png
+  Γ¥î FAIL: Resource Requests heading not found
+  Γ¥î FAIL: "New Request" button not found
+
+Γû║ Step 5: Creating a Resource Request
+  ≡ƒô╕ Screenshot saved: C:\Users\parth\rms_screenshots\05_error_state.png
