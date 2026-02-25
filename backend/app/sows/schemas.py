@@ -17,6 +17,7 @@ class SowUpdate(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     max_resources: int | None = None
+    is_active: bool | None = None
 
 
 class SowResponse(BaseModel):
@@ -26,4 +27,5 @@ class SowResponse(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     max_resources: int | None = None
+    is_active: bool | None = None
     created_at: datetime | None = None

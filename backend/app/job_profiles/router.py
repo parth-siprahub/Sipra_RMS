@@ -12,14 +12,14 @@ router = APIRouter(prefix="/job-profiles", tags=["Job Profiles"])
 
 
 @router.get("/", response_model=list[JobProfileResponse])
-async def list_job_profiles(current_user: dict = Depends(get_current_user)):
+def list_job_profiles(current_user: dict = Depends(get_current_user)):
     client = get_supabase_admin()
     result = client.table("job_profiles").select("*").order("role_name").execute()
     return result.data
 
 
 @router.post("/", response_model=JobProfileResponse, status_code=status.HTTP_201_CREATED)
-async def create_job_profile(
+def create_job_profile(
     payload: JobProfileCreate,
     current_user: dict = Depends(require_admin),
 ):
@@ -33,7 +33,7 @@ async def create_job_profile(
 
 
 @router.get("/{profile_id}", response_model=JobProfileResponse)
-async def get_job_profile(profile_id: int, current_user: dict = Depends(get_current_user)):
+def get_job_profile(profile_id: int, current_user: dict = Depends(get_current_user)):
     client = get_supabase_admin()
     result = client.table("job_profiles").select("*").eq("id", profile_id).single().execute()
     if not result.data:
@@ -42,7 +42,7 @@ async def get_job_profile(profile_id: int, current_user: dict = Depends(get_curr
 
 
 @router.put("/{profile_id}", response_model=JobProfileResponse)
-async def update_job_profile(
+def update_job_profile(
     profile_id: int,
     payload: JobProfileUpdate,
     current_user: dict = Depends(require_admin),
@@ -58,7 +58,7 @@ async def update_job_profile(
 
 
 @router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_job_profile(
+def delete_job_profile(
     profile_id: int,
     current_user: dict = Depends(require_admin),
 ):

@@ -1,0 +1,133 @@
+INFO:     127.0.0.1:61050 - "OPTIONS /auth/login HTTP/1.1" 200 OK
+INCOMING REQUEST: POST http://localhost:8000/auth/login
+OUTGOING RESPONSE: 200 http://localhost:8000/auth/login
+INFO:     127.0.0.1:61050 - "POST /auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61050 - "OPTIONS /dashboard/metrics/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60192 - "OPTIONS /dashboard/metrics/ HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/dashboard/metrics/
+OUTGOING RESPONSE: 307 http://localhost:8000/dashboard/metrics/
+INFO:     127.0.0.1:55363 - "GET /dashboard/metrics/ HTTP/1.1" 307 Temporary Redirect
+INCOMING REQUEST: GET http://localhost:8000/dashboard/metrics/
+OUTGOING RESPONSE: 307 http://localhost:8000/dashboard/metrics/
+INFO:     127.0.0.1:55363 - "GET /dashboard/metrics/ HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:60192 - "OPTIONS /dashboard/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55363 - "OPTIONS /dashboard/metrics HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/dashboard/metrics
+OUTGOING RESPONSE: 200 http://localhost:8000/dashboard/metrics
+INFO:     127.0.0.1:61050 - "GET /dashboard/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55363 - "OPTIONS /sows/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60192 - "OPTIONS /sows/ HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/dashboard/metrics
+INCOMING REQUEST: GET http://localhost:8000/sows/
+OUTGOING RESPONSE: 200 http://localhost:8000/dashboard/metrics
+INFO:     127.0.0.1:61050 - "GET /dashboard/metrics HTTP/1.1" 200 OK
+OUTGOING RESPONSE: 200 http://localhost:8000/sows/
+INFO:     127.0.0.1:55363 - "GET /sows/ HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/sows/
+OUTGOING RESPONSE: 200 http://localhost:8000/sows/
+INFO:     127.0.0.1:61050 - "GET /sows/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55363 - "OPTIONS /requests/ HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/requests/
+DEBUG: list_requests starting
+DEBUG: client obtained
+DEBUG: query prepared, executing status=None
+DEBUG: query finished, rows=13
+OUTGOING RESPONSE: 200 http://localhost:8000/requests/
+INFO:     127.0.0.1:61050 - "GET /requests/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60195 - "OPTIONS /auth/login HTTP/1.1" 200 OK
+INCOMING REQUEST: POST http://localhost:8000/auth/login
+OUTGOING RESPONSE: 200 http://localhost:8000/auth/login
+INFO:     127.0.0.1:60195 - "POST /auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60195 - "OPTIONS /dashboard/metrics/ HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/dashboard/metrics/
+OUTGOING RESPONSE: 307 http://localhost:8000/dashboard/metrics/
+INFO:     127.0.0.1:54437 - "GET /dashboard/metrics/ HTTP/1.1" 307 Temporary Redirect
+INCOMING REQUEST: GET http://localhost:8000/dashboard/metrics/
+OUTGOING RESPONSE: 307 http://localhost:8000/dashboard/metrics/
+INFO:     127.0.0.1:54437 - "GET /dashboard/metrics/ HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:54437 - "OPTIONS /dashboard/metrics HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/dashboard/metrics
+OUTGOING RESPONSE: 200 http://localhost:8000/dashboard/metrics
+INFO:     127.0.0.1:60195 - "GET /dashboard/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54437 - "OPTIONS /sows/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61734 - "OPTIONS /sows/ HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/dashboard/metrics
+INCOMING REQUEST: GET http://localhost:8000/sows/
+OUTGOING RESPONSE: 200 http://localhost:8000/dashboard/metrics
+INFO:     127.0.0.1:60195 - "GET /dashboard/metrics HTTP/1.1" 200 OK
+OUTGOING RESPONSE: 200 http://localhost:8000/sows/
+INFO:     127.0.0.1:54437 - "GET /sows/ HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/sows/
+OUTGOING RESPONSE: 200 http://localhost:8000/sows/
+INFO:     127.0.0.1:60195 - "GET /sows/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54437 - "OPTIONS /candidates/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61734 - "OPTIONS /candidates/ HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/candidates/
+OUTGOING RESPONSE: 200 http://localhost:8000/candidates/
+INFO:     127.0.0.1:64928 - "GET /candidates/ HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/candidates/
+OUTGOING RESPONSE: 200 http://localhost:8000/candidates/
+INFO:     127.0.0.1:61734 - "GET /candidates/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64928 - "OPTIONS /requests/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54437 - "OPTIONS /job-profiles/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60195 - "OPTIONS /requests/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49554 - "OPTIONS /job-profiles/ HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/requests/
+DEBUG: list_requests starting
+DEBUG: client obtained
+DEBUG: query prepared, executing status=None
+DEBUG: query finished, rows=13
+INCOMING REQUEST: GET http://localhost:8000/job-profiles/
+OUTGOING RESPONSE: 200 http://localhost:8000/requests/
+INFO:     127.0.0.1:61734 - "GET /requests/ HTTP/1.1" 200 OK
+OUTGOING RESPONSE: 200 http://localhost:8000/job-profiles/
+INFO:     127.0.0.1:64928 - "GET /job-profiles/ HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/requests/
+DEBUG: list_requests starting
+DEBUG: client obtained
+DEBUG: query prepared, executing status=None
+DEBUG: query finished, rows=13
+OUTGOING RESPONSE: 200 http://localhost:8000/requests/
+INFO:     127.0.0.1:49554 - "GET /requests/ HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/job-profiles/
+INCOMING REQUEST: GET http://localhost:8000/sows/
+OUTGOING RESPONSE: 200 http://localhost:8000/job-profiles/
+OUTGOING RESPONSE: 200 http://localhost:8000/sows/
+INFO:     127.0.0.1:52660 - "OPTIONS /auth/login HTTP/1.1" 200 OK
+INCOMING REQUEST: POST http://localhost:8000/auth/login
+OUTGOING RESPONSE: 200 http://localhost:8000/auth/login
+INFO:     127.0.0.1:52660 - "POST /auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52660 - "OPTIONS /dashboard/metrics/ HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/dashboard/metrics/
+OUTGOING RESPONSE: 307 http://localhost:8000/dashboard/metrics/
+INFO:     127.0.0.1:61339 - "GET /dashboard/metrics/ HTTP/1.1" 307 Temporary Redirect
+INCOMING REQUEST: GET http://localhost:8000/dashboard/metrics/
+OUTGOING RESPONSE: 307 http://localhost:8000/dashboard/metrics/
+INFO:     127.0.0.1:61339 - "GET /dashboard/metrics/ HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:61339 - "OPTIONS /dashboard/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52660 - "OPTIONS /dashboard/metrics HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/dashboard/metrics
+OUTGOING RESPONSE: 200 http://localhost:8000/dashboard/metrics
+INFO:     127.0.0.1:61706 - "GET /dashboard/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52660 - "OPTIONS /sows/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61339 - "OPTIONS /requests/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52228 - "OPTIONS /candidates/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54201 - "OPTIONS /sows/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49627 - "OPTIONS /requests/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61706 - "OPTIONS /candidates/ HTTP/1.1" 200 OK
+INCOMING REQUEST: GET http://localhost:8000/dashboard/metrics
+INCOMING REQUEST: GET http://localhost:8000/sows/
+INCOMING REQUEST: GET http://localhost:8000/requests/
+DEBUG: list_requests starting
+DEBUG: client obtained
+DEBUG: query prepared, executing status=None
+DEBUG: query finished, rows=13
+INCOMING REQUEST: GET http://localhost:8000/candidates/
+OUTGOING RESPONSE: 200 http://localhost:8000/dashboard/metrics
+INFO:     127.0.0.1:52660 - "GET /dashboard/metrics HTTP/1.1" 200 OK
+OUTGOING RESPONSE: 200 http://localhost:8000/sows/
+INFO:     127.0.0.1:61339 - "GET /sows/ HTTP/1.1" 200 OK
+OUTGOING RESPONSE: 200 http://localhost:8000/requests/
+INFO:     127.0.0.1:52228 - "GET /requests/ HTTP/1.1" 200 OK
+OUTGOING RESPONSE: 200 http://localhost:8000/candidates/
+INFO:     127.0.0.1:54201 - "GET /candidates/ HTTP/1.1" 200 OK
