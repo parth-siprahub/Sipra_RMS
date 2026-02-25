@@ -292,14 +292,50 @@ async function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
             pass('Status filter applied to Candidates table');
         }
 
-        // ─── Final: Back to Dashboard ─────────────────────────────────────────────
-        log('Step 11: Final Dashboard View');
-        const dashLink = page.locator('a[href="/"], a[href*="dashboard"], a:has-text("Dashboard")').first();
-        if (await dashLink.isVisible()) {
-            await dashLink.click();
-            await delay(1000);
+        // ─── Step 12: SOW Management ─────────────────────────────────────────────
+        log('Step 12: Navigating to SOW Management');
+        const sowLink = page.locator('a[href*="sows"], a:has-text("SOW")').first();
+        if (await sowLink.isVisible()) {
+            await sowLink.click();
+            await delay(1200);
+            pass('Clicked SOWs link');
+        } else {
+            await page.goto(`${BASE_URL}/sows`, { waitUntil: 'networkidle' });
+            await delay(1200);
         }
-        await screenshot(page, 'final_dashboard');
+        await screenshot(page, 'sows_page');
+        const sowHeading = page.locator('h1:has-text("Statement of Work")');
+        if (await sowHeading.isVisible()) pass('SOW page heading found');
+
+        // ─── Step 13: Job Profiles ──────────────────────────────────────────────
+        log('Step 13: Navigating to Job Profiles');
+        const jpLink = page.locator('a[href*="job-profiles"], a:has-text("Job Profiles")').first();
+        if (await jpLink.isVisible()) {
+            await jpLink.click();
+            await delay(1200);
+            pass('Clicked Job Profiles link');
+        } else {
+            await page.goto(`${BASE_URL}/job-profiles`, { waitUntil: 'networkidle' });
+            await delay(1200);
+        }
+        await screenshot(page, 'job_profiles_page');
+        const jpHeading = page.locator('h1:has-text("Job Profiles")');
+        if (await jpHeading.isVisible()) pass('Job Profiles page heading found');
+
+        // ─── Step 14: Communication Logs ────────────────────────────────────────
+        log('Step 14: Navigating to Communication Logs');
+        const logLink = page.locator('a[href*="logs"], a:has-text("Logs")').first();
+        if (await logLink.isVisible()) {
+            await logLink.click();
+            await delay(1200);
+            pass('Clicked Communication Logs link');
+        } else {
+            await page.goto(`${BASE_URL}/logs`, { waitUntil: 'networkidle' });
+            await delay(1200);
+        }
+        await screenshot(page, 'comm_logs_page');
+        const logsHeading = page.locator('h1:has-text("Communication History")');
+        if (await logsHeading.isVisible()) pass('Communication Logs page heading found');
 
         // ─── Summary ──────────────────────────────────────────────────────────────
         console.log('\n═══════════════════════════════════════════════════════════');
@@ -308,9 +344,9 @@ async function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
         console.log(`   Total screenshots: ${ssCount}`);
         console.log('═══════════════════════════════════════════════════════════');
 
-        // Keep browser open for 10 seconds so user can review
-        console.log('\n   Browser will remain open for 10 seconds...');
-        await delay(10000);
+        // Keep browser open for 15 seconds so user can review
+        console.log('\n   Browser will remain open for 15 seconds...');
+        await delay(15000);
 
     } catch (err) {
         console.error('\n💥 Unexpected error:', err.message);

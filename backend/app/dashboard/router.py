@@ -7,7 +7,7 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
 @router.get("/metrics")
-async def get_metrics(current_user: dict = Depends(get_current_user)):
+def get_metrics(current_user: dict = Depends(get_current_user)):
     """Return aggregated dashboard metrics."""
     client = get_supabase_admin()
 

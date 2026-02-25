@@ -13,6 +13,8 @@ import type {
 import { Modal } from '../components/ui/Modal';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
+import { sowApi, type SOW } from '../api/sows';
+import { jobProfileApi, type JobProfile } from '../api/jobProfiles';
 
 // ─── Status Transition Map ────────────────────────────────────────────────────
 const STATUS_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
@@ -81,18 +83,46 @@ interface CreateModalProps {
 }
 
 function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
+    const [sows, setSows] = useState<SOW[]>([]);
+    const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
+    const [sowId, setSowId] = useState<number | ''>('');
+    const [jobProfileId, setJobProfileId] = useState<number | ''>('');
     const [priority, setPriority] = useState<RequestPriority>('MEDIUM');
     const [source, setSource] = useState<RequestSource | ''>('');
     const [isBackfill, setIsBackfill] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
+    useEffect(() => {
+        if (isOpen) {
+            const fetchData = async () => {
+                try {
+                    const [sowsRes, profilesRes] = await Promise.all([
+                        sowApi.list(),
+                        jobProfileApi.list()
+                    ]);
+                    setSows(sowsRes.filter(s => s.is_active !== false));
+                    setJobProfiles(profilesRes);
+                } catch (error) {
+                    console.error('Failed to fetch master data:', error);
+                }
+            };
+            fetchData();
+        }
+    }, [isOpen]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!sowId || !jobProfileId) {
+            toast.error('SOW and Job Profile are required');
+            return;
+        }
         setSubmitting(true);
         try {
             const payload: CreateResourceRequestPayload = {
                 priority,
                 is_backfill: isBackfill,
+                sow_id: Number(sowId),
+                job_profile_id: Number(jobProfileId),
                 ...(source ? { source } : {}),
             };
             await resourceRequestsApi.create(payload);
@@ -100,6 +130,8 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
             onCreated();
             onClose();
             // reset
+            setSowId('');
+            setJobProfileId('');
             setPriority('MEDIUM');
             setSource('');
             setIsBackfill(false);
@@ -113,6 +145,48 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="New Resource Request">
             <form onSubmit={handleSubmit} className="space-y-5">
+                {/* SOW Selection */}
+                <div>
+                    <label className="input-label" htmlFor="rr-sow">
+                        Statement of Work (SOW) <span className="text-danger">*</span>
+                    </label>
+                    <select
+                        id="rr-sow"
+                        className="input-field"
+                        value={sowId}
+                        onChange={(e) => setSowId(e.target.value ? Number(e.target.value) : '')}
+                        required
+                    >
+                        <option value="">— Select SOW —</option>
+                        {sows.map((s) => (
+                            <option key={s.id} value={s.id}>
+                                {s.sow_number} - {s.client_name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Job Profile Selection */}
+                <div>
+                    <label className="input-label" htmlFor="rr-profile">
+                        Job Profile <span className="text-danger">*</span>
+                    </label>
+                    <select
+                        id="rr-profile"
+                        className="input-field"
+                        value={jobProfileId}
+                        onChange={(e) => setJobProfileId(e.target.value ? Number(e.target.value) : '')}
+                        required
+                    >
+                        <option value="">— Select Profile —</option>
+                        {jobProfiles.map((p) => (
+                            <option key={p.id} value={p.id}>
+                                {p.role_name} ({p.technology})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
                 {/* Priority */}
                 <div>
                     <label className="input-label" htmlFor="rr-priority">
@@ -199,6 +273,8 @@ export function ResourceRequests() {
     const [requests, setRequests] = useState<ResourceRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
+    const [sows, setSows] = useState<SOW[]>([]);
 
     // Filters
     const [statusFilter, setStatusFilter] = useState('');
@@ -207,11 +283,17 @@ export function ResourceRequests() {
     const fetchRequests = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await resourceRequestsApi.list({
-                ...(statusFilter ? { status: statusFilter } : {}),
-                ...(priorityFilter ? { priority: priorityFilter } : {}),
-            });
-            setRequests(data);
+            const [reqData, profilesRes, sowsRes] = await Promise.all([
+                resourceRequestsApi.list({
+                    ...(statusFilter ? { status: statusFilter } : {}),
+                    ...(priorityFilter ? { priority: priorityFilter } : {}),
+                }),
+                jobProfileApi.list(),
+                sowApi.list()
+            ]);
+            setRequests(reqData);
+            setJobProfiles(profilesRes);
+            setSows(sowsRes);
         } catch {
             // error toast handled globally
         } finally {
@@ -335,10 +417,11 @@ export function ResourceRequests() {
                             <thead>
                                 <tr>
                                     <th>Request ID</th>
+                                    <th>SOW / Client</th>
+                                    <th>Role / Profile</th>
                                     <th>Priority</th>
                                     <th>Status</th>
                                     <th>Source</th>
-                                    <th>Backfill</th>
                                     <th>Created</th>
                                 </tr>
                             </thead>
@@ -351,6 +434,26 @@ export function ResourceRequests() {
                                             </span>
                                         </td>
                                         <td>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-text">
+                                                    {sows.find(s => s.id === req.sow_id)?.sow_number || 'Internal'}
+                                                </span>
+                                                <span className="text-xs text-text-muted">
+                                                    {sows.find(s => s.id === req.sow_id)?.client_name || '—'}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-text">
+                                                    {jobProfiles.find(p => p.id === req.job_profile_id)?.role_name || 'Unknown Role'}
+                                                </span>
+                                                <span className="text-xs text-text-muted">
+                                                    {jobProfiles.find(p => p.id === req.job_profile_id)?.technology || '—'}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td>
                                             <StatusBadge value={req.priority} type="priority" />
                                         </td>
                                         <td>
@@ -361,14 +464,9 @@ export function ResourceRequests() {
                                         </td>
                                         <td className="text-text-muted">{req.source ?? '—'}</td>
                                         <td>
-                                            {req.is_backfill ? (
-                                                <span className="badge badge-warning">Backfill</span>
-                                            ) : (
-                                                <span className="text-text-muted text-sm">No</span>
-                                            )}
-                                        </td>
-                                        <td className="text-text-muted text-sm">
-                                            {formatDate(req.created_at)}
+                                            <span className="text-xs text-text-muted">
+                                                {req.created_at ? new Date(req.created_at).toLocaleDateString() : '—'}
+                                            </span>
                                         </td>
                                     </tr>
                                 ))}
