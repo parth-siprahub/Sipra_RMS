@@ -39,16 +39,21 @@ class ApiClient {
             }
         }
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
         const config: RequestInit = {
             ...init,
             headers: {
                 ...this.getHeaders(),
                 ...init.headers,
             },
+            signal: controller.signal,
         };
 
         try {
             const response = await fetch(url, config);
+            clearTimeout(timeoutId);
 
             // Handle 401 Unauthorized globally
             if (response.status === 401) {
@@ -81,8 +86,15 @@ class ApiClient {
             return {} as T;
 
         } catch (error) {
-            if (error instanceof Error && error.message !== 'Unauthorized') {
-                toast.error(error.message);
+            if (error instanceof Error) {
+                if (error.name === 'AbortError') {
+                    const msg = 'Request timed out (30s). The server might be busy.';
+                    toast.error(msg);
+                    throw new Error(msg);
+                }
+                if (error.message !== 'Unauthorized') {
+                    toast.error(error.message);
+                }
             }
             throw error;
         }

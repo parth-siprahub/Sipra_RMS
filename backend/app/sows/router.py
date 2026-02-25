@@ -8,14 +8,14 @@ router = APIRouter(prefix="/sows", tags=["SOWs"])
 
 
 @router.get("/", response_model=list[SowResponse])
-async def list_sows(current_user: dict = Depends(get_current_user)):
+def list_sows(current_user: dict = Depends(get_current_user)):
     client = get_supabase_admin()
     result = client.table("sows").select("*").order("created_at", desc=True).execute()
     return result.data
 
 
 @router.post("/", response_model=SowResponse, status_code=status.HTTP_201_CREATED)
-async def create_sow(
+def create_sow(
     payload: SowCreate,
     current_user: dict = Depends(require_admin),
 ):
@@ -30,7 +30,7 @@ async def create_sow(
 
 
 @router.get("/{sow_id}", response_model=SowResponse)
-async def get_sow(sow_id: int, current_user: dict = Depends(get_current_user)):
+def get_sow(sow_id: int, current_user: dict = Depends(get_current_user)):
     client = get_supabase_admin()
     result = client.table("sows").select("*").eq("id", sow_id).single().execute()
     if not result.data:
@@ -39,7 +39,7 @@ async def get_sow(sow_id: int, current_user: dict = Depends(get_current_user)):
 
 
 @router.patch("/{sow_id}", response_model=SowResponse)
-async def update_sow(
+def update_sow(
     sow_id: int,
     payload: SowUpdate,
     current_user: dict = Depends(require_admin),

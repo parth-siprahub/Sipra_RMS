@@ -69,9 +69,10 @@ const STAGE_COLORS: Record<string, string> = {
 interface KanbanBoardProps {
     candidates: Candidate[];
     onStatusChange: (id: number, status: CandidateStatus) => void;
+    onCandidateClick: (candidate: Candidate) => void;
 }
 
-function KanbanBoard({ candidates, onStatusChange }: KanbanBoardProps) {
+function KanbanBoard({ candidates, onStatusChange, onCandidateClick }: KanbanBoardProps) {
     const draggingIdRef = useRef<number | null>(null);
     const [draggingId, setDraggingId] = useState<number | null>(null);
 
@@ -139,8 +140,9 @@ function KanbanBoard({ candidates, onStatusChange }: KanbanBoardProps) {
                         onMouseDown={() => handleDragStart(c.id)}
                         onMouseUp={(e) => e.stopPropagation()}
                         onDragEnd={() => { setDraggingId(null); draggingIdRef.current = null; }}
+                        onClick={() => onCandidateClick(c)}
                         className={cn(
-                            'card p-3 cursor-grab active:cursor-grabbing select-none transition-all duration-150',
+                            'card p-3 cursor-grab active:cursor-grabbing select-none transition-all duration-150 hover:border-cta',
                             draggingId === c.id && 'opacity-50 scale-95'
                         )}
                     >
@@ -185,6 +187,200 @@ function KanbanBoard({ candidates, onStatusChange }: KanbanBoardProps) {
     );
 }
 
+// ─── Details Modal ──────────────────────────────────────────────────────────
+
+interface DetailsModalProps {
+    candidate: Candidate | null;
+    isOpen: boolean;
+    onClose: () => void;
+    onUpdated: () => void;
+}
+
+function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated }: DetailsModalProps) {
+    const [activeTab, setActiveTab] = useState<'info' | 'interview' | 'transition'>('info');
+    const [submitting, setSubmitting] = useState(false);
+    const [editForm, setEditForm] = useState<Partial<Candidate>>({});
+
+    useEffect(() => {
+        if (candidate) {
+            setEditForm({
+                l1_feedback: candidate.l1_feedback || '',
+                l1_score: candidate.l1_score || 0,
+                l2_feedback: candidate.l2_feedback || '',
+                l2_score: candidate.l2_score || 0,
+                overlap_until: candidate.overlap_until || '',
+                remarks: candidate.remarks || '',
+            });
+        }
+    }, [candidate]);
+
+    if (!candidate) return null;
+
+    const handleUpdate = async () => {
+        setSubmitting(true);
+        try {
+            await candidatesApi.update(candidate.id, editForm);
+            toast.success('Candidate updated');
+            onUpdated();
+            onClose();
+        } catch {
+            // error
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={`${candidate.first_name} ${candidate.last_name}`}
+            maxWidth="max-w-2xl"
+        >
+            <div className="space-y-6">
+                {/* Tabs */}
+                <div className="flex border-b border-border">
+                    {([
+                        { id: 'info', label: 'Candidate Info' },
+                        { id: 'interview', label: 'Interview Audit' },
+                        { id: 'transition', label: 'Transition' },
+                    ] as const).map((t) => (
+                        <button
+                            key={t.id}
+                            onClick={() => setActiveTab(t.id)}
+                            className={cn(
+                                'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+                                activeTab === t.id
+                                    ? 'border-cta text-cta'
+                                    : 'border-transparent text-text-muted hover:text-text'
+                            )}
+                        >
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Tab Content */}
+                <div className="min-h-[300px]">
+                    {activeTab === 'info' && (
+                        <div className="grid grid-cols-2 gap-6">
+                            <div>
+                                <h4 className="text-xs font-bold text-text-muted uppercase mb-3">Basic Details</h4>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between">
+                                        <span className="text-sm text-text-muted">Email</span>
+                                        <span className="text-sm font-medium text-text">{candidate.email}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-sm text-text-muted">Phone</span>
+                                        <span className="text-sm font-medium text-text">{candidate.phone || '—'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-sm text-text-muted">Vendor</span>
+                                        <span className="badge badge-neutral">{candidate.vendor || 'INTERNAL'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="text-xs font-bold text-text-muted uppercase mb-3">Professional</h4>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between">
+                                        <span className="text-sm text-text-muted">Current Co</span>
+                                        <span className="text-sm font-medium text-text">{candidate.current_company || '—'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-sm text-text-muted">Exp (Total/Rel)</span>
+                                        <span className="text-sm font-medium text-text">
+                                            {candidate.total_experience || 0}y / {candidate.relevant_experience || 0}y
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'interview' && (
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-3">
+                                    <label className="input-label">L1 Feedback</label>
+                                    <textarea
+                                        className="input-field min-h-[100px] text-sm"
+                                        value={editForm.l1_feedback || ''}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, l1_feedback: e.target.value }))}
+                                        placeholder="Enter technical interview notes..."
+                                    />
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-xs font-medium text-text-muted">L1 Score (0-10):</label>
+                                        <input
+                                            type="number"
+                                            className="input-field w-16 py-1 px-2 text-xs"
+                                            min={0} max={10}
+                                            value={editForm.l1_score || 0}
+                                            onChange={(e) => setEditForm(prev => ({ ...prev, l1_score: parseInt(e.target.value) }))}
+                                            title="L1 Score"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    <label className="input-label">L2 Feedback</label>
+                                    <textarea
+                                        className="input-field min-h-[100px] text-sm"
+                                        value={editForm.l2_feedback || ''}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, l2_feedback: e.target.value }))}
+                                        placeholder="Enter client interview notes..."
+                                    />
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-xs font-medium text-text-muted">L2 Score (0-10):</label>
+                                        <input
+                                            type="number"
+                                            className="input-field w-16 py-1 px-2 text-xs"
+                                            min={0} max={10}
+                                            value={editForm.l2_score || 0}
+                                            onChange={(e) => setEditForm(prev => ({ ...prev, l2_score: parseInt(e.target.value) }))}
+                                            title="L2 Score"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'transition' && (
+                        <div className="space-y-4 max-w-sm">
+                            <div>
+                                <label className="input-label">Overlap Until (Transition Period)</label>
+                                <input
+                                    type="date"
+                                    className="input-field"
+                                    value={editForm.overlap_until || ''}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, overlap_until: e.target.value }))}
+                                    title="Overlap Until"
+                                />
+                                <p className="text-[10px] text-text-muted mt-2 px-1">
+                                    Assign a date for the overlap period if this candidate is a backfill.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer Actions */}
+                <div className="flex gap-3 pt-4 border-t border-border">
+                    <button onClick={onClose} className="btn btn-secondary flex-1">Close</button>
+                    <button
+                        onClick={handleUpdate}
+                        className="btn btn-cta flex-1"
+                        disabled={submitting}
+                    >
+                        {submitting ? <span className="spinner w-4 h-4" /> : 'Save Changes'}
+                    </button>
+                </div>
+            </div>
+        </Modal>
+    );
+}
+
 // ─── Create Candidate Modal ───────────────────────────────────────────────────
 
 interface CreateCandidateModalProps {
@@ -202,6 +398,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateMod
     });
 
     const [form, setForm] = useState<CreateCandidatePayload>(emptyForm());
+    const [resumeFile, setResumeFile] = useState<File | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
     const set = (field: keyof CreateCandidatePayload, value: unknown) =>
@@ -211,11 +408,23 @@ function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateMod
         e.preventDefault();
         setSubmitting(true);
         try {
-            await candidatesApi.create(form);
-            toast.success(`${form.first_name} ${form.last_name} added!`);
+            const candidate = await candidatesApi.create(form);
+
+            if (resumeFile && candidate.id) {
+                try {
+                    await candidatesApi.uploadResume(candidate.id, resumeFile);
+                    toast.success('Candidate and Resume added!');
+                } catch (err: any) {
+                    toast.error('Candidate added, but resume upload failed.');
+                }
+            } else {
+                toast.success(`${form.first_name} ${form.last_name} added!`);
+            }
+
             onCreated();
             onClose();
             setForm(emptyForm());
+            setResumeFile(null);
         } catch {
             // toast handled by client.ts
         } finally {
@@ -296,6 +505,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateMod
                             value={form.vendor}
                             onChange={(e) => set('vendor', e.target.value as CandidateVendor)}
                             required
+                            title="Select Vendor"
                         >
                             {(['WRS', 'GFM', 'INTERNAL'] as CandidateVendor[]).map((v) => (
                                 <option key={v} value={v}>
@@ -337,6 +547,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateMod
                             onChange={(e) =>
                                 set('total_experience', e.target.value ? parseFloat(e.target.value) : undefined)
                             }
+                            title="Total Experience"
                         />
                     </div>
                     <div>
@@ -354,6 +565,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateMod
                             onChange={(e) =>
                                 set('relevant_experience', e.target.value ? parseFloat(e.target.value) : undefined)
                             }
+                            title="Relevant Experience"
                         />
                     </div>
                     <div>
@@ -370,6 +582,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateMod
                             onChange={(e) =>
                                 set('notice_period', e.target.value ? parseInt(e.target.value) : undefined)
                             }
+                            title="Notice Period"
                         />
                     </div>
                 </div>
@@ -403,6 +616,20 @@ function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateMod
                     />
                 </div>
 
+                {/* Resume Upload */}
+                <div>
+                    <label className="input-label" htmlFor="c-resume">
+                        Resume (PDF/DOCX, max 5MB)
+                    </label>
+                    <input
+                        id="c-resume"
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        className="input-field py-1"
+                        onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+                    />
+                </div>
+
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">
                     <button
@@ -429,8 +656,10 @@ type ViewMode = 'table' | 'kanban';
 export function Candidates() {
     const [candidates, setCandidates] = useState<Candidate[]>([]);
     const [loading, setLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<ViewMode>('table');
+    const [viewMode, setViewMode] = useState<ViewMode>('kanban'); // Default to kanban for better viz
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [statusFilter, setStatusFilter] = useState('');
 
     const fetchCandidates = useCallback(async () => {
@@ -598,7 +827,11 @@ export function Candidates() {
                                 </thead>
                                 <tbody>
                                     {candidates.map((c) => (
-                                        <tr key={c.id}>
+                                        <tr
+                                            key={c.id}
+                                            className="cursor-pointer hover:bg-surface-hover transition-colors"
+                                            onClick={() => { setSelectedCandidate(c); setIsDetailsOpen(true); }}
+                                        >
                                             <td>
                                                 <div className="font-semibold text-text">
                                                     {c.first_name} {c.last_name}
@@ -630,7 +863,11 @@ export function Candidates() {
                     </p>
                 </>
             ) : (
-                <KanbanBoard candidates={candidates} onStatusChange={handleStatusChange} />
+                <KanbanBoard
+                    candidates={candidates}
+                    onStatusChange={handleStatusChange}
+                    onCandidateClick={(c) => { setSelectedCandidate(c); setIsDetailsOpen(true); }}
+                />
             )}
 
             {/* Create Modal */}
@@ -638,6 +875,14 @@ export function Candidates() {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onCreated={fetchCandidates}
+            />
+
+            {/* Details Modal */}
+            <CandidateDetailsModal
+                candidate={selectedCandidate}
+                isOpen={isDetailsOpen}
+                onClose={() => { setIsDetailsOpen(false); setSelectedCandidate(null); }}
+                onUpdated={fetchCandidates}
             />
         </div>
     );

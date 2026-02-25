@@ -41,7 +41,7 @@ ADMIN_REVIEW_TRANSITIONS = {
 
 
 @router.get("/", response_model=list[CandidateResponse])
-async def list_candidates(
+def list_candidates(
     request_id: int | None = None,
     candidate_status: str | None = Query(None, alias="status"),
     current_user: dict = Depends(get_current_user),
@@ -57,12 +57,12 @@ async def list_candidates(
 
 
 @router.post("/", response_model=CandidateResponse, status_code=status.HTTP_201_CREATED)
-async def create_candidate(
+def create_candidate(
     payload: CandidateCreate,
     current_user: dict = Depends(get_current_user),
 ):
     client = get_supabase_admin()
-    data = payload.model_dump(exclude_none=True)
+    data = payload.model_dump(exclude_none=True, mode="json")
     data["owner_id"] = current_user["id"]
     data["status"] = CandidateStatus.NEW.value
     result = client.table("candidates").insert(data).execute()
@@ -70,7 +70,7 @@ async def create_candidate(
 
 
 @router.get("/{candidate_id}", response_model=CandidateResponse)
-async def get_candidate(candidate_id: int, current_user: dict = Depends(get_current_user)):
+def get_candidate(candidate_id: int, current_user: dict = Depends(get_current_user)):
     client = get_supabase_admin()
     result = client.table("candidates").select("*").eq("id", candidate_id).single().execute()
     if not result.data:
@@ -79,21 +79,15 @@ async def get_candidate(candidate_id: int, current_user: dict = Depends(get_curr
 
 
 @router.patch("/{candidate_id}", response_model=CandidateResponse)
-async def update_candidate(
+def update_candidate(
     candidate_id: int,
     payload: CandidateUpdate,
     current_user: dict = Depends(get_current_user),
 ):
     client = get_supabase_admin()
-    data = payload.model_dump(exclude_none=True)
+    data = payload.model_dump(exclude_none=True, mode="json")
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
-    # Convert date/time fields to string for JSON serialization
-    for key in ("interview_date", "onboarding_date", "last_working_day"):
-        if key in data and data[key] is not None:
-            data[key] = str(data[key])
-    if "interview_time" in data and data["interview_time"] is not None:
-        data["interview_time"] = str(data["interview_time"])
     result = client.table("candidates").update(data).eq("id", candidate_id).execute()
     if not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found")
@@ -101,7 +95,7 @@ async def update_candidate(
 
 
 @router.patch("/{candidate_id}/review", response_model=CandidateResponse)
-async def admin_review_candidate(
+def admin_review_candidate(
     candidate_id: int,
     payload: AdminReview,
     current_user: dict = Depends(require_admin),
@@ -131,7 +125,7 @@ async def admin_review_candidate(
 
 
 @router.patch("/{candidate_id}/exit", response_model=CandidateResponse)
-async def process_exit(
+def process_exit(
     candidate_id: int,
     payload: ExitRequest,
     current_user: dict = Depends(get_current_user),

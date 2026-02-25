@@ -43,6 +43,11 @@ export interface Candidate {
     client_jira_id: string | null;
     exit_reason: string | null;
     last_working_day: string | null;
+    l1_feedback: string | null;
+    l1_score: number | null;
+    l2_feedback: string | null;
+    l2_score: number | null;
+    overlap_until: string | null;
     created_at: string | null;
 }
 
@@ -63,11 +68,22 @@ export interface CreateCandidatePayload {
 
 export const candidatesApi = {
     list: (filters?: { status?: string; request_id?: number }) =>
-        api.get<Candidate[]>('/candidates', filters),
+        api.get<Candidate[]>('/candidates/', filters),
 
     create: (payload: CreateCandidatePayload) =>
-        api.post<Candidate>('/candidates', payload),
+        api.post<Candidate>('/candidates/', payload),
 
     review: (id: number, status: CandidateStatus, remarks?: string) =>
         api.patch<Candidate>(`/candidates/${id}/review`, { status, remarks }),
+
+    uploadResume: (id: number, file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post<{ message: string; resume_url: string; candidate_id: number }>(
+            `/candidates/${id}/resume`,
+            formData
+        );
+    },
+    update: (id: number, payload: Partial<Candidate>) =>
+        api.patch<Candidate>(`/candidates/${id}/`, payload),
 };
