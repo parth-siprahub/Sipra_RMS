@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
+const TOKEN_EXPIRY_MINUTES = 55; // slightly less than backend's 60min to avoid boundary issues
 
 interface UserProfile {
     id: string;
     email: string;
-    role: 'admin' | 'manager' | 'recruiter';
+    role: 'ADMIN' | 'RECRUITER';
     full_name: string;
 }
 
@@ -19,39 +20,49 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function clearAuthStorage() {
+    localStorage.removeItem('rms_access_token');
+    localStorage.removeItem('rms_user_profile');
+    localStorage.removeItem('rms_token_expiry');
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<UserProfile | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    // We can't use useNavigate here directly if AuthProvider is outside Router.
-    // Assuming AuthProvider is wrapped by Router or handles redirection via window or separate effect.
 
     useEffect(() => {
-        // Check for existing token and profile on mount
         const token = localStorage.getItem('rms_access_token');
         const savedUser = localStorage.getItem('rms_user_profile');
+        const expiry = localStorage.getItem('rms_token_expiry');
+
+        // Token expiry check — force logout if token is expired
+        if (expiry && Date.now() > parseInt(expiry)) {
+            clearAuthStorage();
+            setIsLoading(false);
+            return;
+        }
 
         if (token && savedUser) {
             try {
                 setUser(JSON.parse(savedUser));
-            } catch (e) {
-                console.error("Failed to parse user profile", e);
-                localStorage.removeItem('rms_user_profile');
-                localStorage.removeItem('rms_access_token');
+            } catch {
+                clearAuthStorage();
             }
         }
         setIsLoading(false);
     }, []);
 
     const login = (token: string, userData: UserProfile) => {
+        const expiresAt = Date.now() + TOKEN_EXPIRY_MINUTES * 60 * 1000;
         localStorage.setItem('rms_access_token', token);
         localStorage.setItem('rms_user_profile', JSON.stringify(userData));
+        localStorage.setItem('rms_token_expiry', expiresAt.toString());
         setUser(userData);
         toast.success(`Welcome back, ${userData.full_name}`);
     };
 
     const logout = () => {
-        localStorage.removeItem('rms_access_token');
-        localStorage.removeItem('rms_user_profile');
+        clearAuthStorage();
         setUser(null);
         toast.success('Logged out successfully');
         window.location.href = '/login';
@@ -71,3 +82,4 @@ export const useAuth = () => {
     }
     return context;
 };
+

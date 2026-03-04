@@ -315,14 +315,6 @@ export function ResourceRequests() {
         }
     };
 
-    const formatDate = (iso: string | null) => {
-        if (!iso) return '—';
-        return new Date(iso).toLocaleDateString('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-        });
-    };
 
     return (
         <div className="space-y-6">

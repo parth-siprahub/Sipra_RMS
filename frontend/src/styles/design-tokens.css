@@ -139,11 +139,24 @@
   --z-modal: 100;
   --z-toast: 110;
   --z-dropdown: 60;
+  --z-tooltip: 70;
 
-  /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-base: 200ms ease;
-  --transition-slow: 300ms ease;
+  /* === TRANSITIONS === */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* === SIDEBAR (Dark) === */
+  --sidebar-bg: #0F172A;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-text: rgba(148, 163, 184, 1);
+  /* Slate 400 */
+  --sidebar-text-active: rgba(248, 250, 252, 1);
+  /* Slate 50 */
+  --sidebar-item-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-item-active: rgba(22, 163, 74, 0.15);
+  --sidebar-accent: #22C55E;
+  /* Green 500 */
 }
 
 /* =========================================

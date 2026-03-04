@@ -23,7 +23,7 @@ function App() {
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
 
-            {/* Protected Protected */}
+            {/* Protected Routes */}
             <Route path="/" element={
               <ProtectedRoute>
                 <DashboardLayout />
@@ -35,6 +35,7 @@ function App() {
               <Route path="job-profiles" element={<JobProfiles />} />
               <Route path="sows" element={<Sows />} />
               <Route path="communication-logs" element={<CommunicationLogs />} />
+              <Route path="vendors" element={<Vendors />} />
             </Route>
 
             {/* Dashboard alias – direct nav to /dashboard redirects to root */}

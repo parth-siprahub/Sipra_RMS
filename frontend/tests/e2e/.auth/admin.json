@@ -1,0 +1,18 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:5173",
+      "localStorage": [
+        {
+          "name": "rms_access_token",
+          "value": "eyJhbGciOiJFUzI1NiIsImtpZCI6IjU3ZDIzMmExLTVjOTgtNDg4Yi1iYjg5LWIwOWU2NGQzYWVkNyIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL21udmxscnpocXhma2t2Y2ZqZndkLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIzZDMzZTRhNy1kZDllLTRiNmItOTExYS01MTEzMmNlMzEyOTAiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzcyNjAyNjMwLCJpYXQiOjE3NzI1OTkwMzAsImVtYWlsIjoiYWRtaW5Ac2lwcmFybXMuY29tIiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCJdfSwidXNlcl9tZXRhZGF0YSI6eyJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZnVsbF9uYW1lIjoiQWRtaW4iLCJyb2xlIjoiYWRtaW4ifSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc3MjU5OTAzMH1dLCJzZXNzaW9uX2lkIjoiMGVlNDE4NTYtMWY3NS00MWU4LWJhNTktNDk3YzI0Mzk0YzNkIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.zLv5x2BKBuvuq7OB0kSsN7y0wIEDoCtZNMUm3ccnTIalEP0g_AaiLPpOz4Sx1A2AnzZ_xYLvQ5ozQLZliSrFWA"
+        },
+        {
+          "name": "rms_user_profile",
+          "value": "{\"id\":\"3d33e4a7-dd9e-4b6b-911a-51132ce31290\",\"email\":\"admin@siprarms.com\",\"role\":\"ADMIN\",\"full_name\":\"Admin\"}"
+        }
+      ]
+    }
+  ]
+}

@@ -7,18 +7,20 @@ interface RequestOptions extends RequestInit {
 }
 
 class ApiClient {
-    private getHeaders(): HeadersInit {
-        const headers: HeadersInit = {
-            'Content-Type': 'application/json',
-        };
-
-        // Auto-inject token if available
+    private getAuthHeaders(): HeadersInit {
+        const headers: HeadersInit = {};
         const token = localStorage.getItem('rms_access_token');
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
         }
-
         return headers;
+    }
+
+    private getJsonHeaders(): HeadersInit {
+        return {
+            ...this.getAuthHeaders(),
+            'Content-Type': 'application/json',
+        };
     }
 
     private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
@@ -45,7 +47,7 @@ class ApiClient {
         const config: RequestInit = {
             ...init,
             headers: {
-                ...this.getHeaders(),
+                ...this.getJsonHeaders(),
                 ...init.headers,
             },
             signal: controller.signal,
@@ -104,20 +106,33 @@ class ApiClient {
         return this.request<T>(endpoint, { method: 'GET', params });
     }
 
-    post<T>(endpoint: string, body: any) {
+    post<T>(endpoint: string, body: unknown) {
         return this.request<T>(endpoint, { method: 'POST', body: JSON.stringify(body) });
     }
 
-    patch<T>(endpoint: string, body: any) {
+    patch<T>(endpoint: string, body: unknown) {
         return this.request<T>(endpoint, { method: 'PATCH', body: JSON.stringify(body) });
     }
 
-    put<T>(endpoint: string, body: any) {
+    put<T>(endpoint: string, body: unknown) {
         return this.request<T>(endpoint, { method: 'PUT', body: JSON.stringify(body) });
     }
 
     delete<T>(endpoint: string) {
         return this.request<T>(endpoint, { method: 'DELETE' });
+    }
+
+    /**
+     * Upload a file (FormData) — does NOT set Content-Type header
+     * so the browser auto-sets multipart/form-data with boundary.
+     * C1 fix: Previously, upload went through post() which JSON.stringify'd the FormData.
+     */
+    upload<T>(endpoint: string, formData: FormData): Promise<T> {
+        return this.request<T>(endpoint, {
+            method: 'POST',
+            body: formData,
+            headers: this.getAuthHeaders(),  // Auth only, NO Content-Type
+        });
     }
 }
 
