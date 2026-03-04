@@ -13,8 +13,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @router.post("/login", response_model=TokenResponse)
-@limiter.limit("10/minute")   # ← Max 10 login attempts per IP per minute
-async def login(request: Request, body: LoginRequest):
+def login(body: LoginRequest):
     """Authenticate user via Supabase Auth and return JWT."""
     client = get_supabase_admin()
     loop = asyncio.get_event_loop()
@@ -61,7 +60,7 @@ async def login(request: Request, body: LoginRequest):
 
 
 @router.get("/me", response_model=UserProfile)
-async def me(current_user: dict = Depends(get_current_user)):
+def me(current_user: dict = Depends(get_current_user)):
     """Return the current authenticated user's profile."""
     return UserProfile(
         id=current_user["id"],

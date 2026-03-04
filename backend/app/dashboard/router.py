@@ -8,12 +8,9 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
 @router.get("/metrics")
-async def get_metrics(current_user: dict = Depends(get_current_user)):
-    """Return aggregated dashboard metrics with caching."""
-    cache_key = "dashboard_metrics_v2"
-    cached_data = api_cache.get(cache_key)
-    if cached_data:
-        return cached_data
+def get_metrics(current_user: dict = Depends(get_current_user)):
+    """Return aggregated dashboard metrics."""
+    client = get_supabase_admin()
 
     client = await get_supabase_admin_async()
 

@@ -8,21 +8,15 @@ from app.utils.cache import api_cache
 router = APIRouter(prefix="/sows", tags=["SOWs"])
 
 
-@router.get("", response_model=list[SowResponse])
-async def list_sows(current_user: dict = Depends(get_current_user)):
-    cache_key = "sows_list"
-    cached = api_cache.get(cache_key)
-    if cached:
-        return cached
-
-    client = await get_supabase_admin_async()
-    result = await client.table("sows").select("*").order("created_at", desc=True).execute()
-    api_cache.set(cache_key, result.data)
+@router.get("/", response_model=list[SowResponse])
+def list_sows(current_user: dict = Depends(get_current_user)):
+    client = get_supabase_admin()
+    result = client.table("sows").select("*").order("created_at", desc=True).execute()
     return result.data
 
 
-@router.post("", response_model=SowResponse, status_code=status.HTTP_201_CREATED)
-async def create_sow(
+@router.post("/", response_model=SowResponse, status_code=status.HTTP_201_CREATED)
+def create_sow(
     payload: SowCreate,
     current_user: dict = Depends(require_admin),
 ):
@@ -39,16 +33,16 @@ async def create_sow(
 
 
 @router.get("/{sow_id}", response_model=SowResponse)
-async def get_sow(sow_id: int, current_user: dict = Depends(get_current_user)):
-    client = await get_supabase_admin_async()
-    result = await client.table("sows").select("*").eq("id", sow_id).single().execute()
+def get_sow(sow_id: int, current_user: dict = Depends(get_current_user)):
+    client = get_supabase_admin()
+    result = client.table("sows").select("*").eq("id", sow_id).single().execute()
     if not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "SOW not found")
     return result.data
 
 
 @router.patch("/{sow_id}", response_model=SowResponse)
-async def update_sow(
+def update_sow(
     sow_id: int,
     payload: SowUpdate,
     current_user: dict = Depends(require_admin),

@@ -52,11 +52,6 @@ export interface Candidate {
     l2_feedback: string | null;
     l2_score: number | null;
     overlap_until: string | null;
-    screening_comment: string | null;
-    vendor_feedback: string | null;
-    offer_date: string | null;
-    expected_joining_date: string | null;
-    offer_status: string | null;
     created_at: string | null;
 }
 
@@ -78,10 +73,10 @@ export interface CreateCandidatePayload {
 
 export const candidatesApi = {
     list: (filters?: { status?: string; request_id?: number }) =>
-        api.get<Candidate[]>('/candidates', filters),
+        api.get<Candidate[]>('/candidates/', filters),
 
     create: (payload: CreateCandidatePayload) =>
-        api.post<Candidate>('/candidates', payload),
+        api.post<Candidate>('/candidates/', payload),
 
     review: (id: number, status: CandidateStatus, remarks?: string) =>
         api.patch<Candidate>(`/candidates/${id}/review`, { status, remarks }),
@@ -89,11 +84,11 @@ export const candidatesApi = {
     uploadResume: (id: number, file: File) => {
         const formData = new FormData();
         formData.append('file', file);
-        return api.upload<{ message: string; resume_url: string; candidate_id: number }>(
+        return api.post<{ message: string; resume_url: string; candidate_id: number }>(
             `/candidates/${id}/resume`,
             formData
         );
     },
     update: (id: number, payload: Partial<Candidate>) =>
-        api.patch<Candidate>(`/candidates/${id}`, payload),
+        api.patch<Candidate>(`/candidates/${id}/`, payload),
 };

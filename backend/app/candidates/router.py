@@ -69,8 +69,8 @@ ADMIN_REVIEW_TRANSITIONS = {
 }
 
 
-@router.get("", response_model=list[CandidateResponse])
-async def list_candidates(
+@router.get("/", response_model=list[CandidateResponse])
+def list_candidates(
     request_id: int | None = None,
     candidate_status: str | None = Query(None, alias="status"),
     current_user: dict = Depends(get_current_user),
@@ -91,12 +91,12 @@ async def list_candidates(
     return result.data
 
 
-@router.post("", response_model=CandidateResponse, status_code=status.HTTP_201_CREATED)
-async def create_candidate(
+@router.post("/", response_model=CandidateResponse, status_code=status.HTTP_201_CREATED)
+def create_candidate(
     payload: CandidateCreate,
     current_user: dict = Depends(get_current_user),
 ):
-    client = await get_supabase_admin_async()
+    client = get_supabase_admin()
     data = payload.model_dump(exclude_none=True, mode="json")
     data["owner_id"] = current_user["id"]
     data["status"] = CandidateStatus.NEW.value
@@ -107,25 +107,25 @@ async def create_candidate(
 
 
 @router.get("/{candidate_id}", response_model=CandidateResponse)
-async def get_candidate(candidate_id: int, current_user: dict = Depends(get_current_user)):
-    client = await get_supabase_admin_async()
-    result = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
+def get_candidate(candidate_id: int, current_user: dict = Depends(get_current_user)):
+    client = get_supabase_admin()
+    result = client.table("candidates").select("*").eq("id", candidate_id).single().execute()
     if not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found")
     return result.data
 
 
 @router.patch("/{candidate_id}", response_model=CandidateResponse)
-async def update_candidate(
+def update_candidate(
     candidate_id: int,
     payload: CandidateUpdate,
     current_user: dict = Depends(get_current_user),
 ):
-    client = await get_supabase_admin_async()
+    client = get_supabase_admin()
     data = payload.model_dump(exclude_none=True, mode="json")
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
-    result = await client.table("candidates").update(data).eq("id", candidate_id).execute()
+    result = client.table("candidates").update(data).eq("id", candidate_id).execute()
     if not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found")
     api_cache.clear_prefix("candidates_")
@@ -134,7 +134,7 @@ async def update_candidate(
 
 
 @router.patch("/{candidate_id}/review", response_model=CandidateResponse)
-async def admin_review_candidate(
+def admin_review_candidate(
     candidate_id: int,
     payload: AdminReview,
     current_user: dict = Depends(get_current_user),
@@ -166,7 +166,7 @@ async def admin_review_candidate(
 
 
 @router.patch("/{candidate_id}/exit", response_model=CandidateResponse)
-async def process_exit(
+def process_exit(
     candidate_id: int,
     payload: ExitRequest,
     current_user: dict = Depends(get_current_user),

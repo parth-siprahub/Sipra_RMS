@@ -1,8 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
 @import './design-tokens.css';
 @import './components.css';
 
-/* Tailwind directives */
+
+
+/* Tailwind directives (optional usage) */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -19,11 +21,12 @@
 }
 
 :root {
-    --font-heading: 'Plus Jakarta Sans', sans-serif;
-    --font-body: 'Plus Jakarta Sans', sans-serif;
+    --font-heading: 'Outfit', sans-serif;
+    --font-body: 'Inter', sans-serif;
 
     font-family: var(--font-body);
     font-size: 15px;
+    /* Slightly more dense for professional apps */
     line-height: 1.6;
     font-weight: 400;
 
@@ -80,7 +83,7 @@ h5,
 h6 {
     font-family: var(--font-heading);
     line-height: 1.25;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.02em;
     margin-bottom: var(--space-md);
     color: var(--color-text);
 }

@@ -21,9 +21,9 @@ export interface JobProfileUpdate {
 }
 
 export const jobProfileApi = {
-    list: () => api.get<JobProfile[]>('/job-profiles'),
-    get: (id: number) => api.get<JobProfile>(`/job-profiles/${id}`),
-    create: (data: JobProfileCreate) => api.post<JobProfile>('/job-profiles', data),
-    update: (id: number, data: JobProfileUpdate) => api.put<JobProfile>(`/job-profiles/${id}`, data),
-    delete: (id: number) => api.delete<void>(`/job-profiles/${id}`),
+    list: () => api.get<JobProfile[]>('/job-profiles/'),
+    get: (id: number) => api.get<JobProfile>(`/job-profiles/${id}/`),
+    create: (data: JobProfileCreate) => api.post<JobProfile>('/job-profiles/', data),
+    update: (id: number, data: JobProfileUpdate) => api.put<JobProfile>(`/job-profiles/${id}/`, data),
+    delete: (id: number) => api.delete<void>(`/job-profiles/${id}/`),
 };

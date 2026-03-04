@@ -77,11 +77,6 @@ class CandidateUpdate(BaseModel):
     l2_feedback: str | None = None
     l2_score: int | None = None
     overlap_until: date | None = None
-    screening_comment: str | None = None
-    vendor_feedback: str | None = None
-    offer_date: date | None = None
-    expected_joining_date: date | None = None
-    offer_status: str | None = None
 
 
 class AdminReview(BaseModel):
@@ -131,9 +126,4 @@ class CandidateResponse(BaseModel):
     l2_feedback: str | None = None
     l2_score: int | None = None
     overlap_until: date | None = None
-    screening_comment: str | None = None
-    vendor_feedback: str | None = None
-    offer_date: date | None = None
-    expected_joining_date: date | None = None
-    offer_status: str | None = None
     created_at: datetime | None = None
