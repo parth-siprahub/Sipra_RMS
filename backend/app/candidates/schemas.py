@@ -4,10 +4,7 @@ from datetime import datetime, date, time
 from enum import Enum
 
 
-class CandidateVendor(str, Enum):
-    WRS = "WRS"
-    GFM = "GFM"
-    INTERNAL = "INTERNAL"
+
 
 
 class CandidateStatus(str, Enum):
@@ -16,11 +13,16 @@ class CandidateStatus(str, Enum):
     WITH_ADMIN = "WITH_ADMIN"
     REJECTED_BY_ADMIN = "REJECTED_BY_ADMIN"
     WITH_CLIENT = "WITH_CLIENT"
+    L1_SCHEDULED = "L1_SCHEDULED"
+    L1_COMPLETED = "L1_COMPLETED"
+    L1_SHORTLIST = "L1_SHORTLIST"
+    L1_REJECT = "L1_REJECT"
     INTERVIEW_SCHEDULED = "INTERVIEW_SCHEDULED"
     SELECTED = "SELECTED"
     ONBOARDED = "ONBOARDED"
     REJECTED_BY_CLIENT = "REJECTED_BY_CLIENT"
     ON_HOLD = "ON_HOLD"
+    SCREEN_REJECT = "SCREEN_REJECT"
     EXIT = "EXIT"
 
 
@@ -30,7 +32,8 @@ class CandidateCreate(BaseModel):
     last_name: str
     email: str
     phone: str | None = None
-    vendor: CandidateVendor = CandidateVendor.INTERNAL
+    vendor: str | None = None
+    vendor_id: int | None = None
     current_company: str | None = None
     current_ctc: float | None = None
     expected_ctc: float | None = None
@@ -41,6 +44,8 @@ class CandidateCreate(BaseModel):
     relevant_experience: float | None = None
     skills: str | None = None
     remarks: str | None = None
+    screening_comment: str | None = None
+    vendor_feedback: str | None = None
 
 
 class CandidateUpdate(BaseModel):
@@ -48,7 +53,9 @@ class CandidateUpdate(BaseModel):
     last_name: str | None = None
     email: str | None = None
     phone: str | None = None
-    vendor: CandidateVendor | None = None
+    request_id: int | None = None
+    vendor: str | None = None
+    vendor_id: int | None = None
     current_company: str | None = None
     current_ctc: float | None = None
     expected_ctc: float | None = None
@@ -60,6 +67,7 @@ class CandidateUpdate(BaseModel):
     skills: str | None = None
     interview_date: date | None = None
     interview_time: time | None = None
+    status: CandidateStatus | None = None
     remarks: str | None = None
     onboarding_date: date | None = None
     client_email: str | None = None
@@ -93,6 +101,7 @@ class CandidateResponse(BaseModel):
     email: str
     phone: str | None = None
     vendor: str | None = None
+    vendor_id: int | None = None
     current_company: str | None = None
     current_ctc: float | None = None
     expected_ctc: float | None = None

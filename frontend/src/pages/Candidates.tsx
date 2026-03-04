@@ -2,12 +2,14 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Plus, RefreshCw, LayoutGrid, List } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { candidatesApi } from '../api/candidates';
+import { resourceRequestsApi } from '../api/resourceRequests';
 import type {
     Candidate,
     CandidateStatus,
-    CandidateVendor,
     CreateCandidatePayload,
 } from '../api/candidates';
+import type { ResourceRequest } from '../api/resourceRequests';
+import { vendorsApi, type Vendor } from '../api/vendors';
 
 import { Modal } from '../components/ui/Modal';
 import { StatusBadge } from '../components/ui/StatusBadge';
@@ -22,6 +24,9 @@ const PIPELINE_STAGES: CandidateStatus[] = [
     'SUBMITTED_TO_ADMIN',
     'WITH_ADMIN',
     'WITH_CLIENT',
+    'L1_SCHEDULED',
+    'L1_COMPLETED',
+    'L1_SHORTLIST',
     'INTERVIEW_SCHEDULED',
     'SELECTED',
     'ONBOARDED',
@@ -30,6 +35,8 @@ const PIPELINE_STAGES: CandidateStatus[] = [
 const CLOSED_STAGES: CandidateStatus[] = [
     'REJECTED_BY_ADMIN',
     'REJECTED_BY_CLIENT',
+    'SCREEN_REJECT',
+    'L1_REJECT',
     'ON_HOLD',
     'EXIT',
 ];
@@ -41,11 +48,16 @@ const STAGE_LABELS: Record<CandidateStatus, string> = {
     WITH_ADMIN: 'With Admin',
     REJECTED_BY_ADMIN: 'Rejected (Admin)',
     WITH_CLIENT: 'With Client',
+    L1_SCHEDULED: 'L1 Scheduled',
+    L1_COMPLETED: 'L1 Completed',
+    L1_SHORTLIST: 'L1 Shortlist',
+    L1_REJECT: 'L1 Reject',
     INTERVIEW_SCHEDULED: 'Interview',
     SELECTED: 'Selected',
     ONBOARDED: 'Onboarded',
     REJECTED_BY_CLIENT: 'Rejected (Client)',
     ON_HOLD: 'On Hold',
+    SCREEN_REJECT: 'Screen Reject',
     EXIT: 'Exit',
 };
 
@@ -55,11 +67,16 @@ const STAGE_COLORS: Record<string, string> = {
     SUBMITTED_TO_ADMIN: 'border-[#8B5CF6]',
     WITH_ADMIN: 'border-[#F59E0B]',
     WITH_CLIENT: 'border-[#06B6D4]',
+    L1_SCHEDULED: 'border-[#A855F7]',
+    L1_COMPLETED: 'border-[#7C3AED]',
+    L1_SHORTLIST: 'border-[#2DD4BF]',
+    L1_REJECT: 'border-[#F43F5E]',
     INTERVIEW_SCHEDULED: 'border-[#EC4899]',
     SELECTED: 'border-[#22C55E]',
     ONBOARDED: 'border-[#10B981]',
     REJECTED_BY_ADMIN: 'border-[#EF4444]',
     REJECTED_BY_CLIENT: 'border-[#EF4444]',
+    SCREEN_REJECT: 'border-[#DC2626]',
     ON_HOLD: 'border-[#6B7280]',
     EXIT: 'border-[#F97316]',
 };
@@ -153,9 +170,9 @@ function KanbanBoard({ candidates, onStatusChange, onCandidateClick }: KanbanBoa
                         {c.current_company && (
                             <p className="text-xs text-text-muted truncate">{c.current_company}</p>
                         )}
-                        {c.vendor && (
-                            <span className="badge badge-neutral mt-2 text-[10px]">{c.vendor}</span>
-                        )}
+                        <span className="badge badge-neutral mt-2 text-[10px]">
+                            {vendors.find(v => v.id === c.vendor_id)?.name || c.vendor || 'INTERNAL'}
+                        </span>
                     </div>
                 ))}
             </div>
@@ -387,14 +404,17 @@ interface CreateCandidateModalProps {
     isOpen: boolean;
     onClose: () => void;
     onCreated: () => void;
+    requests: ResourceRequest[];
+    vendors: Vendor[];
 }
 
-function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateModalProps) {
+function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors }: CreateCandidateModalProps) {
     const emptyForm = (): CreateCandidatePayload => ({
         first_name: '',
         last_name: '',
         email: '',
-        vendor: 'INTERNAL',
+        vendor_id: undefined,
+        request_id: undefined,
     });
 
     const [form, setForm] = useState<CreateCandidatePayload>(emptyForm());
@@ -435,6 +455,27 @@ function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateMod
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Add Candidate" maxWidth="max-w-xl">
             <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Linked Request Selection */}
+                <div>
+                    <label className="input-label" htmlFor="c-request">
+                        Linked Resource Request
+                    </label>
+                    <select
+                        id="c-request"
+                        className="input-field"
+                        value={form.request_id || ''}
+                        onChange={(e) => set('request_id', e.target.value ? parseInt(e.target.value) : undefined)}
+                        title="Select Request"
+                    >
+                        <option value="">No specific request (Global Pool)</option>
+                        {requests.filter(r => r.status === 'OPEN').map(r => (
+                            <option key={r.id} value={r.id}>
+                                {r.request_display_id} | {r.priority} | {r.sow_id ? 'Client Project' : 'Internal'}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
                 {/* Row: Names */}
                 <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -502,14 +543,15 @@ function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateMod
                         <select
                             id="c-vendor"
                             className="input-field"
-                            value={form.vendor}
-                            onChange={(e) => set('vendor', e.target.value as CandidateVendor)}
+                            value={form.vendor_id || ''}
+                            onChange={(e) => set('vendor_id', e.target.value ? parseInt(e.target.value) : undefined)}
                             required
                             title="Select Vendor"
                         >
-                            {(['WRS', 'GFM', 'INTERNAL'] as CandidateVendor[]).map((v) => (
-                                <option key={v} value={v}>
-                                    {v}
+                            <option value="">— Select —</option>
+                            {vendors.filter(v => v.is_active).map((v) => (
+                                <option key={v.id} value={v.id}>
+                                    {v.name}
                                 </option>
                             ))}
                         </select>
@@ -649,6 +691,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateMod
     );
 }
 
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 type ViewMode = 'table' | 'kanban';
@@ -661,14 +704,22 @@ export function Candidates() {
     const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [statusFilter, setStatusFilter] = useState('');
+    const [requests, setRequests] = useState<ResourceRequest[]>([]);
+    const [vendors, setVendors] = useState<Vendor[]>([]);
 
     const fetchCandidates = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await candidatesApi.list(
-                statusFilter && viewMode === 'table' ? { status: statusFilter } : undefined
-            );
-            setCandidates(data);
+            const [cData, rData, vData] = await Promise.all([
+                candidatesApi.list(
+                    statusFilter && viewMode === 'table' ? { status: statusFilter } : undefined
+                ),
+                resourceRequestsApi.list(),
+                vendorsApi.list()
+            ]);
+            setCandidates(cData);
+            setRequests(rData);
+            setVendors(vData || []);
         } catch {
             // handled globally
         } finally {
@@ -842,7 +893,9 @@ export function Candidates() {
                                             </td>
                                             <td className="text-text-muted text-sm">{c.email}</td>
                                             <td>
-                                                <span className="badge badge-neutral">{c.vendor ?? '—'}</span>
+                                                <span className="badge badge-neutral">
+                                                    {vendors.find(v => v.id === c.vendor_id)?.name || c.vendor || '—'}
+                                                </span>
                                             </td>
                                             <td>
                                                 <StatusBadge value={c.status} type="candidate" />
@@ -875,6 +928,18 @@ export function Candidates() {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onCreated={fetchCandidates}
+                requests={requests}
+                vendors={vendors}
+            />
+
+            {/* Details Modal */}
+            <CandidateDetailsModal
+                candidate={selectedCandidate}
+                isOpen={isDetailsOpen}
+                onClose={() => { setIsDetailsOpen(false); setSelectedCandidate(null); }}
+                onUpdated={fetchCandidates}
+                requests={requests}
+                vendors={vendors}
             />
 
             {/* Details Modal */}

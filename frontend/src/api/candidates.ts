@@ -6,14 +6,17 @@ export type CandidateStatus =
     | 'WITH_ADMIN'
     | 'REJECTED_BY_ADMIN'
     | 'WITH_CLIENT'
+    | 'L1_SCHEDULED'
+    | 'L1_COMPLETED'
+    | 'L1_SHORTLIST'
+    | 'L1_REJECT'
     | 'INTERVIEW_SCHEDULED'
     | 'SELECTED'
     | 'ONBOARDED'
     | 'REJECTED_BY_CLIENT'
     | 'ON_HOLD'
+    | 'SCREEN_REJECT'
     | 'EXIT';
-
-export type CandidateVendor = 'WRS' | 'GFM' | 'INTERNAL';
 
 export interface Candidate {
     id: number;
@@ -23,7 +26,8 @@ export interface Candidate {
     last_name: string;
     email: string;
     phone: string | null;
-    vendor: CandidateVendor | null;
+    vendor: string | null;
+    vendor_id: number | null;
     current_company: string | null;
     current_ctc: number | null;
     expected_ctc: number | null;
@@ -56,7 +60,8 @@ export interface CreateCandidatePayload {
     last_name: string;
     email: string;
     phone?: string;
-    vendor: CandidateVendor;
+    vendor?: string;
+    vendor_id?: number;
     current_company?: string;
     total_experience?: number;
     relevant_experience?: number;
