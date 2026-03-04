@@ -1,0 +1,95 @@
+
+Running 2 tests using 1 worker
+
+✅ Auth state saved
+  ✓  1 [setup] › tests\e2e\auth.setup.ts:5:1 › authenticate as admin (5.4s)
+  ✘  2 [chromium] › tests\e2e\features\candidates.spec.ts:34:5 › Candidates (Kanban Pipeline) › should open Add Candidate modal (9.0s)
+  ✘  3 [chromium] › tests\e2e\features\candidates.spec.ts:34:5 › Candidates (Kanban Pipeline) › should open Add Candidate modal (retry #1) (3.2s)
+
+
+  1) [chromium] › tests\e2e\features\candidates.spec.ts:34:5 › Candidates (Kanban Pipeline) › should open Add Candidate modal 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('text=Add Candidate')
+    Expected: visible
+    Error: strict mode violation: locator('text=Add Candidate') resolved to 3 elements:
+        1) <button id="add-candidate-btn" class="btn btn-cta shrink-0">…</button> aka locator('#add-candidate-btn')
+        2) <h2 id="modal-title" class="text-xl font-bold text-text">Add Candidate</h2> aka getByRole('heading', { name: 'Add Candidate' })
+        3) <button type="submit" class="btn btn-cta flex-1">Add Candidate</button> aka getByLabel('Add Candidate').getByRole('button', { name: 'Add Candidate' })
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('text=Add Candidate')[22m
+
+
+      37 |         await addBtn.click();
+      38 |
+    > 39 |         await expect(page.locator('text=Add Candidate')).toBeVisible({ timeout: 5000 });
+         |                                                          ^
+      40 |         await expect(page.locator('#c-first')).toBeVisible();
+      41 |         await expect(page.locator('#c-last')).toBeVisible();
+      42 |         await expect(page.locator('#c-email')).toBeVisible();
+        at d:\RMS_Siprahub\frontend\tests\e2e\features\candidates.spec.ts:39:58
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\features-candidates-Candid-d54a7-ld-open-Add-Candidate-modal-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\features-candidates-Candid-d54a7-ld-open-Add-Candidate-modal-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\features-candidates-Candid-d54a7-ld-open-Add-Candidate-modal-chromium\error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('text=Add Candidate')
+    Expected: visible
+    Error: strict mode violation: locator('text=Add Candidate') resolved to 3 elements:
+        1) <button id="add-candidate-btn" class="btn btn-cta shrink-0">…</button> aka locator('#add-candidate-btn')
+        2) <h2 id="modal-title" class="text-xl font-bold text-text">Add Candidate</h2> aka getByRole('heading', { name: 'Add Candidate' })
+        3) <button type="submit" class="btn btn-cta flex-1">Add Candidate</button> aka getByLabel('Add Candidate').getByRole('button', { name: 'Add Candidate' })
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('text=Add Candidate')[22m
+
+
+      37 |         await addBtn.click();
+      38 |
+    > 39 |         await expect(page.locator('text=Add Candidate')).toBeVisible({ timeout: 5000 });
+         |                                                          ^
+      40 |         await expect(page.locator('#c-first')).toBeVisible();
+      41 |         await expect(page.locator('#c-last')).toBeVisible();
+      42 |         await expect(page.locator('#c-email')).toBeVisible();
+        at d:\RMS_Siprahub\frontend\tests\e2e\features\candidates.spec.ts:39:58
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\features-candidates-Candid-d54a7-ld-open-Add-Candidate-modal-chromium-retry1\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\features-candidates-Candid-d54a7-ld-open-Add-Candidate-modal-chromium-retry1\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\features-candidates-Candid-d54a7-ld-open-Add-Candidate-modal-chromium-retry1\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\features-candidates-Candid-d54a7-ld-open-Add-Candidate-modal-chromium-retry1\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\features-candidates-Candid-d54a7-ld-open-Add-Candidate-modal-chromium-retry1\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › tests\e2e\features\candidates.spec.ts:34:5 › Candidates (Kanban Pipeline) › should open Add Candidate modal 
+  1 passed (31.5s)
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m
