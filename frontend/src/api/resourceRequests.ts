@@ -28,11 +28,11 @@ export interface CreateResourceRequestPayload {
 
 export const resourceRequestsApi = {
     list: (filters?: { status?: string; priority?: string }) =>
-        api.get<ResourceRequest[]>('/requests/', filters),
+        api.get<ResourceRequest[]>('/requests', filters),
 
     create: (payload: CreateResourceRequestPayload) =>
-        api.post<ResourceRequest>('/requests/', payload),
+        api.post<ResourceRequest>('/requests', payload),
 
     updateStatus: (id: number, status: RequestStatus) =>
-        api.patch<ResourceRequest>(`/requests/${id}/status/`, { status }),
+        api.patch<ResourceRequest>(`/requests/${id}/status`, { status }),
 };

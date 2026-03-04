@@ -2,12 +2,14 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Plus, RefreshCw, LayoutGrid, List } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { candidatesApi } from '../api/candidates';
+import { resourceRequestsApi } from '../api/resourceRequests';
 import type {
     Candidate,
     CandidateStatus,
-    CandidateVendor,
     CreateCandidatePayload,
 } from '../api/candidates';
+import type { ResourceRequest } from '../api/resourceRequests';
+import { vendorsApi, type Vendor } from '../api/vendors';
 
 import { Modal } from '../components/ui/Modal';
 import { StatusBadge } from '../components/ui/StatusBadge';
@@ -22,6 +24,9 @@ const PIPELINE_STAGES: CandidateStatus[] = [
     'SUBMITTED_TO_ADMIN',
     'WITH_ADMIN',
     'WITH_CLIENT',
+    'L1_SCHEDULED',
+    'L1_COMPLETED',
+    'L1_SHORTLIST',
     'INTERVIEW_SCHEDULED',
     'SELECTED',
     'ONBOARDED',
@@ -30,6 +35,8 @@ const PIPELINE_STAGES: CandidateStatus[] = [
 const CLOSED_STAGES: CandidateStatus[] = [
     'REJECTED_BY_ADMIN',
     'REJECTED_BY_CLIENT',
+    'SCREEN_REJECT',
+    'L1_REJECT',
     'ON_HOLD',
     'EXIT',
 ];
@@ -41,11 +48,16 @@ const STAGE_LABELS: Record<CandidateStatus, string> = {
     WITH_ADMIN: 'With Admin',
     REJECTED_BY_ADMIN: 'Rejected (Admin)',
     WITH_CLIENT: 'With Client',
+    L1_SCHEDULED: 'L1 Scheduled',
+    L1_COMPLETED: 'L1 Completed',
+    L1_SHORTLIST: 'L1 Shortlist',
+    L1_REJECT: 'L1 Reject',
     INTERVIEW_SCHEDULED: 'Interview',
     SELECTED: 'Selected',
     ONBOARDED: 'Onboarded',
     REJECTED_BY_CLIENT: 'Rejected (Client)',
     ON_HOLD: 'On Hold',
+    SCREEN_REJECT: 'Screen Reject',
     EXIT: 'Exit',
 };
 
@@ -55,11 +67,16 @@ const STAGE_COLORS: Record<string, string> = {
     SUBMITTED_TO_ADMIN: 'border-[#8B5CF6]',
     WITH_ADMIN: 'border-[#F59E0B]',
     WITH_CLIENT: 'border-[#06B6D4]',
+    L1_SCHEDULED: 'border-[#A855F7]',
+    L1_COMPLETED: 'border-[#7C3AED]',
+    L1_SHORTLIST: 'border-[#2DD4BF]',
+    L1_REJECT: 'border-[#F43F5E]',
     INTERVIEW_SCHEDULED: 'border-[#EC4899]',
     SELECTED: 'border-[#22C55E]',
     ONBOARDED: 'border-[#10B981]',
     REJECTED_BY_ADMIN: 'border-[#EF4444]',
     REJECTED_BY_CLIENT: 'border-[#EF4444]',
+    SCREEN_REJECT: 'border-[#DC2626]',
     ON_HOLD: 'border-[#6B7280]',
     EXIT: 'border-[#F97316]',
 };
@@ -70,9 +87,10 @@ interface KanbanBoardProps {
     candidates: Candidate[];
     onStatusChange: (id: number, status: CandidateStatus) => void;
     onCandidateClick: (candidate: Candidate) => void;
+    vendors: Vendor[];
 }
 
-function KanbanBoard({ candidates, onStatusChange, onCandidateClick }: KanbanBoardProps) {
+function KanbanBoard({ candidates, onStatusChange, onCandidateClick, vendors }: KanbanBoardProps) {
     const draggingIdRef = useRef<number | null>(null);
     const [draggingId, setDraggingId] = useState<number | null>(null);
 
@@ -153,9 +171,9 @@ function KanbanBoard({ candidates, onStatusChange, onCandidateClick }: KanbanBoa
                         {c.current_company && (
                             <p className="text-xs text-text-muted truncate">{c.current_company}</p>
                         )}
-                        {c.vendor && (
-                            <span className="badge badge-neutral mt-2 text-[10px]">{c.vendor}</span>
-                        )}
+                        <span className="badge badge-neutral mt-2 text-[10px]">
+                            {vendors.find(v => v.id === c.vendor_id)?.name || c.vendor || 'INTERNAL'}
+                        </span>
                     </div>
                 ))}
             </div>
@@ -194,9 +212,11 @@ interface DetailsModalProps {
     isOpen: boolean;
     onClose: () => void;
     onUpdated: () => void;
+    requests: ResourceRequest[];
+    vendors: Vendor[];
 }
 
-function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated }: DetailsModalProps) {
+function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, requests, vendors }: DetailsModalProps) {
     const [activeTab, setActiveTab] = useState<'info' | 'interview' | 'transition'>('info');
     const [submitting, setSubmitting] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Candidate>>({});
@@ -204,12 +224,19 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated }: Detail
     useEffect(() => {
         if (candidate) {
             setEditForm({
+                status: candidate.status || 'NEW',
+                request_id: candidate.request_id || null,
                 l1_feedback: candidate.l1_feedback || '',
                 l1_score: candidate.l1_score || 0,
                 l2_feedback: candidate.l2_feedback || '',
                 l2_score: candidate.l2_score || 0,
-                overlap_until: candidate.overlap_until || '',
+                overlap_until: candidate.overlap_until || null,
                 remarks: candidate.remarks || '',
+                screening_comment: candidate.screening_comment || '',
+                vendor_feedback: candidate.vendor_feedback || '',
+                offer_date: candidate.offer_date || null,
+                expected_joining_date: candidate.expected_joining_date || null,
+                offer_status: candidate.offer_status || '',
             });
         }
     }, [candidate]);
@@ -219,7 +246,11 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated }: Detail
     const handleUpdate = async () => {
         setSubmitting(true);
         try {
-            await candidatesApi.update(candidate.id, editForm);
+            const payload = { ...editForm };
+            // Ensure dates are not empty strings
+            if (!payload.overlap_until) payload.overlap_until = null;
+
+            await candidatesApi.update(candidate.id, payload);
             toast.success('Candidate updated');
             onUpdated();
             onClose();
@@ -276,8 +307,16 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated }: Detail
                                         <span className="text-sm font-medium text-text">{candidate.phone || '—'}</span>
                                     </div>
                                     <div className="flex justify-between">
+                                        <span className="text-sm text-text-muted">Linked Request</span>
+                                        <span className="text-sm font-medium text-cta">
+                                            {requests.find(r => r.id === candidate.request_id)?.request_display_id || 'Global'}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
                                         <span className="text-sm text-text-muted">Vendor</span>
-                                        <span className="badge badge-neutral">{candidate.vendor || 'INTERNAL'}</span>
+                                        <span className="badge badge-neutral">
+                                            {vendors.find(v => v.id === candidate.vendor_id)?.name || candidate.vendor || 'UNKNOWN'}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -295,6 +334,53 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated }: Detail
                                         </span>
                                     </div>
                                 </div>
+                            </div>
+                            {/* F5: Screening Comment */}
+                            <div className="col-span-2 border-t border-border pt-4">
+                                <h4 className="text-xs font-bold text-text-muted uppercase mb-3">Screening Assessment</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="input-label" htmlFor="screening-comment">Screening Comment</label>
+                                        <select
+                                            id="screening-comment"
+                                            className="input-field"
+                                            value={editForm.screening_comment || ''}
+                                            onChange={(e) => setEditForm(prev => ({ ...prev, screening_comment: e.target.value }))}
+                                            title="Screening Comment"
+                                        >
+                                            <option value="">— Select —</option>
+                                            <option value="Good Fit">Good Fit</option>
+                                            <option value="Skills Mismatch">Skills Mismatch</option>
+                                            <option value="Overqualified">Overqualified</option>
+                                            <option value="Underqualified">Underqualified</option>
+                                            <option value="Budget Mismatch">Budget Mismatch</option>
+                                            <option value="Location Issue">Location Issue</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                    {editForm.screening_comment === 'Other' && (
+                                        <div>
+                                            <label className="input-label" htmlFor="screening-custom">Custom Comment</label>
+                                            <textarea
+                                                id="screening-custom"
+                                                className="input-field text-sm min-h-[60px]"
+                                                placeholder="Enter custom screening notes..."
+                                                value={editForm.remarks || ''}
+                                                onChange={(e) => setEditForm(prev => ({ ...prev, remarks: e.target.value }))}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            {/* F6: Vendor Feedback */}
+                            <div className="col-span-2 border-t border-border pt-4">
+                                <h4 className="text-xs font-bold text-text-muted uppercase mb-3">Vendor Feedback</h4>
+                                <textarea
+                                    className="input-field text-sm min-h-[80px] w-full"
+                                    placeholder="Paste vendor feedback from email/form..."
+                                    value={editForm.vendor_feedback || ''}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, vendor_feedback: e.target.value }))}
+                                />
                             </div>
                         </div>
                     )}
@@ -316,8 +402,11 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated }: Detail
                                             type="number"
                                             className="input-field w-16 py-1 px-2 text-xs"
                                             min={0} max={10}
-                                            value={editForm.l1_score || 0}
-                                            onChange={(e) => setEditForm(prev => ({ ...prev, l1_score: parseInt(e.target.value) }))}
+                                            value={editForm.l1_score ?? ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setEditForm(prev => ({ ...prev, l1_score: val ? parseInt(val) : 0 }));
+                                            }}
                                             title="L1 Score"
                                         />
                                     </div>
@@ -336,8 +425,11 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated }: Detail
                                             type="number"
                                             className="input-field w-16 py-1 px-2 text-xs"
                                             min={0} max={10}
-                                            value={editForm.l2_score || 0}
-                                            onChange={(e) => setEditForm(prev => ({ ...prev, l2_score: parseInt(e.target.value) }))}
+                                            value={editForm.l2_score ?? ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setEditForm(prev => ({ ...prev, l2_score: val ? parseInt(val) : 0 }));
+                                            }}
                                             title="L2 Score"
                                         />
                                     </div>
@@ -347,20 +439,90 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated }: Detail
                     )}
 
                     {activeTab === 'transition' && (
-                        <div className="space-y-4 max-w-sm">
+                        <div className="space-y-6 max-w-sm">
+                            <div>
+                                <label className="input-label">Linked Resource Request</label>
+                                <select
+                                    className="input-field"
+                                    value={editForm.request_id || ''}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, request_id: e.target.value ? parseInt(e.target.value) : null }))}
+                                    title="Linked Request"
+                                >
+                                    <option value="">Global Pool (No Request)</option>
+                                    {requests.map(r => (
+                                        <option key={r.id} value={r.id}>
+                                            {r.request_display_id} | {r.priority}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="input-label">Pipeline Status</label>
+                                <select
+                                    className="input-field"
+                                    value={editForm.status || candidate.status || 'NEW'}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, status: e.target.value as CandidateStatus }))}
+                                    title="Candidate Status"
+                                >
+                                    {[...PIPELINE_STAGES, ...CLOSED_STAGES].map(s => (
+                                        <option key={s} value={s}>{STAGE_LABELS[s]}</option>
+                                    ))}
+                                </select>
+                            </div>
                             <div>
                                 <label className="input-label">Overlap Until (Transition Period)</label>
                                 <input
                                     type="date"
                                     className="input-field"
-                                    value={editForm.overlap_until || ''}
-                                    onChange={(e) => setEditForm(prev => ({ ...prev, overlap_until: e.target.value }))}
+                                    value={(editForm.overlap_until as string) || ''}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, overlap_until: e.target.value || null }))}
                                     title="Overlap Until"
                                 />
                                 <p className="text-[10px] text-text-muted mt-2 px-1">
                                     Assign a date for the overlap period if this candidate is a backfill.
                                 </p>
                             </div>
+                            {/* F2: Post-Offer Follow-Up — visible when SELECTED */}
+                            {(candidate.status === 'SELECTED' || editForm.status === 'SELECTED') && (
+                                <div className="border-t border-border pt-4 space-y-4">
+                                    <h4 className="text-xs font-bold text-text-muted uppercase">Post-Offer Follow-Up</h4>
+                                    <div>
+                                        <label className="input-label" htmlFor="offer-date">Offer Date</label>
+                                        <input
+                                            id="offer-date"
+                                            type="date"
+                                            className="input-field"
+                                            value={(editForm.offer_date as string) || ''}
+                                            onChange={(e) => setEditForm(prev => ({ ...prev, offer_date: e.target.value || null }))}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="input-label" htmlFor="expected-joining">Expected Joining Date</label>
+                                        <input
+                                            id="expected-joining"
+                                            type="date"
+                                            className="input-field"
+                                            value={(editForm.expected_joining_date as string) || ''}
+                                            onChange={(e) => setEditForm(prev => ({ ...prev, expected_joining_date: e.target.value || null }))}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="input-label" htmlFor="offer-status">Offer Status</label>
+                                        <select
+                                            id="offer-status"
+                                            className="input-field"
+                                            value={editForm.offer_status || ''}
+                                            onChange={(e) => setEditForm(prev => ({ ...prev, offer_status: e.target.value }))}
+                                            title="Offer Status"
+                                        >
+                                            <option value="">— Select —</option>
+                                            <option value="OFFER_EXTENDED">Offer Extended</option>
+                                            <option value="OFFER_ACCEPTED">Offer Accepted</option>
+                                            <option value="OFFER_DECLINED">Offer Declined</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -387,14 +549,17 @@ interface CreateCandidateModalProps {
     isOpen: boolean;
     onClose: () => void;
     onCreated: () => void;
+    requests: ResourceRequest[];
+    vendors: Vendor[];
 }
 
-function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateModalProps) {
+function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors }: CreateCandidateModalProps) {
     const emptyForm = (): CreateCandidatePayload => ({
         first_name: '',
         last_name: '',
         email: '',
-        vendor: 'INTERNAL',
+        vendor_id: undefined,
+        request_id: undefined,
     });
 
     const [form, setForm] = useState<CreateCandidatePayload>(emptyForm());
@@ -435,6 +600,27 @@ function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateMod
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Add Candidate" maxWidth="max-w-xl">
             <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Linked Request Selection */}
+                <div>
+                    <label className="input-label" htmlFor="c-request">
+                        Linked Resource Request
+                    </label>
+                    <select
+                        id="c-request"
+                        className="input-field"
+                        value={form.request_id || ''}
+                        onChange={(e) => set('request_id', e.target.value ? parseInt(e.target.value) : undefined)}
+                        title="Select Request"
+                    >
+                        <option value="">No specific request (Global Pool)</option>
+                        {requests.filter(r => r.status === 'OPEN').map(r => (
+                            <option key={r.id} value={r.id}>
+                                {r.request_display_id} | {r.priority} | {r.sow_id ? 'Client Project' : 'Internal'}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
                 {/* Row: Names */}
                 <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -502,14 +688,15 @@ function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateMod
                         <select
                             id="c-vendor"
                             className="input-field"
-                            value={form.vendor}
-                            onChange={(e) => set('vendor', e.target.value as CandidateVendor)}
+                            value={form.vendor_id || ''}
+                            onChange={(e) => set('vendor_id', e.target.value ? parseInt(e.target.value) : undefined)}
                             required
                             title="Select Vendor"
                         >
-                            {(['WRS', 'GFM', 'INTERNAL'] as CandidateVendor[]).map((v) => (
-                                <option key={v} value={v}>
-                                    {v}
+                            <option value="">— Select —</option>
+                            {vendors.filter(v => v.is_active).map((v) => (
+                                <option key={v.id} value={v.id}>
+                                    {v.name}
                                 </option>
                             ))}
                         </select>
@@ -630,8 +817,11 @@ function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateMod
                     />
                 </div>
 
-                {/* Actions */}
-                <div className="flex gap-3 pt-2">
+                {/* ── Form footer ── */}
+                <div
+                    className="flex gap-3 pt-4 mt-2"
+                    style={{ borderTop: '1px solid var(--color-border)' }}
+                >
                     <button
                         type="button"
                         onClick={onClose}
@@ -649,6 +839,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated }: CreateCandidateMod
     );
 }
 
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 type ViewMode = 'table' | 'kanban';
@@ -661,14 +852,22 @@ export function Candidates() {
     const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [statusFilter, setStatusFilter] = useState('');
+    const [requests, setRequests] = useState<ResourceRequest[]>([]);
+    const [vendors, setVendors] = useState<Vendor[]>([]);
 
     const fetchCandidates = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await candidatesApi.list(
-                statusFilter && viewMode === 'table' ? { status: statusFilter } : undefined
-            );
-            setCandidates(data);
+            const [cData, rData, vData] = await Promise.all([
+                candidatesApi.list(
+                    statusFilter && viewMode === 'table' ? { status: statusFilter } : undefined
+                ),
+                resourceRequestsApi.list(),
+                vendorsApi.list()
+            ]);
+            setCandidates(cData);
+            setRequests(rData);
+            setVendors(vData || []);
         } catch {
             // handled globally
         } finally {
@@ -842,7 +1041,9 @@ export function Candidates() {
                                             </td>
                                             <td className="text-text-muted text-sm">{c.email}</td>
                                             <td>
-                                                <span className="badge badge-neutral">{c.vendor ?? '—'}</span>
+                                                <span className="badge badge-neutral">
+                                                    {vendors.find(v => v.id === c.vendor_id)?.name || c.vendor || '—'}
+                                                </span>
                                             </td>
                                             <td>
                                                 <StatusBadge value={c.status} type="candidate" />
@@ -867,6 +1068,7 @@ export function Candidates() {
                     candidates={candidates}
                     onStatusChange={handleStatusChange}
                     onCandidateClick={(c) => { setSelectedCandidate(c); setIsDetailsOpen(true); }}
+                    vendors={vendors}
                 />
             )}
 
@@ -875,6 +1077,8 @@ export function Candidates() {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onCreated={fetchCandidates}
+                requests={requests}
+                vendors={vendors}
             />
 
             {/* Details Modal */}
@@ -883,6 +1087,8 @@ export function Candidates() {
                 isOpen={isDetailsOpen}
                 onClose={() => { setIsDetailsOpen(false); setSelectedCandidate(null); }}
                 onUpdated={fetchCandidates}
+                requests={requests}
+                vendors={vendors}
             />
         </div>
     );

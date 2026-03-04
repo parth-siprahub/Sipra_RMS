@@ -25,7 +25,7 @@ export interface CommunicationLogCreate {
 
 export const communicationLogApi = {
     list: (params?: { request_id?: number; candidate_id?: number }) =>
-        api.get<CommunicationLog[]>('/logs/', params),
+        api.get<CommunicationLog[]>('/logs', params),
     create: (data: CommunicationLogCreate) =>
-        api.post<CommunicationLog>('/logs/', data),
+        api.post<CommunicationLog>('/logs', data),
 };

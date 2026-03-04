@@ -6,14 +6,17 @@ export type CandidateStatus =
     | 'WITH_ADMIN'
     | 'REJECTED_BY_ADMIN'
     | 'WITH_CLIENT'
+    | 'L1_SCHEDULED'
+    | 'L1_COMPLETED'
+    | 'L1_SHORTLIST'
+    | 'L1_REJECT'
     | 'INTERVIEW_SCHEDULED'
     | 'SELECTED'
     | 'ONBOARDED'
     | 'REJECTED_BY_CLIENT'
     | 'ON_HOLD'
+    | 'SCREEN_REJECT'
     | 'EXIT';
-
-export type CandidateVendor = 'WRS' | 'GFM' | 'INTERNAL';
 
 export interface Candidate {
     id: number;
@@ -23,7 +26,8 @@ export interface Candidate {
     last_name: string;
     email: string;
     phone: string | null;
-    vendor: CandidateVendor | null;
+    vendor: string | null;
+    vendor_id: number | null;
     current_company: string | null;
     current_ctc: number | null;
     expected_ctc: number | null;
@@ -48,6 +52,11 @@ export interface Candidate {
     l2_feedback: string | null;
     l2_score: number | null;
     overlap_until: string | null;
+    screening_comment: string | null;
+    vendor_feedback: string | null;
+    offer_date: string | null;
+    expected_joining_date: string | null;
+    offer_status: string | null;
     created_at: string | null;
 }
 
@@ -56,7 +65,8 @@ export interface CreateCandidatePayload {
     last_name: string;
     email: string;
     phone?: string;
-    vendor: CandidateVendor;
+    vendor?: string;
+    vendor_id?: number;
     current_company?: string;
     total_experience?: number;
     relevant_experience?: number;
@@ -68,10 +78,10 @@ export interface CreateCandidatePayload {
 
 export const candidatesApi = {
     list: (filters?: { status?: string; request_id?: number }) =>
-        api.get<Candidate[]>('/candidates/', filters),
+        api.get<Candidate[]>('/candidates', filters),
 
     create: (payload: CreateCandidatePayload) =>
-        api.post<Candidate>('/candidates/', payload),
+        api.post<Candidate>('/candidates', payload),
 
     review: (id: number, status: CandidateStatus, remarks?: string) =>
         api.patch<Candidate>(`/candidates/${id}/review`, { status, remarks }),
@@ -79,11 +89,11 @@ export const candidatesApi = {
     uploadResume: (id: number, file: File) => {
         const formData = new FormData();
         formData.append('file', file);
-        return api.post<{ message: string; resume_url: string; candidate_id: number }>(
+        return api.upload<{ message: string; resume_url: string; candidate_id: number }>(
             `/candidates/${id}/resume`,
             formData
         );
     },
     update: (id: number, payload: Partial<Candidate>) =>
-        api.patch<Candidate>(`/candidates/${id}/`, payload),
+        api.patch<Candidate>(`/candidates/${id}`, payload),
 };

@@ -24,6 +24,8 @@ interface DashboardMetrics {
     total_candidates: number;
     candidates_by_status: Record<string, number>;
     backfill_count: number;
+    vendor_performance: Record<string, { total: number; selected: number; onboarded: number; rejected: number }>;
+    sow_utilization: Array<{ sow_number: string; max: number; current: number }>;
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -39,9 +41,18 @@ const STATUS_COLORS: Record<string, string> = {
     SUBMITTED_TO_ADMIN: '#8B5CF6',
     WITH_ADMIN: '#F59E0B',
     WITH_CLIENT: '#06B6D4',
+    L1_SCHEDULED: '#A855F7',
+    L1_COMPLETED: '#7C3AED',
+    L1_SHORTLIST: '#2DD4BF',
+    L1_REJECT: '#F43F5E',
     INTERVIEW_SCHEDULED: '#EC4899',
     SELECTED: '#22C55E',
     ONBOARDED: '#10B981',
+    REJECTED_BY_ADMIN: '#EF4444',
+    REJECTED_BY_CLIENT: '#EF4444',
+    SCREEN_REJECT: '#DC2626',
+    ON_HOLD: '#6B7280',
+    EXIT: '#F97316',
     UNKNOWN: '#6B7280'
 };
 
@@ -68,8 +79,17 @@ export function Dashboard() {
         name, value
     })) : [];
 
-    const pipelineData = metrics ? Object.entries(metrics.candidates_by_status).map(([name, value]) => ({
-        name: name.replace(/_/g, ' '), value
+    const pipelineData = metrics ? Object.entries(metrics.candidates_by_status)
+        .sort((a, b) => b[1] - a[1]) // Sort by count
+        .map(([name, value]) => ({
+            name: name.replace(/_/g, ' '), value
+        })) : [];
+
+    const vendorData = metrics ? Object.entries(metrics.vendor_performance).map(([name, stats]) => ({
+        name,
+        total: stats.total,
+        hires: stats.selected + stats.onboarded,
+        rejected: stats.rejected
     })) : [];
 
     if (loading) {
@@ -168,6 +188,58 @@ export function Dashboard() {
                                     </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="card">
+                            <h2 className="text-lg font-bold mb-4">Vendor Performance</h2>
+                            <div className="h-64">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={vendorData}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                                        <XAxis dataKey="name" fontSize={10} />
+                                        <YAxis fontSize={10} />
+                                        <Tooltip />
+                                        <Legend wrapperStyle={{ fontSize: '10px' }} />
+                                        <Bar dataKey="total" fill="#3B82F6" name="Total Submissions" radius={[2, 2, 0, 0]} />
+                                        <Bar dataKey="hires" fill="#10B981" name="Hires (Sel/Onb)" radius={[2, 2, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        <div className="card">
+                            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                <CheckCircle size={18} className="text-success" />
+                                SOW Utilization
+                            </h2>
+                            <div className="space-y-5">
+                                {metrics?.sow_utilization.length === 0 ? (
+                                    <p className="text-xs text-text-muted italic">No active SOWs found.</p>
+                                ) : (
+                                    metrics?.sow_utilization.map((s) => {
+                                        const percent = s.max > 0 ? (s.current / s.max) * 100 : 0;
+                                        return (
+                                            <div key={s.sow_number}>
+                                                <div className="flex justify-between text-xs mb-1.5 font-bold">
+                                                    <span className="text-text">{s.sow_number}</span>
+                                                    <span className="text-text-muted">{s.current} / {s.max} POSITIONS</span>
+                                                </div>
+                                                <div className="w-full h-2 bg-surface-hover rounded-full overflow-hidden border border-border">
+                                                    <div
+                                                        className={cn(
+                                                            "h-full transition-all duration-1000 ease-out",
+                                                            percent > 90 ? "bg-danger" : percent > 70 ? "bg-warning" : "bg-success"
+                                                        )}
+                                                        style={{ width: `${Math.min(percent, 100)}%` }}
+                                                    ></div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
                         </div>
                     </div>
 

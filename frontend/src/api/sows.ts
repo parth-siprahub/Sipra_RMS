@@ -29,8 +29,8 @@ export interface SowUpdate {
 }
 
 export const sowApi = {
-    list: () => api.get<SOW[]>('/sows/'),
-    get: (id: number) => api.get<SOW>(`/sows/${id}/`),
-    create: (data: SowCreate) => api.post<SOW>('/sows/', data),
-    update: (id: number, data: SowUpdate) => api.patch<SOW>(`/sows/${id}/`, data),
+    list: () => api.get<SOW[]>('/sows'),
+    get: (id: number) => api.get<SOW>(`/sows/${id}`),
+    create: (data: SowCreate) => api.post<SOW>('/sows', data),
+    update: (id: number, data: SowUpdate) => api.patch<SOW>(`/sows/${id}`, data),
 };

@@ -3,98 +3,92 @@
      LIGHT MODE (Default)
      ========================================= */
 
-  /* Primary Brand Colors */
+  /* === PRIMARY BRAND === */
   --color-primary: #0F172A;
-  /* Slate 900 - Main headers, primary actions */
+  /* Slate 900 */
   --color-primary-hover: #1E293B;
   /* Slate 800 */
 
-  --color-secondary: #F1F5F9;
-  /* Slate 100 - Secondary buttons, backgrounds */
-  --color-secondary-hover: #E2E8F0;
-  /* Slate 200 */
+  /* === ENTERPRISE BLUE (links, info) === */
+  --color-blue: #0369A1;
+  /* Sky 700 */
+  --color-blue-hover: #0284C7;
+  /* Sky 600 */
+  --color-blue-bg: #E0F2FE;
+  /* Sky 100 */
+  --color-blue-text: #0C4A6E;
+  /* Sky 900 */
 
-  /* CTA / Accent - Green for growth/resources */
+  /* === CTA / ACCENT — Brand Green === */
   --color-cta: #16A34A;
   /* Green 600 */
   --color-cta-hover: #15803D;
   /* Green 700 */
   --color-cta-text: #FFFFFF;
+  --color-cta-glow: rgba(22, 163, 74, 0.2);
+  --color-cta-subtle: #DCFCE7;
+  /* Green 100 */
 
-  /* Backgrounds & Surfaces */
-  --color-background: #FFFFFF;
-  /* Pure White */
-  --color-surface: #F8FAFC;
-  /* Slate 50 - Cards, Sidebar */
-  --color-surface-hover: #F1F5F9;
+  /* === SECONDARY BUTTONS === */
+  --color-secondary: #F1F5F9;
   /* Slate 100 */
-  --color-surface-active: #E2E8F0;
+  --color-secondary-hover: #E2E8F0;
   /* Slate 200 */
 
-  --color-border: #E2E8F0;
-  /* Slate 200 */
+  /* === BACKGROUNDS & SURFACES === */
+  --color-background: #F8FAFC;
+  /* Slate 50 — soft base */
+  --color-surface: #FFFFFF;
+  /* Pure White — cards pop */
+  --color-surface-hover: #F8FAFC;
+  /* Slate 50 */
+  --color-surface-active: #F1F5F9;
+  /* Slate 100 */
+
+  /* === BORDERS === */
+  --color-border: #E9EEF5;
+  /* Custom subtle border */
   --color-border-hover: #CBD5E1;
   /* Slate 300 */
 
-  /* Typography */
+  /* === TYPOGRAPHY === */
   --color-text: #0F172A;
   /* Slate 900 */
+  --color-text-secondary: #334155;
+  /* Slate 700 */
   --color-text-muted: #64748B;
   /* Slate 500 */
   --color-text-inverse: #FFFFFF;
 
-  /* Status Colors (Semantic) */
+  /* === STATUS SEMANTIC === */
   --color-success: #22C55E;
-  /* Green 500 */
   --color-success-bg: #DCFCE7;
-  /* Green 100 */
   --color-success-text: #166534;
-  /* Green 800 */
 
   --color-warning: #F59E0B;
-  /* Amber 500 */
   --color-warning-bg: #FEF3C7;
-  /* Amber 100 */
   --color-warning-text: #92400E;
-  /* Amber 800 */
 
   --color-danger: #EF4444;
-  /* Red 500 */
   --color-danger-bg: #FEE2E2;
-  /* Red 100 */
   --color-danger-text: #991B1B;
-  /* Red 800 */
 
-  --color-info: #3B82F6;
-  /* Blue 500 */
-  --color-info-bg: #DBEAFE;
-  /* Blue 100 */
-  --color-info-text: #1E40AF;
-  /* Blue 800 */
+  --color-info: #0369A1;
+  --color-info-bg: #E0F2FE;
+  --color-info-text: #0C4A6E;
 
-  /* Candidate Pipeline Status Colors */
+  /* === PIPELINE STATUS COLORS === */
   --status-new: #3B82F6;
-  /* Blue */
-  --status-submitted: #8B5CF6;
-  /* Violet */
-  --status-with-admin: #F59E0B;
-  /* Amber */
-  --status-with-client: #06B6D4;
-  /* Cyan */
-  --status-interview: #EC4899;
-  /* Pink */
+  --status-screening: #8B5CF6;
+  --status-l1: #F59E0B;
+  --status-l2: #F97316;
   --status-selected: #22C55E;
-  /* Green */
+  --status-with-client: #06B6D4;
   --status-onboarded: #10B981;
-  /* Emerald */
   --status-rejected: #EF4444;
-  /* Red */
-  --status-hold: #6B7280;
-  /* Gray */
-  --status-exit: #F97316;
-  /* Orange */
+  --status-exit: #6B7280;
 
-  /* Spacing Scale */
+  /* === SPACING SCALE === */
   --space-xs: 0.25rem;
   /* 4px */
   --space-sm: 0.5rem;
@@ -110,13 +104,17 @@
   --space-3xl: 4rem;
   /* 64px */
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  /* === SHADOWS (Directional & Layered) === */
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.04);
+  --shadow-md: 0 4px 8px -2px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.04);
+  --shadow-lg: 0 12px 20px -4px rgb(15 23 42 / 0.10), 0 4px 8px -4px rgb(15 23 42 / 0.06);
+  --shadow-xl: 0 24px 40px -8px rgb(15 23 42 / 0.12), 0 8px 16px -8px rgb(15 23 42 / 0.08);
+  --shadow-card: 0 1px 3px 0 rgb(15 23 42 / 0.06), 0 0 0 1px rgb(15 23 42 / 0.04);
 
-  /* Radius */
+  /* === RADIUS === */
+  --radius-xs: 0.25rem;
+  /* 4px */
   --radius-sm: 0.375rem;
   /* 6px */
   --radius-md: 0.5rem;
@@ -125,72 +123,89 @@
   /* 12px */
   --radius-xl: 1rem;
   /* 16px */
+  --radius-2xl: 1.5rem;
+  /* 24px */
   --radius-full: 9999px;
 
-  /* Layout */
-  --header-height: 64px;
-  --sidebar-width: 260px;
-  --sidebar-collapsed: 72px;
-  --content-max-width: 1400px;
+  /* === LAYOUT === */
+  --header-height: 60px;
+  --sidebar-width: 256px;
+  --sidebar-collapsed: 68px;
+  --content-max-width: 1440px;
 
-  /* Z-Index */
+  /* === Z-INDEX === */
   --z-header: 50;
   --z-sidebar: 40;
   --z-modal: 100;
   --z-toast: 110;
   --z-dropdown: 60;
+  --z-tooltip: 70;
 
-  /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-base: 200ms ease;
-  --transition-slow: 300ms ease;
+  /* === TRANSITIONS === */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* === SIDEBAR (Dark) === */
+  --sidebar-bg: #0F172A;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-text: rgba(148, 163, 184, 1);
+  /* Slate 400 */
+  --sidebar-text-active: rgba(248, 250, 252, 1);
+  /* Slate 50 */
+  --sidebar-item-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-item-active: rgba(22, 163, 74, 0.15);
+  --sidebar-accent: #22C55E;
+  /* Green 500 */
 }
 
 /* =========================================
    DARK MODE
    ========================================= */
 [data-theme='dark'] {
-  /* Brand Colors Override */
   --color-primary: #F8FAFC;
-  /* Slate 50 */
   --color-primary-hover: #E2E8F0;
-  /* Slate 200 */
 
   --color-secondary: #1E293B;
-  /* Slate 800 */
   --color-secondary-hover: #334155;
-  /* Slate 700 */
 
   --color-cta: #22C55E;
-  /* Green 500 - brighter for dark mode */
   --color-cta-hover: #16A34A;
-  /* Green 600 */
+  --color-cta-glow: rgba(34, 197, 94, 0.25);
 
-  /* Backgrounds & Surfaces */
+  --color-blue: #38BDF8;
+  --color-blue-hover: #7DD3FC;
+  --color-blue-bg: #0C4A6E;
+  --color-blue-text: #BAE6FD;
+
+  /* Backgrounds */
   --color-background: #020617;
   /* Slate 950 */
   --color-surface: #0F172A;
   /* Slate 900 */
   --color-surface-hover: #1E293B;
-  /* Slate 800 */
   --color-surface-active: #334155;
-  /* Slate 700 */
 
   --color-border: #1E293B;
-  /* Slate 800 */
   --color-border-hover: #334155;
-  /* Slate 700 */
 
   /* Typography */
-  --color-text: #F8FAFC;
-  /* Slate 50 */
+  --color-text: #F1F5F9;
+  /* Slate 100 */
+  --color-text-secondary: #CBD5E1;
+  /* Slate 300 */
   --color-text-muted: #94A3B8;
   /* Slate 400 */
   --color-text-inverse: #020617;
 
-  /* Shadows - subtler on dark */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.5);
+  /* Shadows darker */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 8px -2px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 12px 20px -4px rgb(0 0 0 / 0.5);
+  --shadow-xl: 0 24px 40px -8px rgb(0 0 0 / 0.6);
+
+  /* Sidebar same in dark (already dark) */
+  --sidebar-bg: #020617;
+  --sidebar-border: rgba(255, 255, 255, 0.05);
 }

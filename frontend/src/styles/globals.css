@@ -1,15 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
 @import './design-tokens.css';
 @import './components.css';
 
-
-
-/* Tailwind directives (optional usage) */
+/* Tailwind directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Base Reset */
+/* =========================================
+   BASE RESET
+   ========================================= */
 *,
 *::before,
 *::after {
@@ -19,12 +19,11 @@
 }
 
 :root {
-    --font-heading: 'Outfit', sans-serif;
-    --font-body: 'Inter', sans-serif;
+    --font-heading: 'Plus Jakarta Sans', sans-serif;
+    --font-body: 'Plus Jakarta Sans', sans-serif;
 
     font-family: var(--font-body);
     font-size: 15px;
-    /* Slightly more dense for professional apps */
     line-height: 1.6;
     font-weight: 400;
 
@@ -46,6 +45,33 @@ body {
     overflow-x: hidden;
 }
 
+/* =========================================
+   TYPOGRAPHY SCALE
+   ========================================= */
+h1 {
+    font-size: 1.875rem;
+    /* 30px */
+    font-weight: 700;
+}
+
+h2 {
+    font-size: 1.5rem;
+    /* 24px */
+    font-weight: 700;
+}
+
+h3 {
+    font-size: 1.25rem;
+    /* 20px */
+    font-weight: 600;
+}
+
+h4 {
+    font-size: 1.125rem;
+    /* 18px */
+    font-weight: 600;
+}
+
 h1,
 h2,
 h3,
@@ -54,47 +80,49 @@ h5,
 h6 {
     font-family: var(--font-heading);
     line-height: 1.25;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.025em;
     margin-bottom: var(--space-md);
     color: var(--color-text);
 }
 
 a {
-    color: var(--color-cta);
+    color: var(--color-blue);
     text-decoration: none;
     transition: color var(--transition-fast);
 }
 
 a:hover {
-    text-decoration: underline;
-    color: var(--color-cta-hover);
+    color: var(--color-blue-hover);
 }
 
 button {
     font-family: inherit;
 }
 
-/* Custom Scrollbar */
+/* =========================================
+   CUSTOM SCROLLBAR (Slim & refined)
+   ========================================= */
 ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--color-background);
+    background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--color-border);
+    background: var(--color-border-hover);
     border-radius: var(--radius-full);
-    border: 2px solid var(--color-background);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-border-hover);
+    background: var(--color-text-muted);
 }
 
-/* Utility / Layout Helpers */
+/* =========================================
+   LAYOUT HELPERS
+   ========================================= */
 .container {
     max-width: var(--content-max-width);
     margin: 0 auto;
@@ -119,16 +147,80 @@ button {
     background-color: var(--color-surface);
 }
 
-.shadow-md {
-    box-shadow: var(--shadow-md);
-}
-
-.rounded-lg {
-    border-radius: var(--radius-lg);
-}
-
-/* Focus States for Accessibility */
+/* =========================================
+   FOCUS STATES — Accessibility
+   ========================================= */
 :focus-visible {
     outline: 2px solid var(--color-cta);
     outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+/* =========================================
+   DARK MODE — Native form elements
+   ========================================= */
+[data-theme='dark'] input,
+[data-theme='dark'] textarea,
+[data-theme='dark'] select {
+    background-color: var(--color-surface) !important;
+    color: var(--color-text) !important;
+    border-color: var(--color-border) !important;
+    color-scheme: dark;
+}
+
+[data-theme='dark'] input::placeholder,
+[data-theme='dark'] textarea::placeholder {
+    color: var(--color-text-muted) !important;
+    opacity: 0.55;
+}
+
+[data-theme='dark'] option {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+}
+
+/* =========================================
+   MODAL ANIMATION
+   ========================================= */
+@keyframes modalIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* =========================================
+   SIDEBAR-SPECIFIC TEXT
+   (when inside the dark sidebar)
+   ========================================= */
+.sidebar-text {
+    color: rgba(248, 250, 252, 0.65);
+}
+
+.sidebar-text-active {
+    color: #F8FAFC;
+}
+
+/* =========================================
+   PAGE ENTRY ANIMATION
+   ========================================= */
+@keyframes pageEnter {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.page-enter {
+    animation: pageEnter 220ms ease-out;
 }

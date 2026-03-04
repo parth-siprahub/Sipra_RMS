@@ -11,6 +11,7 @@ import { Candidates } from './pages/Candidates';
 import { Sows } from './pages/Sows';
 import { JobProfiles } from './pages/JobProfiles';
 import { CommunicationLogs } from './pages/CommunicationLogs';
+import { Vendors } from './pages/Vendors';
 
 const NotFound = () => <div className="p-10 text-center text-2xl">404 - Page Not Found</div>;
 
@@ -23,7 +24,7 @@ function App() {
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
 
-            {/* Protected Protected */}
+            {/* Protected Routes */}
             <Route path="/" element={
               <ProtectedRoute>
                 <DashboardLayout />
@@ -35,6 +36,7 @@ function App() {
               <Route path="job-profiles" element={<JobProfiles />} />
               <Route path="sows" element={<Sows />} />
               <Route path="communication-logs" element={<CommunicationLogs />} />
+              <Route path="vendors" element={<Vendors />} />
             </Route>
 
             {/* Dashboard alias – direct nav to /dashboard redirects to root */}

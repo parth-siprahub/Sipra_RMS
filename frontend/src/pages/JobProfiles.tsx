@@ -114,12 +114,14 @@ export function JobProfiles() {
                                     <button
                                         onClick={() => handleEdit(profile)}
                                         className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors"
+                                        title="Edit profile"
                                     >
                                         <Edit2 size={16} />
                                     </button>
                                     <button
                                         onClick={() => handleDelete(profile.id)}
                                         className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-danger transition-colors"
+                                        title="Delete profile"
                                     >
                                         <Trash2 size={16} />
                                     </button>
