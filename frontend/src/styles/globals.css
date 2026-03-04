@@ -224,6 +224,12 @@ button {
     }
 }
 
+@keyframes shimmer {
+    100% {
+        transform: translateX(100%);
+    }
+}
+
 .page-enter {
     animation: pageEnter 220ms ease-out;
 }

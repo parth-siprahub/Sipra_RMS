@@ -36,77 +36,31 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = 'max-w-lg',
             aria-labelledby="modal-title"
         >
             <div
-                className={`w-full ${maxWidth}`}
-                style={{
-                    backgroundColor: 'var(--color-surface)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '1rem',
-                    boxShadow: 'var(--shadow-xl)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    maxHeight: '88vh',
-                    animation: 'modalIn 200ms cubic-bezier(0.34, 1.1, 0.64, 1)',
-                }}
+                className={`modal-content ${maxWidth}`}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* ── Header ── */}
-                <div
-                    className="flex items-center justify-between flex-shrink-0"
-                    style={{
-                        padding: '1.125rem 1.5rem',
-                        borderBottom: '1px solid var(--color-border)',
-                    }}
-                >
-                    <h2
-                        id="modal-title"
-                        style={{
-                            fontSize: '1rem',
-                            fontWeight: 700,
-                            color: 'var(--color-text)',
-                            margin: 0,
-                            letterSpacing: '-0.02em',
-                        }}
-                    >
+                <div className="modal-header">
+                    <h2 id="modal-title" className="text-lg font-bold text-text m-0 tracking-tight">
                         {title}
                     </h2>
                     <button
                         onClick={onClose}
                         aria-label="Close modal"
-                        className="flex items-center justify-center w-7 h-7 rounded-lg transition-colors cursor-pointer"
-                        style={{ color: 'var(--color-text-muted)' }}
-                        onMouseEnter={(e) => {
-                            (e.currentTarget as HTMLElement).style.backgroundColor =
-                                'var(--color-surface-active)';
-                            (e.currentTarget as HTMLElement).style.color = 'var(--color-text)';
-                        }}
-                        onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-                            (e.currentTarget as HTMLElement).style.color = 'var(--color-text-muted)';
-                        }}
+                        className="flex items-center justify-center w-8 h-8 rounded-xl text-text-muted hover:text-text hover:bg-surface-active transition-all cursor-pointer"
                     >
-                        <X size={16} />
+                        <X size={18} />
                     </button>
                 </div>
 
-                {/* ── Body (scrollable) ── */}
-                <div
-                    className="flex-1 overflow-y-auto custom-scrollbar"
-                    style={{ padding: '1.25rem 1.5rem' }}
-                >
+                {/* ── Body ── */}
+                <div className="modal-body custom-scrollbar">
                     {children}
                 </div>
 
                 {/* ── Footer (optional) ── */}
                 {footer && (
-                    <div
-                        className="flex-shrink-0 flex items-center justify-end gap-2.5"
-                        style={{
-                            padding: '1rem 1.5rem',
-                            borderTop: '1px solid var(--color-border)',
-                            backgroundColor: 'var(--color-background)',
-                            borderRadius: '0 0 1rem 1rem',
-                        }}
-                    >
+                    <div className="modal-footer">
                         {footer}
                     </div>
                 )}

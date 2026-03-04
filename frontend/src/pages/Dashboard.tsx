@@ -16,6 +16,7 @@ import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
     BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
+import { Skeleton, CardSkeleton } from '../components/ui/Skeleton';
 
 interface DashboardMetrics {
     total_requests: number;
@@ -74,9 +75,34 @@ export function Dashboard() {
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center h-96 gap-4">
-                <div className="spinner w-8 h-8 border-cta"></div>
-                <p className="text-text-muted text-sm animate-pulse">Gathering intelligence...</p>
+            <div className="space-y-6 animate-pulse">
+                <div className="flex items-center justify-between">
+                    <div className="space-y-2">
+                        <Skeleton className="h-8 w-48" />
+                        <Skeleton className="h-4 w-64" />
+                    </div>
+                    <Skeleton className="h-8 w-32 rounded-full" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <CardSkeleton />
+                    <CardSkeleton />
+                    <CardSkeleton />
+                    <CardSkeleton />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 space-y-6">
+                        <Skeleton className="h-[400px] w-full rounded-3xl" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Skeleton className="h-64 w-full rounded-3xl" />
+                            <Skeleton className="h-64 w-full rounded-3xl" />
+                        </div>
+                    </div>
+                    <div className="space-y-6">
+                        <Skeleton className="h-64 w-full rounded-3xl" />
+                        <Skeleton className="h-48 w-full rounded-3xl" />
+                        <Skeleton className="h-48 w-full rounded-3xl" />
+                    </div>
+                </div>
             </div>
         );
     }
@@ -100,26 +126,26 @@ export function Dashboard() {
                     title="Total Requests"
                     value={metrics?.total_requests || 0}
                     icon={Briefcase}
-                    trend="+12% this month"
-                    trendColor="text-success"
+                    trend="Inflow active"
+                    trendColor="text-info"
                 />
                 <MetricCard
                     title="Active Candidates"
                     value={metrics?.total_candidates || 0}
                     icon={Users}
-                    trend="Ready for review"
-                    trendColor="text-info"
+                    trend="Sourced & Vetted"
+                    trendColor="text-success"
                 />
                 <MetricCard
                     title="Critical Backfills"
                     value={metrics?.backfill_count || 0}
                     icon={AlertCircle}
-                    trend="Immediate action"
-                    trendColor="text-danger"
+                    trend={metrics?.backfill_count && metrics.backfill_count > 0 ? "Immediate Action" : "No active risks"}
+                    trendColor={metrics?.backfill_count && metrics.backfill_count > 0 ? "text-danger" : "text-text-muted"}
                 />
                 <MetricCard
-                    title="Total Activity"
-                    value={(metrics?.total_requests || 0) + (metrics?.total_candidates || 0)}
+                    title="Pipeline Depth"
+                    value={Object.values(metrics?.candidates_by_status || {}).reduce((a, b) => a + b, 0)}
                     icon={Activity}
                     trend="System throughput"
                     trendColor="text-cta"

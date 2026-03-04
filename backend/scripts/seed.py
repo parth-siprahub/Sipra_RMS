@@ -76,12 +76,22 @@ def seed():
     admin_id = get_or_create_user("admin@siprarms.com", "Admin123!", "ADMIN")
     recruiter_id = get_or_create_user("recruiter@siprarms.com", "Recruiter123!", "RECRUITER")
     
+    # QA Admin accounts for HR team review
+    qa_admin_1 = get_or_create_user("hr.qa1@siprarms.com", "SipraQA2026!", "ADMIN")
+    qa_admin_2 = get_or_create_user("hr.qa2@siprarms.com", "SipraQA2026!", "ADMIN")
+    
+    # New Demo Admin accounts for HR & Managers
+    hr_demo = get_or_create_user("hr.lead@sipra.demo", "SipraAdmin@2026", "ADMIN")
+    manager_demo = get_or_create_user("hiring.manager@sipra.demo", "SipraAdmin@2026", "ADMIN")
+    
     if not admin_id or not recruiter_id:
         print("CRITICAL: Could not get ID for admin or recruiter. Exiting.")
         return
 
-    print(f"Admin ID: {admin_id}")
-    print(f"Recruiter ID: {recruiter_id}\n")
+    print(f"Primary Admin ID: {admin_id}")
+    print(f"Primary Recruiter ID: {recruiter_id}")
+    print(f"QA Admin 1: {qa_admin_1}")
+    print(f"QA Admin 2: {qa_admin_2}\n")
 
     # 1. Seed Job Profiles
     print("--- Job Profiles ---")

@@ -1,0 +1,18 @@
+# Railway Deployment Configuration — FastAPI Backend
+# =====================================================
+# This file tells Railway how to build and run the backend.
+# Deploy ONLY the /backend directory on Railway.
+#
+# Steps:
+#   1. Go to railway.app → New Project → Deploy from GitHub
+#   2. Select the repo, set ROOT DIRECTORY to: backend
+#   3. Railway auto-detects Python via requirements.txt
+#   4. Start command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+#   5. Add the environment variables below in Railway dashboard
+
+[deploy]
+startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
