@@ -63,11 +63,11 @@ async def upload_resume(
     try:
         # Remove old file if exists (ignore errors)
         try:
-            client.storage.from_("resumes").remove([storage_path])
+            await client.storage.from_("resumes").remove([storage_path])
         except Exception:
             pass
 
-        client.storage.from_("resumes").upload(
+        await client.storage.from_("resumes").upload(
             storage_path,
             content,
             file_options={"content-type": file.content_type},
