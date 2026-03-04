@@ -12,7 +12,7 @@ router = APIRouter(prefix="/logs", tags=["Communication Logs"])
 
 
 @router.get("/", response_model=list[CommunicationLogResponse])
-def list_logs(
+async def list_logs(
     request_id: int | None = None,
     candidate_id: int | None = None,
     current_user: dict = Depends(get_current_user),
@@ -34,7 +34,7 @@ def list_logs(
 
 
 @router.post("/", response_model=CommunicationLogResponse, status_code=status.HTTP_201_CREATED)
-def create_log(
+async def create_log(
     payload: CommunicationLogCreate,
     current_user: dict = Depends(get_current_user),
 ):
