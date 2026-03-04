@@ -13,6 +13,7 @@ import type {
 import { Modal } from '../components/ui/Modal';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
+import { TableRowSkeleton } from '../components/ui/Skeleton';
 import { sowApi, type SOW } from '../api/sows';
 import { jobProfileApi, type JobProfile } from '../api/jobProfiles';
 
@@ -388,21 +389,26 @@ export function ResourceRequests() {
             {/* Data Table */}
             <div className="card p-0 overflow-hidden">
                 {loading ? (
-                    <div className="flex items-center justify-center h-48">
-                        <div className="spinner w-8 h-8" />
+                    <div className="divide-y divide-border/50">
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                            <TableRowSkeleton key={i} />
+                        ))}
                     </div>
                 ) : requests.length === 0 ? (
-                    <EmptyState
-                        message="No resource requests found."
-                        action={
-                            <button
-                                onClick={() => setIsModalOpen(true)}
-                                className="btn btn-cta btn-sm"
-                            >
-                                <Plus size={14} /> Create your first request
-                            </button>
-                        }
-                    />
+                    <div className="p-8">
+                        <EmptyState
+                            title="No Staffing Requests"
+                            message="All clear! There are no active or pending resource requests at the moment."
+                            action={
+                                <button
+                                    onClick={() => setIsModalOpen(true)}
+                                    className="btn btn-cta btn-sm"
+                                >
+                                    <Plus size={14} /> Create your first request
+                                </button>
+                            }
+                        />
+                    </div>
                 ) : (
                     <div className="table-container border-none">
                         <table className="data-table">

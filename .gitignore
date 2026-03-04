@@ -50,3 +50,4 @@ requests_debug.json
 *.rar
 *.zip
 .agent
+_legacy_archive/

@@ -8,10 +8,14 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
 @router.get("/metrics")
-def get_metrics(current_user: dict = Depends(get_current_user)):
-    """Return aggregated dashboard metrics."""
-    client = get_supabase_admin()
+async def get_metrics(current_user: dict = Depends(get_current_user)):
+    """Return aggregated dashboard dashboard/metrics."""
+    cache_key = "dashboard_metrics"
+    cached_data = api_cache.get(cache_key)
+    if cached_data:
+        return cached_data
 
+    # Use the singleton async client
     client = await get_supabase_admin_async()
 
     # 1. Resource Requests Metrics
@@ -86,5 +90,6 @@ def get_metrics(current_user: dict = Depends(get_current_user)):
         "vendor_performance": vendor_stats,
         "sow_utilization": sow_utilization,
     }
+    
     api_cache.set(cache_key, result)
     return result
