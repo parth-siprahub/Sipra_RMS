@@ -1,14 +1,3 @@
-# Railway Deployment Configuration — React/Vite Frontend
-# =======================================================
-# This file tells Railway how to build and serve the frontend.
-# Deploy this as a SEPARATE service in your Railway project.
-#
-# Steps:
-#   1. In your Railway project, click "New" → "GitHub Repo"
-#   2. Select the same repo again
-#   3. CRITICAL: Go to Settings → Root Directory and set it to: frontend
-#   4. Railway will auto-detect Node.js and use the 'start' script in package.json
-
 [build]
 builder = "NIXPACKS"
 buildCommand = "npm install && npm run build"
