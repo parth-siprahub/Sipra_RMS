@@ -53,7 +53,7 @@ export function Dashboard() {
     useEffect(() => {
         const fetchMetrics = async () => {
             try {
-                const data = await api.get<DashboardMetrics>('/dashboard/metrics/');
+                const data = await api.get<DashboardMetrics>('/dashboard/metrics');
                 setMetrics(data);
             } catch (error) {
                 console.error('Failed to fetch dashboard metrics:', error);
