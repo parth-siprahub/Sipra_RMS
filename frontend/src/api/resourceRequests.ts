@@ -2,7 +2,7 @@ import { api } from './client';
 
 export type RequestStatus = 'OPEN' | 'CLOSED' | 'HOLD';
 export type RequestPriority = 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
-export type RequestSource = 'EMAIL' | 'CHAT' | 'PORTAL';
+export type RequestSource = 'PORTAL' | 'JOB_BOARDS' | 'NETWORK' | 'VENDORS';
 
 export interface ResourceRequest {
     id: number;

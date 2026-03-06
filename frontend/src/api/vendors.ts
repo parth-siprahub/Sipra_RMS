@@ -12,9 +12,9 @@ export interface Vendor {
 
 export interface CreateVendorPayload {
     name: string;
-    contact_person?: string;
-    contact_email?: string;
-    contact_phone?: string;
+    contact_person: string;
+    contact_email: string;
+    contact_phone: string;
     is_active?: boolean;
 }
 

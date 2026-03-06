@@ -3,7 +3,7 @@ import { Modal } from '../ui/Modal';
 import { jobProfileApi } from '../../api/jobProfiles';
 import type { JobProfile } from '../../api/jobProfiles';
 import toast from 'react-hot-toast';
-import { Briefcase, Code, Layers } from 'lucide-react';
+import { Briefcase, Code, Layers, FileText, Upload } from 'lucide-react';
 
 interface JobProfileModalProps {
     isOpen: boolean;
@@ -18,7 +18,10 @@ export function JobProfileModal({ isOpen, onClose, onSuccess, jobProfile }: JobP
         role_name: '',
         technology: '',
         experience_level: '',
+        job_description: '',
+        jd_file_url: '',
     });
+    const [jdFile, setJdFile] = useState<File | null>(null);
 
     useEffect(() => {
         if (jobProfile) {
@@ -26,14 +29,19 @@ export function JobProfileModal({ isOpen, onClose, onSuccess, jobProfile }: JobP
                 role_name: jobProfile.role_name,
                 technology: jobProfile.technology,
                 experience_level: jobProfile.experience_level || '',
+                job_description: jobProfile.job_description || '',
+                jd_file_url: jobProfile.jd_file_url || '',
             });
         } else {
             setFormData({
                 role_name: '',
                 technology: '',
                 experience_level: '',
+                job_description: '',
+                jd_file_url: '',
             });
         }
+        setJdFile(null);
     }, [jobProfile, isOpen]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -41,11 +49,16 @@ export function JobProfileModal({ isOpen, onClose, onSuccess, jobProfile }: JobP
         setLoading(true);
 
         try {
+            const payload = {
+                ...formData,
+                ...(jdFile ? { jd_file_url: jdFile.name } : {}),
+            };
+
             if (jobProfile?.id) {
-                await jobProfileApi.update(jobProfile.id, formData);
+                await jobProfileApi.update(jobProfile.id, payload);
                 toast.success('Job Profile updated successfully');
             } else {
-                await jobProfileApi.create(formData);
+                await jobProfileApi.create(payload);
                 toast.success('Job Profile created successfully');
             }
             onSuccess();
@@ -112,6 +125,42 @@ export function JobProfileModal({ isOpen, onClose, onSuccess, jobProfile }: JobP
                                 <option value="SENIOR">Senior Level</option>
                                 <option value="LEAD">Lead / Architect</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="input-label flex items-center gap-1.5" htmlFor="job_description">
+                            <FileText size={14} className="text-text-muted" />
+                            Job Description
+                        </label>
+                        <textarea
+                            id="job_description"
+                            className="input-field min-h-[120px] resize-y text-sm"
+                            rows={5}
+                            value={formData.job_description}
+                            onChange={(e) => setFormData({ ...formData, job_description: e.target.value })}
+                            placeholder="Enter the detailed job description, responsibilities, and requirements for this role..."
+                        />
+                    </div>
+
+                    <div>
+                        <label className="input-label flex items-center gap-1.5" htmlFor="jd_file">
+                            <Upload size={14} className="text-text-muted" />
+                            JD Attachment (PDF/DOCX)
+                        </label>
+                        <div className="bg-surface p-3 rounded-xl border border-border hover:border-cta/30 transition-all">
+                            {formData.jd_file_url && !jdFile && (
+                                <p className="text-xs text-text-muted mb-2">
+                                    Current file: <span className="font-medium text-cta">{formData.jd_file_url}</span>
+                                </p>
+                            )}
+                            <input
+                                id="jd_file"
+                                type="file"
+                                accept=".pdf,.doc,.docx"
+                                className="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-surface-hover file:text-cta hover:file:bg-cta/10 file:cursor-pointer transition-all w-full"
+                                onChange={(e) => setJdFile(e.target.files?.[0] || null)}
+                            />
                         </div>
                     </div>
                 </div>

@@ -5,6 +5,8 @@ export interface JobProfile {
     role_name: string;
     technology: string;
     experience_level: string | null;
+    job_description: string | null;
+    jd_file_url: string | null;
     created_at?: string;
 }
 
@@ -12,12 +14,16 @@ export interface JobProfileCreate {
     role_name: string;
     technology: string;
     experience_level?: string;
+    job_description?: string;
+    jd_file_url?: string;
 }
 
 export interface JobProfileUpdate {
     role_name?: string;
     technology?: string;
     experience_level?: string;
+    job_description?: string;
+    jd_file_url?: string;
 }
 
 export const jobProfileApi = {

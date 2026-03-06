@@ -168,7 +168,19 @@ export function Sows() {
                                                 <Calendar size={14} />
                                                 <span>{sow.start_date || 'N/A'}</span>
                                                 <span>→</span>
-                                                <span>{sow.end_date || 'N/A'}</span>
+                                                <span className={cn(
+                                                    (() => {
+                                                        if (!sow.target_date) return '';
+                                                        const target = new Date(sow.target_date);
+                                                        const now = new Date();
+                                                        const diffDays = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                                                        if (diffDays < 0) return 'text-red-500 font-semibold';
+                                                        if (diffDays <= 7) return 'text-amber-500 font-semibold';
+                                                        return 'text-emerald-500';
+                                                    })()
+                                                )}>
+                                                    {sow.target_date || 'N/A'}
+                                                </span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">

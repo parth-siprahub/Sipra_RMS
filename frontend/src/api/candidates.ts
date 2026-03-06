@@ -2,6 +2,7 @@ import { api } from './client';
 
 export type CandidateStatus =
     | 'NEW'
+    | 'SCREENING'
     | 'SUBMITTED_TO_ADMIN'
     | 'WITH_ADMIN'
     | 'REJECTED_BY_ADMIN'
@@ -16,6 +17,8 @@ export type CandidateStatus =
     | 'REJECTED_BY_CLIENT'
     | 'ON_HOLD'
     | 'SCREEN_REJECT'
+    | 'INTERVIEW_BACK_OUT'
+    | 'OFFER_BACK_OUT'
     | 'EXIT';
 
 export interface Candidate {
@@ -51,6 +54,8 @@ export interface Candidate {
     l1_score: number | null;
     l2_feedback: string | null;
     l2_score: number | null;
+    l1_feedback_file_url: string | null;
+    l2_feedback_file_url: string | null;
     overlap_until: string | null;
     created_at: string | null;
 }
@@ -69,6 +74,8 @@ export interface CreateCandidatePayload {
     current_location?: string;
     notice_period?: number;
     request_id?: number;
+    l1_feedback_file_url?: string;
+    l2_feedback_file_url?: string;
 }
 
 export const candidatesApi = {
