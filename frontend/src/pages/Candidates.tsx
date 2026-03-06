@@ -33,16 +33,18 @@ import {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 // Ordered pipeline stages shown as kanban columns
+// Flow: New → Screening → L1 → L2 → Selected → Admin → Client → Submitted → Onboarded
 const PIPELINE_STAGES: CandidateStatus[] = [
     'NEW',
-    'SUBMITTED_TO_ADMIN',
-    'WITH_ADMIN',
-    'WITH_CLIENT',
+    'SCREENING',
     'L1_SCHEDULED',
     'L1_COMPLETED',
     'L1_SHORTLIST',
     'INTERVIEW_SCHEDULED',
     'SELECTED',
+    'WITH_ADMIN',
+    'WITH_CLIENT',
+    'SUBMITTED_TO_ADMIN',
     'ONBOARDED',
 ];
 
@@ -51,6 +53,8 @@ const CLOSED_STAGES: CandidateStatus[] = [
     'REJECTED_BY_CLIENT',
     'SCREEN_REJECT',
     'L1_REJECT',
+    'INTERVIEW_BACK_OUT',
+    'OFFER_BACK_OUT',
     'ON_HOLD',
     'EXIT',
 ];
@@ -58,6 +62,7 @@ const CLOSED_STAGES: CandidateStatus[] = [
 // Short label for kanban column headers
 const STAGE_LABELS: Record<CandidateStatus, string> = {
     NEW: 'New',
+    SCREENING: 'Screening',
     SUBMITTED_TO_ADMIN: 'Submitted',
     WITH_ADMIN: 'With Admin',
     REJECTED_BY_ADMIN: 'Rejected (Admin)',
@@ -66,18 +71,21 @@ const STAGE_LABELS: Record<CandidateStatus, string> = {
     L1_COMPLETED: 'L1 Completed',
     L1_SHORTLIST: 'L1 Shortlist',
     L1_REJECT: 'L1 Reject',
-    INTERVIEW_SCHEDULED: 'Interview',
+    INTERVIEW_SCHEDULED: 'L2 / Interview',
     SELECTED: 'Selected',
     ONBOARDED: 'Onboarded',
     REJECTED_BY_CLIENT: 'Rejected (Client)',
     ON_HOLD: 'On Hold',
     SCREEN_REJECT: 'Screen Reject',
+    INTERVIEW_BACK_OUT: 'Interview Back-out',
+    OFFER_BACK_OUT: 'Offer Back-out',
     EXIT: 'Exit',
 };
 
 // Column accent colours matching design-tokens.css status vars
 const STAGE_COLORS: Record<string, string> = {
     NEW: 'border-[#3B82F6]',
+    SCREENING: 'border-[#60A5FA]',
     SUBMITTED_TO_ADMIN: 'border-[#8B5CF6]',
     WITH_ADMIN: 'border-[#F59E0B]',
     WITH_CLIENT: 'border-[#06B6D4]',
@@ -91,6 +99,8 @@ const STAGE_COLORS: Record<string, string> = {
     REJECTED_BY_ADMIN: 'border-[#EF4444]',
     REJECTED_BY_CLIENT: 'border-[#EF4444]',
     SCREEN_REJECT: 'border-[#DC2626]',
+    INTERVIEW_BACK_OUT: 'border-[#FB923C]',
+    OFFER_BACK_OUT: 'border-[#F97316]',
     ON_HOLD: 'border-[#6B7280]',
     EXIT: 'border-[#F97316]',
 };
@@ -372,6 +382,27 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors 
                                             title="L1 Score"
                                         />
                                     </div>
+                                    <div className="bg-surface p-3 rounded-xl border border-border hover:border-cta/30 transition-all">
+                                        <label className="text-[11px] font-semibold text-text-muted block mb-2">
+                                            L1 Feedback File (PDF/DOCX)
+                                        </label>
+                                        {candidate.l1_feedback_file_url && (
+                                            <p className="text-[10px] text-cta mb-1.5 truncate">
+                                                Current: {candidate.l1_feedback_file_url}
+                                            </p>
+                                        )}
+                                        <input
+                                            type="file"
+                                            accept=".pdf,.doc,.docx"
+                                            className="text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-surface-hover file:text-cta hover:file:bg-cta/10 file:cursor-pointer transition-all w-full"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    setEditForm(prev => ({ ...prev, l1_feedback_file_url: file.name }));
+                                                }
+                                            }}
+                                        />
+                                    </div>
                                 </div>
                                 <div className="space-y-3">
                                     <label className="input-label">L2 Feedback</label>
@@ -390,6 +421,27 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors 
                                             value={editForm.l2_score || 0}
                                             onChange={(e) => setEditForm(prev => ({ ...prev, l2_score: parseInt(e.target.value) }))}
                                             title="L2 Score"
+                                        />
+                                    </div>
+                                    <div className="bg-surface p-3 rounded-xl border border-border hover:border-cta/30 transition-all">
+                                        <label className="text-[11px] font-semibold text-text-muted block mb-2">
+                                            L2 Feedback File (PDF/DOCX)
+                                        </label>
+                                        {candidate.l2_feedback_file_url && (
+                                            <p className="text-[10px] text-cta mb-1.5 truncate">
+                                                Current: {candidate.l2_feedback_file_url}
+                                            </p>
+                                        )}
+                                        <input
+                                            type="file"
+                                            accept=".pdf,.doc,.docx"
+                                            className="text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-surface-hover file:text-cta hover:file:bg-cta/10 file:cursor-pointer transition-all w-full"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    setEditForm(prev => ({ ...prev, l2_feedback_file_url: file.name }));
+                                                }
+                                            }}
                                         />
                                     </div>
                                 </div>

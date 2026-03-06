@@ -18,7 +18,8 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
         sow_number: '',
         client_name: '',
         start_date: '',
-        end_date: '',
+        target_date: '',
+        submitted_date: '',
         max_resources: 0,
         is_active: true,
     });
@@ -29,7 +30,8 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
                 sow_number: sow.sow_number,
                 client_name: sow.client_name,
                 start_date: sow.start_date || '',
-                end_date: sow.end_date || '',
+                target_date: sow.target_date || '',
+                submitted_date: sow.submitted_date || '',
                 max_resources: sow.max_resources || 0,
                 is_active: sow.is_active !== false,
             });
@@ -38,7 +40,8 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
                 sow_number: '',
                 client_name: '',
                 start_date: '',
-                end_date: '',
+                target_date: '',
+                submitted_date: '',
                 max_resources: 0,
                 is_active: true,
             });
@@ -120,15 +123,29 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
                     </div>
 
                     <div>
-                        <label className="input-label" htmlFor="end_date">End Date</label>
+                        <label className="input-label" htmlFor="target_date">Target Date</label>
                         <div className="relative">
                             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
                             <input
-                                id="end_date"
+                                id="target_date"
                                 type="date"
                                 className="input-field pl-10"
-                                value={formData.end_date}
-                                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                                value={formData.target_date}
+                                onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="input-label" htmlFor="submitted_date">Submitted Date</label>
+                        <div className="relative">
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+                            <input
+                                id="submitted_date"
+                                type="date"
+                                className="input-field pl-10"
+                                value={formData.submitted_date}
+                                onChange={(e) => setFormData({ ...formData, submitted_date: e.target.value })}
                             />
                         </div>
                     </div>

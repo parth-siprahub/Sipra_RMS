@@ -155,7 +155,14 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
                         id="rr-sow"
                         className="input-field"
                         value={sowId}
-                        onChange={(e) => setSowId(e.target.value ? Number(e.target.value) : '')}
+                        onChange={(e) => {
+                            const selectedSowId = e.target.value ? Number(e.target.value) : '';
+                            setSowId(selectedSowId);
+                            // Auto-select first matching job profile if one exists for this SOW
+                            if (selectedSowId && jobProfiles.length > 0 && !jobProfileId) {
+                                setJobProfileId(jobProfiles[0].id);
+                            }
+                        }}
                         required
                     >
                         <option value="">— Select SOW —</option>
@@ -220,9 +227,9 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
                         onChange={(e) => setSource(e.target.value as RequestSource | '')}
                     >
                         <option value="">— Select source —</option>
-                        {(['EMAIL', 'CHAT', 'PORTAL'] as RequestSource[]).map((s) => (
+                        {(['PORTAL', 'JOB_BOARDS', 'NETWORK', 'VENDORS'] as RequestSource[]).map((s) => (
                             <option key={s} value={s}>
-                                {s}
+                                {s.replace(/_/g, ' ')}
                             </option>
                         ))}
                     </select>

@@ -20,9 +20,15 @@ router = APIRouter(prefix="/candidates", tags=["Candidates"])
 # Valid status transitions for pipeline stages
 ADMIN_REVIEW_TRANSITIONS = {
     CandidateStatus.NEW: [
+        CandidateStatus.SCREENING,
         CandidateStatus.SUBMITTED_TO_ADMIN,
         CandidateStatus.WITH_ADMIN,
         CandidateStatus.REJECTED_BY_ADMIN,
+        CandidateStatus.SCREEN_REJECT,
+    ],
+    CandidateStatus.SCREENING: [
+        CandidateStatus.SUBMITTED_TO_ADMIN,
+        CandidateStatus.WITH_ADMIN,
         CandidateStatus.SCREEN_REJECT,
     ],
     CandidateStatus.SUBMITTED_TO_ADMIN: [
@@ -44,6 +50,7 @@ ADMIN_REVIEW_TRANSITIONS = {
     CandidateStatus.L1_SCHEDULED: [
         CandidateStatus.L1_COMPLETED,
         CandidateStatus.L1_REJECT,
+        CandidateStatus.INTERVIEW_BACK_OUT,
     ],
     CandidateStatus.L1_COMPLETED: [
         CandidateStatus.L1_SHORTLIST,
@@ -59,13 +66,17 @@ ADMIN_REVIEW_TRANSITIONS = {
         CandidateStatus.SELECTED,
         CandidateStatus.REJECTED_BY_CLIENT,
         CandidateStatus.ON_HOLD,
+        CandidateStatus.INTERVIEW_BACK_OUT,
     ],
     CandidateStatus.SELECTED: [
         CandidateStatus.ONBOARDED,
+        CandidateStatus.OFFER_BACK_OUT,
     ],
     # Terminal statuses — no transitions out
     CandidateStatus.L1_REJECT: [],
     CandidateStatus.SCREEN_REJECT: [],
+    CandidateStatus.INTERVIEW_BACK_OUT: [],
+    CandidateStatus.OFFER_BACK_OUT: [],
 }
 
 
