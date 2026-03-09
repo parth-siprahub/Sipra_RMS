@@ -8,6 +8,7 @@ export interface SOW {
     target_date: string | null;
     submitted_date: string | null;
     max_resources: number | null;
+    job_profile_id: number | null;
     is_active?: boolean;
     created_at?: string;
 }
@@ -19,6 +20,7 @@ export interface SowCreate {
     target_date?: string;
     submitted_date?: string;
     max_resources?: number;
+    job_profile_id?: number;
 }
 
 export interface SowUpdate {
@@ -28,6 +30,7 @@ export interface SowUpdate {
     target_date?: string;
     submitted_date?: string;
     max_resources?: number;
+    job_profile_id?: number;
     is_active?: boolean;
 }
 

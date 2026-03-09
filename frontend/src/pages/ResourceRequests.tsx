@@ -158,9 +158,14 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
                         onChange={(e) => {
                             const selectedSowId = e.target.value ? Number(e.target.value) : '';
                             setSowId(selectedSowId);
-                            // Auto-select first matching job profile if one exists for this SOW
-                            if (selectedSowId && jobProfiles.length > 0 && !jobProfileId) {
-                                setJobProfileId(jobProfiles[0].id);
+                            // Auto-select the SOW's linked job profile, or first available
+                            if (selectedSowId) {
+                                const selectedSow = sows.find(s => s.id === selectedSowId);
+                                if (selectedSow?.job_profile_id) {
+                                    setJobProfileId(selectedSow.job_profile_id);
+                                } else if (jobProfiles.length > 0 && !jobProfileId) {
+                                    setJobProfileId(jobProfiles[0].id);
+                                }
                             }
                         }}
                         required
