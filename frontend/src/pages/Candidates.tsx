@@ -10,6 +10,8 @@ import type {
 } from '../api/candidates';
 import type { ResourceRequest } from '../api/resourceRequests';
 import { vendorsApi, type Vendor } from '../api/vendors';
+import { sowApi, type SOW } from '../api/sows';
+import { jobProfileApi, type JobProfile } from '../api/jobProfiles';
 
 import { Modal } from '../components/ui/Modal';
 import { StatusBadge } from '../components/ui/StatusBadge';
@@ -552,9 +554,11 @@ interface CreateCandidateModalProps {
     onCreated: () => void;
     requests: ResourceRequest[];
     vendors: Vendor[];
+    sows: SOW[];
+    jobProfiles: JobProfile[];
 }
 
-function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors }: CreateCandidateModalProps) {
+function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors, sows, jobProfiles }: CreateCandidateModalProps) {
     const emptyForm = (): CreateCandidatePayload => ({
         first_name: '',
         last_name: '',
@@ -615,12 +619,33 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors }:
                         title="Select Request"
                     >
                         <option value="">Global Talent Pool (No specific request)</option>
-                        {requests.filter(r => r.status === 'OPEN').map(r => (
-                            <option key={r.id} value={r.id}>
-                                {r.request_display_id} | {r.priority}
-                            </option>
-                        ))}
+                        {requests.filter(r => r.status === 'OPEN').map(r => {
+                            const jp = jobProfiles.find(p => p.id === r.job_profile_id);
+                            return (
+                                <option key={r.id} value={r.id}>
+                                    {r.request_display_id} | Priority: {r.priority} | Role: {jp?.role_name || '—'}
+                                </option>
+                            );
+                        })}
                     </select>
+                    {form.request_id && (() => {
+                        const selectedReq = requests.find(r => r.id === form.request_id);
+                        const linkedSow = selectedReq ? sows.find(s => s.id === selectedReq.sow_id) : null;
+                        const linkedJp = selectedReq ? jobProfiles.find(p => p.id === selectedReq.job_profile_id) : null;
+                        return (
+                            <div className="p-3 bg-surface-hover/50 rounded-lg border border-border space-y-1.5">
+                                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Request Context</p>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                                    <span className="text-text-muted">SOW:</span>
+                                    <span className="text-text font-medium">{linkedSow ? `${linkedSow.sow_number} — ${linkedSow.client_name}` : '—'}</span>
+                                    <span className="text-text-muted">Job Profile:</span>
+                                    <span className="text-text font-medium">{linkedJp ? `${linkedJp.role_name} (${linkedJp.technology})` : '—'}</span>
+                                    <span className="text-text-muted">Max Resources:</span>
+                                    <span className="text-text font-medium">{linkedSow?.max_resources ?? '—'}</span>
+                                </div>
+                            </div>
+                        );
+                    })()}
                     <p className="text-[10px] text-text-muted px-1">
                         Linking a candidate to a request helps track pipeline metrics more accurately.
                     </p>
@@ -867,20 +892,26 @@ export function Candidates() {
     const [statusFilter, setStatusFilter] = useState('');
     const [requests, setRequests] = useState<ResourceRequest[]>([]);
     const [vendors, setVendors] = useState<Vendor[]>([]);
+    const [sows, setSows] = useState<SOW[]>([]);
+    const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
 
     const fetchCandidates = useCallback(async () => {
         setLoading(true);
         try {
-            const [cData, rData, vData] = await Promise.all([
+            const [cData, rData, vData, sowData, jpData] = await Promise.all([
                 candidatesApi.list(
                     statusFilter && viewMode === 'table' ? { status: statusFilter } : undefined
                 ),
                 resourceRequestsApi.list(),
-                vendorsApi.list()
+                vendorsApi.list(),
+                sowApi.list(),
+                jobProfileApi.list()
             ]);
             setCandidates(cData);
             setRequests(rData);
             setVendors(vData || []);
+            setSows(sowData || []);
+            setJobProfiles(jpData || []);
         } catch {
             // handled globally
         } finally {
@@ -1107,6 +1138,8 @@ export function Candidates() {
                 onCreated={fetchCandidates}
                 requests={requests}
                 vendors={vendors}
+                sows={sows}
+                jobProfiles={jobProfiles}
             />
 
             {/* Details Modal */}

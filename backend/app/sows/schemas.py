@@ -10,6 +10,7 @@ class SowCreate(BaseModel):
     target_date: date | None = None
     submitted_date: date | None = None
     max_resources: int | None = None
+    job_profile_id: int | None = None
 
 
 class SowUpdate(BaseModel):
@@ -19,6 +20,7 @@ class SowUpdate(BaseModel):
     target_date: date | None = None
     submitted_date: date | None = None
     max_resources: int | None = None
+    job_profile_id: int | None = None
     is_active: bool | None = None
 
 
@@ -30,5 +32,6 @@ class SowResponse(BaseModel):
     target_date: date | None = None
     submitted_date: date | None = None
     max_resources: int | None = None
+    job_profile_id: int | None = None
     is_active: bool | None = None
     created_at: datetime | None = None

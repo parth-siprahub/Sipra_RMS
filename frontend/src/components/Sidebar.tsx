@@ -22,10 +22,10 @@ interface SidebarProps {
 
 const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
+    { to: '/sows', icon: ScrollText, label: 'SOWs' },
+    { to: '/job-profiles', icon: FileText, label: 'Job Profiles' },
     { to: '/resource-requests', icon: Briefcase, label: 'Resource Requests' },
     { to: '/candidates', icon: Users, label: 'Candidates' },
-    { to: '/job-profiles', icon: FileText, label: 'Job Profiles' },
-    { to: '/sows', icon: ScrollText, label: 'SOWs' },
     { to: '/communication-logs', icon: MessageSquare, label: 'Comm. Logs' },
     { to: '/vendors', icon: Building2, label: 'Vendors' },
 ];

@@ -93,6 +93,12 @@ async def list_candidates(
 
     client = await get_supabase_admin_async()
     query = client.table("candidates").select("*")
+    # Application-level RLS: vendors can only see their own candidates
+    user_role = current_user.get("role", "").upper()
+    if user_role == "VENDOR":
+        vendor_id = current_user.get("vendor_id")
+        if vendor_id:
+            query = query.eq("vendor_id", vendor_id)
     if request_id:
         query = query.eq("request_id", request_id)
     if candidate_status:

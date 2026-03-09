@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { sowApi } from '../../api/sows';
 import { type SOW } from '../../api/sows';
+import { jobProfileApi, type JobProfile } from '../../api/jobProfiles';
 import toast from 'react-hot-toast';
-import { Calendar, Users, Hash, Building2 } from 'lucide-react';
+import { Calendar, Users, Hash, Building2, Briefcase } from 'lucide-react';
 
 interface SowModalProps {
     isOpen: boolean;
@@ -14,6 +15,7 @@ interface SowModalProps {
 
 export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
     const [loading, setLoading] = useState(false);
+    const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
     const [formData, setFormData] = useState({
         sow_number: '',
         client_name: '',
@@ -21,8 +23,15 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
         target_date: '',
         submitted_date: '',
         max_resources: 0,
+        job_profile_id: undefined as number | undefined,
         is_active: true,
     });
+
+    useEffect(() => {
+        if (isOpen) {
+            jobProfileApi.list().then(setJobProfiles).catch(() => {});
+        }
+    }, [isOpen]);
 
     useEffect(() => {
         if (sow) {
@@ -33,6 +42,7 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
                 target_date: sow.target_date || '',
                 submitted_date: sow.submitted_date || '',
                 max_resources: sow.max_resources || 0,
+                job_profile_id: sow.job_profile_id ?? undefined,
                 is_active: sow.is_active !== false,
             });
         } else {
@@ -43,6 +53,7 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
                 target_date: '',
                 submitted_date: '',
                 max_resources: 0,
+                job_profile_id: undefined,
                 is_active: true,
             });
         }
@@ -105,6 +116,29 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
                                 required
                                 placeholder="Client Alpha Inc."
                             />
+                        </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                        <label className="input-label" htmlFor="job_profile_id">Linked Job Profile</label>
+                        <div className="relative">
+                            <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+                            <select
+                                id="job_profile_id"
+                                className="input-field pl-10 appearance-none"
+                                value={formData.job_profile_id ?? ''}
+                                onChange={(e) => setFormData({
+                                    ...formData,
+                                    job_profile_id: e.target.value ? parseInt(e.target.value) : undefined
+                                })}
+                            >
+                                <option value="">— No linked profile —</option>
+                                {jobProfiles.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.role_name} ({p.technology})
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 
