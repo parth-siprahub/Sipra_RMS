@@ -49,5 +49,4 @@ requests_debug.json
 # ─── Archives ───────────────────────────────────────────
 *.rar
 *.zip
-.agent
 _legacy_archive/
