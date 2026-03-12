@@ -29,6 +29,7 @@ export interface Candidate {
     last_name: string;
     email: string;
     phone: string | null;
+    source: string | null;
     vendor: string | null;
     vendor_id: number | null;
     current_company: string | null;
@@ -60,11 +61,14 @@ export interface Candidate {
     created_at: string | null;
 }
 
+export type CandidateSource = 'PORTAL' | 'JOB_BOARDS' | 'NETWORK' | 'VENDORS' | 'LINKEDIN' | 'INTERNAL';
+
 export interface CreateCandidatePayload {
     first_name: string;
     last_name: string;
     email: string;
     phone?: string;
+    source?: CandidateSource;
     vendor?: string;
     vendor_id?: number;
     current_company?: string;

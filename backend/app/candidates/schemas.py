@@ -35,6 +35,7 @@ class CandidateCreate(BaseModel):
     last_name: str
     email: str
     phone: str | None = None
+    source: str | None = None
     vendor: str | None = None
     vendor_id: int | None = None
     current_company: str | None = None
@@ -59,6 +60,7 @@ class CandidateUpdate(BaseModel):
     email: str | None = None
     phone: str | None = None
     request_id: int | None = None
+    source: str | None = None
     vendor: str | None = None
     vendor_id: int | None = None
     current_company: str | None = None
@@ -107,6 +109,7 @@ class CandidateResponse(BaseModel):
     last_name: str
     email: str
     phone: str | None = None
+    source: str | None = None
     vendor: str | None = None
     vendor_id: int | None = None
     current_company: str | None = None

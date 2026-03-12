@@ -6,6 +6,7 @@ import { resourceRequestsApi } from '../api/resourceRequests';
 import type {
     Candidate,
     CandidateStatus,
+    CandidateSource,
     CreateCandidatePayload,
 } from '../api/candidates';
 import type { ResourceRequest } from '../api/resourceRequests';
@@ -119,6 +120,7 @@ interface KanbanBoardProps {
 function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick }: KanbanBoardProps) {
     const draggingIdRef = useRef<number | null>(null);
     const [draggingId, setDraggingId] = useState<number | null>(null);
+    const [dragOverStatus, setDragOverStatus] = useState<CandidateStatus | null>(null);
 
     const grouped = (stages: CandidateStatus[]) =>
         stages.reduce<Record<string, Candidate[]>>((acc, s) => {
@@ -129,12 +131,32 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick }: 
     const pipelineGroups = grouped(PIPELINE_STAGES);
     const closedGroups = grouped(CLOSED_STAGES);
 
-    const handleDragStart = (id: number) => {
+    const handleDragStart = (e: React.DragEvent, id: number) => {
         draggingIdRef.current = id;
         setDraggingId(id);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(id));
     };
 
-    const handleDrop = (targetStatus: CandidateStatus) => {
+    const handleDragOver = (e: React.DragEvent, status: CandidateStatus) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragOverStatus !== status) {
+            setDragOverStatus(status);
+        }
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        // Only clear if we're actually leaving the column (not entering a child)
+        const relatedTarget = e.relatedTarget as HTMLElement | null;
+        if (!relatedTarget || !e.currentTarget.contains(relatedTarget)) {
+            setDragOverStatus(null);
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent, targetStatus: CandidateStatus) => {
+        e.preventDefault();
+        setDragOverStatus(null);
         const id = draggingIdRef.current;
         if (id === null) return;
         const candidate = candidates.find((c) => c.id === id);
@@ -148,63 +170,84 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick }: 
         draggingIdRef.current = null;
     };
 
-    const renderColumn = (status: CandidateStatus, items: Candidate[]) => (
-        <div
-            key={status}
-            className={cn(
-                'flex flex-col min-w-[220px] w-[220px] bg-surface rounded-xl border-t-2 border border-border shrink-0',
-                STAGE_COLORS[status]
-            )}
-            onMouseUp={() => handleDrop(status)}
-        >
-            {/* Column Header */}
-            <div className="px-3 py-2 border-b border-border">
-                <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-text-muted uppercase tracking-wide">
-                        {STAGE_LABELS[status]}
-                    </span>
-                    <span className="text-xs font-bold bg-surface-hover text-text-muted rounded-full px-2 py-0.5">
-                        {items.length}
-                    </span>
-                </div>
-            </div>
+    const handleDragEnd = () => {
+        setDraggingId(null);
+        setDragOverStatus(null);
+        draggingIdRef.current = null;
+    };
 
-            {/* Cards */}
-            <div className="flex-1 p-2 space-y-2 min-h-[120px]">
-                {items.length === 0 && (
-                    <div className="h-16 border-2 border-dashed border-border rounded-lg flex items-center justify-center">
-                        <span className="text-xs text-text-muted">Drop here</span>
-                    </div>
+    const renderColumn = (status: CandidateStatus, items: Candidate[]) => {
+        const isDragOver = dragOverStatus === status;
+        const isDraggingFromThis = draggingId !== null && candidates.find(c => c.id === draggingId)?.status === status;
+
+        return (
+            <div
+                key={status}
+                className={cn(
+                    'flex flex-col min-w-[220px] w-[220px] bg-surface rounded-xl border-t-2 border border-border shrink-0 transition-all duration-200',
+                    STAGE_COLORS[status],
+                    isDragOver && !isDraggingFromThis && 'ring-2 ring-cta/50 border-cta/40 bg-cta/5 scale-[1.02]',
+                    isDragOver && isDraggingFromThis && 'ring-1 ring-border'
                 )}
-                {items.map((c) => (
-                    <div
-                        key={c.id}
-                        draggable
-                        onDragStart={() => handleDragStart(c.id)}
-                        onMouseDown={() => handleDragStart(c.id)}
-                        onMouseUp={(e) => e.stopPropagation()}
-                        onDragEnd={() => { setDraggingId(null); draggingIdRef.current = null; }}
-                        onClick={() => onCandidateClick(c)}
-                        className={cn(
-                            'card p-3 cursor-grab active:cursor-grabbing select-none transition-all duration-150 hover:border-cta',
-                            draggingId === c.id && 'opacity-50 scale-95'
-                        )}
-                    >
-                        <p className="text-sm font-semibold text-text truncate">
-                            {c.first_name} {c.last_name}
-                        </p>
-                        <p className="text-xs text-text-muted truncate mt-0.5">{c.email}</p>
-                        {c.current_company && (
-                            <p className="text-xs text-text-muted truncate">{c.current_company}</p>
-                        )}
-                        <span className="badge badge-neutral mt-2 text-[10px]">
-                            {vendors.find(v => v.id === c.vendor_id)?.name || c.vendor || 'INTERNAL'}
+                onDragOver={(e) => handleDragOver(e, status)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, status)}
+            >
+                {/* Column Header */}
+                <div className="px-3 py-2 border-b border-border">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-text-muted uppercase tracking-wide">
+                            {STAGE_LABELS[status]}
+                        </span>
+                        <span className="text-xs font-bold bg-surface-hover text-text-muted rounded-full px-2 py-0.5">
+                            {items.length}
                         </span>
                     </div>
-                ))}
+                </div>
+
+                {/* Cards */}
+                <div className={cn(
+                    'flex-1 p-2 space-y-2 min-h-[120px] transition-colors duration-200',
+                    isDragOver && !isDraggingFromThis && 'bg-cta/5'
+                )}>
+                    {items.length === 0 && (
+                        <div className={cn(
+                            'h-16 border-2 border-dashed rounded-lg flex items-center justify-center transition-all duration-200',
+                            isDragOver ? 'border-cta/50 bg-cta/10 text-cta' : 'border-border'
+                        )}>
+                            <span className="text-xs text-text-muted">
+                                {isDragOver ? 'Release to drop' : 'Drop here'}
+                            </span>
+                        </div>
+                    )}
+                    {items.map((c) => (
+                        <div
+                            key={c.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, c.id)}
+                            onDragEnd={handleDragEnd}
+                            onClick={() => onCandidateClick(c)}
+                            className={cn(
+                                'card p-3 cursor-grab active:cursor-grabbing select-none transition-all duration-150 hover:border-cta',
+                                draggingId === c.id && 'opacity-40 scale-95 shadow-none'
+                            )}
+                        >
+                            <p className="text-sm font-semibold text-text truncate">
+                                {c.first_name} {c.last_name}
+                            </p>
+                            <p className="text-xs text-text-muted truncate mt-0.5">{c.email}</p>
+                            {c.current_company && (
+                                <p className="text-xs text-text-muted truncate">{c.current_company}</p>
+                            )}
+                            <span className="badge badge-neutral mt-2 text-[10px]">
+                                {vendors.find(v => v.id === c.vendor_id)?.name || c.vendor || 'INTERNAL'}
+                            </span>
+                        </div>
+                    ))}
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <div className="space-y-6">
@@ -239,14 +282,19 @@ interface DetailsModalProps {
     onClose: () => void;
     onUpdated: () => void;
     vendors: Vendor[];
+    onStatusChange: (id: number, status: CandidateStatus) => void;
 }
 
-function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors }: DetailsModalProps) {
+// All valid statuses for the manual status dropdown
+const ALL_CANDIDATE_STATUSES: CandidateStatus[] = [...PIPELINE_STAGES, ...CLOSED_STAGES];
+
+function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors, onStatusChange }: DetailsModalProps) {
     const [activeTab, setActiveTab] = useState<'info' | 'interview' | 'transition'>('info');
     const [submitting, setSubmitting] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Candidate>>({});
     const [logs, setLogs] = useState<CommunicationLog[]>([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
+    const [changingStatus, setChangingStatus] = useState(false);
 
     useEffect(() => {
         if (candidate && isOpen) {
@@ -277,6 +325,16 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors 
 
     if (!candidate) return null;
 
+    const handleManualStatusChange = async (newStatus: CandidateStatus) => {
+        if (!candidate || newStatus === candidate.status) return;
+        setChangingStatus(true);
+        try {
+            await onStatusChange(candidate.id, newStatus);
+        } finally {
+            setChangingStatus(false);
+        }
+    };
+
     const handleUpdate = async () => {
         setSubmitting(true);
         try {
@@ -299,6 +357,31 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors 
             maxWidth="max-w-2xl"
         >
             <div className="space-y-6">
+                {/* Status Changer */}
+                <div className="flex items-center gap-3 px-1">
+                    <span className="text-xs font-bold text-text-muted uppercase tracking-wider shrink-0">
+                        Status
+                    </span>
+                    <div className="flex items-center gap-2 flex-1">
+                        <StatusBadge value={candidate.status} type="candidate" />
+                        <span className="text-text-muted text-xs">→</span>
+                        <select
+                            className="input-field text-sm py-1.5 flex-1 max-w-[220px]"
+                            value={candidate.status || ''}
+                            onChange={(e) => handleManualStatusChange(e.target.value as CandidateStatus)}
+                            disabled={changingStatus}
+                            aria-label="Change candidate status"
+                        >
+                            {ALL_CANDIDATE_STATUSES.map((s) => (
+                                <option key={s} value={s}>
+                                    {STAGE_LABELS[s]}
+                                </option>
+                            ))}
+                        </select>
+                        {changingStatus && <span className="spinner w-4 h-4" />}
+                    </div>
+                </div>
+
                 {/* Tabs */}
                 <div className="flex border-b border-border">
                     {([
@@ -584,7 +667,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors, s
                 try {
                     await candidatesApi.uploadResume(candidate.id, resumeFile);
                     toast.success('Candidate and Resume added!');
-                } catch (err: any) {
+                } catch {
                     toast.error('Candidate added, but resume upload failed.');
                 }
             } else {
@@ -738,25 +821,54 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors, s
                         </h4>
 
                         <div className="space-y-1.5">
-                            <label className="text-[11px] font-semibold text-text-muted px-1 flex items-center gap-1" htmlFor="c-vendor">
-                                <LinkIcon size={12} /> Sourcing Vendor
+                            <label className="text-[11px] font-semibold text-text-muted px-1 flex items-center gap-1" htmlFor="c-source">
+                                <LinkIcon size={12} /> Source
                             </label>
                             <select
-                                id="c-vendor"
+                                id="c-source"
                                 className="input-field"
-                                value={form.vendor_id || ''}
-                                onChange={(e) => set('vendor_id', e.target.value ? parseInt(e.target.value) : undefined)}
+                                value={form.source || ''}
+                                onChange={(e) => {
+                                    const val = e.target.value as CandidateSource | '';
+                                    set('source', val || undefined);
+                                    // Clear vendor when source changes away from VENDORS
+                                    if (val !== 'VENDORS') {
+                                        set('vendor_id', undefined);
+                                    }
+                                }}
                                 required
-                                title="Select Vendor"
+                                title="Select Source"
                             >
-                                <option value="">— Select Vendor —</option>
-                                {vendors.filter(v => v.is_active).map((v) => (
-                                    <option key={v.id} value={v.id}>
-                                        {v.name}
+                                <option value="">— Select Source —</option>
+                                {(['PORTAL', 'JOB_BOARDS', 'NETWORK', 'VENDORS', 'LINKEDIN', 'INTERNAL'] as CandidateSource[]).map((s) => (
+                                    <option key={s} value={s}>
+                                        {s.replace(/_/g, ' ')}
                                     </option>
                                 ))}
                             </select>
                         </div>
+
+                        {form.source === 'VENDORS' && (
+                            <div className="space-y-1.5">
+                                <label className="text-[11px] font-semibold text-text-muted px-1 flex items-center gap-1" htmlFor="c-vendor">
+                                    <Building2 size={12} /> Vendor
+                                </label>
+                                <select
+                                    id="c-vendor"
+                                    className="input-field"
+                                    value={form.vendor_id || ''}
+                                    onChange={(e) => set('vendor_id', e.target.value ? parseInt(e.target.value) : undefined)}
+                                    title="Select Vendor"
+                                >
+                                    <option value="">— Select Vendor —</option>
+                                    {vendors.filter(v => v.is_active).map((v) => (
+                                        <option key={v.id} value={v.id}>
+                                            {v.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
                         <div className="space-y-1.5">
                             <label className="text-[11px] font-semibold text-text-muted px-1" htmlFor="c-company">
@@ -927,9 +1039,15 @@ export function Candidates() {
         try {
             await candidatesApi.review(id, status);
             toast.success(`Moved to ${STAGE_LABELS[status]}`);
+            // Optimistically update the selected candidate so the details modal stays in sync
+            setSelectedCandidate(prev =>
+                prev && prev.id === id ? { ...prev, status } : prev
+            );
             fetchCandidates();
-        } catch {
-            // handled
+        } catch (err: unknown) {
+            const msg =
+                err instanceof Error ? err.message : 'Status transition not allowed';
+            toast.error(msg);
         }
     };
 
@@ -1149,6 +1267,7 @@ export function Candidates() {
                 onClose={() => { setIsDetailsOpen(false); setSelectedCandidate(null); }}
                 onUpdated={fetchCandidates}
                 vendors={vendors}
+                onStatusChange={handleStatusChange}
             />
         </div>
     );
