@@ -1,4 +1,7 @@
 """Dashboard metrics — aligned with actual DB schema."""
+from datetime import datetime, timedelta
+from collections import defaultdict
+
 from fastapi import APIRouter, Depends
 from app.auth.dependencies import get_current_user
 from app.database import get_supabase_admin_async
@@ -30,7 +33,7 @@ async def get_metrics(current_user: dict = Depends(get_current_user)):
         by_priority[p] = by_priority.get(p, 0) + 1
 
     # 2. Candidate Metrics (Detailed Pipeline)
-    candidates_raw = await client.table("candidates").select("status, vendor_id, vendor, request_id").execute()
+    candidates_raw = await client.table("candidates").select("status, vendor_id, vendor, request_id, created_at, skills").execute()
     all_candidates = candidates_raw.data or []
     candidates_by_status: dict[str, int] = {}
     for c in all_candidates:
@@ -80,6 +83,39 @@ async def get_metrics(current_user: dict = Depends(get_current_user)):
             "current": count,
         })
 
+    # 5. Candidate Timeline (last 30 days)
+    cutoff = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+    timeline_counts: dict[str, int] = defaultdict(int)
+    for c in all_candidates:
+        ca = c.get("created_at")
+        if ca:
+            day = ca[:10]  # "YYYY-MM-DD"
+            if day >= cutoff:
+                timeline_counts[day] += 1
+    timeline = sorted(
+        [{"date": d, "count": n} for d, n in timeline_counts.items()],
+        key=lambda x: x["date"],
+    )
+
+    # 6. Candidates by Skill (parsed from comma-separated string)
+    skill_counts: dict[str, int] = defaultdict(int)
+    for c in all_candidates:
+        raw_skills = c.get("skills") or ""
+        for s in raw_skills.split(","):
+            s = s.strip()
+            if s:
+                skill_counts[s] += 1
+    candidates_by_skill = sorted(
+        [{"skill": k, "count": v} for k, v in skill_counts.items()],
+        key=lambda x: x["count"],
+        reverse=True,
+    )
+
+    # 7. Compute rejection_rate per vendor
+    for v_name, stats in vendor_stats.items():
+        total = stats["total"]
+        stats["rejection_rate"] = round(stats["rejected"] / total * 100, 1) if total > 0 else 0.0
+
     result = {
         "total_requests": len(all_requests),
         "requests_by_status": by_status,
@@ -89,6 +125,8 @@ async def get_metrics(current_user: dict = Depends(get_current_user)):
         "backfill_count": sum(1 for r in all_requests if r.get("is_backfill")),
         "vendor_performance": vendor_stats,
         "sow_utilization": sow_utilization,
+        "timeline": timeline,
+        "candidates_by_skill": candidates_by_skill,
     }
     
     api_cache.set(cache_key, result)
