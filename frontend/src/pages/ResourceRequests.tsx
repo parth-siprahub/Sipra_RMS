@@ -6,7 +6,6 @@ import type {
     ResourceRequest,
     RequestStatus,
     RequestPriority,
-    RequestSource,
     CreateResourceRequestPayload,
 } from '../api/resourceRequests';
 
@@ -89,7 +88,6 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
     const [sowId, setSowId] = useState<number | ''>('');
     const [jobProfileId, setJobProfileId] = useState<number | ''>('');
     const [priority, setPriority] = useState<RequestPriority>('MEDIUM');
-    const [source, setSource] = useState<RequestSource | ''>('');
     const [isBackfill, setIsBackfill] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
@@ -124,7 +122,6 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
                 is_backfill: isBackfill,
                 sow_id: Number(sowId),
                 job_profile_id: Number(jobProfileId),
-                ...(source ? { source } : {}),
             };
             await resourceRequestsApi.create(payload);
             toast.success('Resource request created!');
@@ -134,7 +131,6 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
             setSowId('');
             setJobProfileId('');
             setPriority('MEDIUM');
-            setSource('');
             setIsBackfill(false);
         } catch {
             // error toast handled by client.ts
@@ -215,26 +211,6 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
                         {(['URGENT', 'HIGH', 'MEDIUM', 'LOW'] as RequestPriority[]).map((p) => (
                             <option key={p} value={p}>
                                 {p}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* Source */}
-                <div>
-                    <label className="input-label" htmlFor="rr-source">
-                        Source
-                    </label>
-                    <select
-                        id="rr-source"
-                        className="input-field"
-                        value={source}
-                        onChange={(e) => setSource(e.target.value as RequestSource | '')}
-                    >
-                        <option value="">— Select source —</option>
-                        {(['PORTAL', 'JOB_BOARDS', 'NETWORK', 'VENDORS'] as RequestSource[]).map((s) => (
-                            <option key={s} value={s}>
-                                {s.replace(/_/g, ' ')}
                             </option>
                         ))}
                     </select>
