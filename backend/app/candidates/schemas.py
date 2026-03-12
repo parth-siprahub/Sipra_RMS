@@ -9,6 +9,7 @@ from enum import Enum
 
 class CandidateStatus(str, Enum):
     NEW = "NEW"
+    SCREENING = "SCREENING"
     SUBMITTED_TO_ADMIN = "SUBMITTED_TO_ADMIN"
     WITH_ADMIN = "WITH_ADMIN"
     REJECTED_BY_ADMIN = "REJECTED_BY_ADMIN"
@@ -23,6 +24,8 @@ class CandidateStatus(str, Enum):
     REJECTED_BY_CLIENT = "REJECTED_BY_CLIENT"
     ON_HOLD = "ON_HOLD"
     SCREEN_REJECT = "SCREEN_REJECT"
+    INTERVIEW_BACK_OUT = "INTERVIEW_BACK_OUT"
+    OFFER_BACK_OUT = "OFFER_BACK_OUT"
     EXIT = "EXIT"
 
 
@@ -32,6 +35,7 @@ class CandidateCreate(BaseModel):
     last_name: str
     email: str
     phone: str | None = None
+    source: str | None = None
     vendor: str | None = None
     vendor_id: int | None = None
     current_company: str | None = None
@@ -46,6 +50,8 @@ class CandidateCreate(BaseModel):
     remarks: str | None = None
     screening_comment: str | None = None
     vendor_feedback: str | None = None
+    l1_feedback_file_url: str | None = None
+    l2_feedback_file_url: str | None = None
 
 
 class CandidateUpdate(BaseModel):
@@ -54,6 +60,7 @@ class CandidateUpdate(BaseModel):
     email: str | None = None
     phone: str | None = None
     request_id: int | None = None
+    source: str | None = None
     vendor: str | None = None
     vendor_id: int | None = None
     current_company: str | None = None
@@ -76,6 +83,8 @@ class CandidateUpdate(BaseModel):
     l1_score: int | None = None
     l2_feedback: str | None = None
     l2_score: int | None = None
+    l1_feedback_file_url: str | None = None
+    l2_feedback_file_url: str | None = None
     overlap_until: date | None = None
 
 
@@ -100,6 +109,7 @@ class CandidateResponse(BaseModel):
     last_name: str
     email: str
     phone: str | None = None
+    source: str | None = None
     vendor: str | None = None
     vendor_id: int | None = None
     current_company: str | None = None
@@ -125,5 +135,7 @@ class CandidateResponse(BaseModel):
     l1_score: int | None = None
     l2_feedback: str | None = None
     l2_score: int | None = None
+    l1_feedback_file_url: str | None = None
+    l2_feedback_file_url: str | None = None
     overlap_until: date | None = None
     created_at: datetime | None = None

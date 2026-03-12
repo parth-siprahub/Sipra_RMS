@@ -5,9 +5,9 @@ from datetime import datetime
 
 class VendorCreate(BaseModel):
     name: str
-    contact_person: str | None = None
-    contact_email: str | None = None
-    contact_phone: str | None = None
+    contact_person: str
+    contact_email: str
+    contact_phone: str
     is_active: bool = True
 
 

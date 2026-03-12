@@ -13,14 +13,14 @@ router = APIRouter(prefix="/job-profiles", tags=["Job Profiles"])
 
 
 @router.get("/", response_model=list[JobProfileResponse])
-def list_job_profiles(current_user: dict = Depends(get_current_user)):
-    client = get_supabase_admin()
-    result = client.table("job_profiles").select("*").order("role_name").execute()
+async def list_job_profiles(current_user: dict = Depends(get_current_user)):
+    client = await get_supabase_admin_async()
+    result = await client.table("job_profiles").select("*").order("role_name").execute()
     return result.data
 
 
 @router.post("/", response_model=JobProfileResponse, status_code=status.HTTP_201_CREATED)
-def create_job_profile(
+async def create_job_profile(
     payload: JobProfileCreate,
     current_user: dict = Depends(require_admin),
 ):
@@ -35,16 +35,16 @@ def create_job_profile(
 
 
 @router.get("/{profile_id}", response_model=JobProfileResponse)
-def get_job_profile(profile_id: int, current_user: dict = Depends(get_current_user)):
-    client = get_supabase_admin()
-    result = client.table("job_profiles").select("*").eq("id", profile_id).single().execute()
+async def get_job_profile(profile_id: int, current_user: dict = Depends(get_current_user)):
+    client = await get_supabase_admin_async()
+    result = await client.table("job_profiles").select("*").eq("id", profile_id).single().execute()
     if not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job profile not found")
     return result.data
 
 
 @router.put("/{profile_id}", response_model=JobProfileResponse)
-def update_job_profile(
+async def update_job_profile(
     profile_id: int,
     payload: JobProfileUpdate,
     current_user: dict = Depends(require_admin),
@@ -61,7 +61,7 @@ def update_job_profile(
 
 
 @router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_job_profile(
+async def delete_job_profile(
     profile_id: int,
     current_user: dict = Depends(require_admin),
 ):

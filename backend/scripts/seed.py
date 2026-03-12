@@ -76,12 +76,22 @@ def seed():
     admin_id = get_or_create_user("admin@siprarms.com", "Admin123!", "ADMIN")
     recruiter_id = get_or_create_user("recruiter@siprarms.com", "Recruiter123!", "RECRUITER")
     
+    # QA Admin accounts for HR team review
+    qa_admin_1 = get_or_create_user("hr.qa1@siprarms.com", "SipraQA2026!", "ADMIN")
+    qa_admin_2 = get_or_create_user("hr.qa2@siprarms.com", "SipraQA2026!", "ADMIN")
+    
+    # New Demo Admin accounts for HR & Managers
+    hr_demo = get_or_create_user("hr.lead@sipra.demo", "SipraAdmin@2026", "ADMIN")
+    manager_demo = get_or_create_user("hiring.manager@sipra.demo", "SipraAdmin@2026", "ADMIN")
+    
     if not admin_id or not recruiter_id:
         print("CRITICAL: Could not get ID for admin or recruiter. Exiting.")
         return
 
-    print(f"Admin ID: {admin_id}")
-    print(f"Recruiter ID: {recruiter_id}\n")
+    print(f"Primary Admin ID: {admin_id}")
+    print(f"Primary Recruiter ID: {recruiter_id}")
+    print(f"QA Admin 1: {qa_admin_1}")
+    print(f"QA Admin 2: {qa_admin_2}\n")
 
     # 1. Seed Job Profiles
     print("--- Job Profiles ---")
@@ -106,8 +116,8 @@ def seed():
     # 2. Seed SOWs
     print("\n--- SOWs ---")
     sows_data = [
-        {"sow_number": "SOW-2026-001", "client_name": "Acme Corp", "start_date": "2026-01-01", "end_date": "2026-12-31", "max_resources": 10},
-        {"sow_number": "SOW-2026-002", "client_name": "TechStart Inc", "start_date": "2026-03-01", "end_date": "2026-09-30", "max_resources": 5},
+        {"sow_number": "SOW-2026-001", "client_name": "Acme Corp", "start_date": "2026-01-01", "target_date": "2026-12-31", "max_resources": 10},
+        {"sow_number": "SOW-2026-002", "client_name": "TechStart Inc", "start_date": "2026-03-01", "target_date": "2026-09-30", "max_resources": 5},
     ]
     for s in sows_data:
         existing = client.table("sows").select("id").eq("sow_number", s["sow_number"]).execute()
@@ -123,10 +133,10 @@ def seed():
     # 3. Seed Resource Requests
     print("\n--- Resource Requests ---")
     requests_data = [
-        {"request_display_id": "REQ-20260115-001", "job_profile_id": jp_map.get("React Developer"), "sow_id": sow_map.get("SOW-2026-001"), "priority": "HIGH", "status": "OPEN", "source": "EMAIL", "created_by_id": admin_id},
+        {"request_display_id": "REQ-20260115-001", "job_profile_id": jp_map.get("React Developer"), "sow_id": sow_map.get("SOW-2026-001"), "priority": "HIGH", "status": "OPEN", "source": "JOB_BOARDS", "created_by_id": admin_id},
         {"request_display_id": "REQ-20260120-002", "job_profile_id": jp_map.get("Python Backend Engineer"), "sow_id": sow_map.get("SOW-2026-001"), "priority": "URGENT", "status": "OPEN", "source": "PORTAL", "created_by_id": admin_id},
-        {"request_display_id": "REQ-20260201-003", "job_profile_id": jp_map.get("DevOps Engineer"), "sow_id": sow_map.get("SOW-2026-002"), "priority": "MEDIUM", "status": "OPEN", "source": "CHAT", "created_by_id": recruiter_id},
-        {"request_display_id": "REQ-20260210-004", "job_profile_id": jp_map.get("React Developer"), "sow_id": sow_map.get("SOW-2026-002"), "priority": "LOW", "status": "HOLD", "source": "EMAIL", "created_by_id": recruiter_id},
+        {"request_display_id": "REQ-20260201-003", "job_profile_id": jp_map.get("DevOps Engineer"), "sow_id": sow_map.get("SOW-2026-002"), "priority": "MEDIUM", "status": "OPEN", "source": "NETWORK", "created_by_id": recruiter_id},
+        {"request_display_id": "REQ-20260210-004", "job_profile_id": jp_map.get("React Developer"), "sow_id": sow_map.get("SOW-2026-002"), "priority": "LOW", "status": "HOLD", "source": "VENDORS", "created_by_id": recruiter_id},
         {"request_display_id": "REQ-20260215-005", "job_profile_id": jp_map.get("Python Backend Engineer"), "sow_id": sow_map.get("SOW-2026-001"), "priority": "HIGH", "status": "CLOSED", "source": "PORTAL", "created_by_id": admin_id},
     ]
     for req in requests_data:

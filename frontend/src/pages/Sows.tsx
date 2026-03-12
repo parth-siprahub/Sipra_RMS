@@ -7,13 +7,15 @@ import {
     Plus,
     Search,
     Edit2,
-    Calendar
+    Calendar,
+    Briefcase
 } from 'lucide-react';
 import { EmptyState } from '../components/ui/EmptyState';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
 import { resourceRequestsApi } from '../api/resourceRequests';
 import { candidatesApi } from '../api/candidates';
+import { jobProfileApi, type JobProfile } from '../api/jobProfiles';
 
 export function Sows() {
     const [sows, setSows] = useState<SOW[]>([]);
@@ -23,17 +25,20 @@ export function Sows() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedSow, setSelectedSow] = useState<SOW | undefined>();
     const [onboardedCounts, setOnboardedCounts] = useState<Record<number, number>>({});
+    const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
 
     const fetchSows = async () => {
         try {
             setLoading(true);
-            const [sowsRes, reqsRes, candidatesRes] = await Promise.all([
+            const [sowsRes, reqsRes, candidatesRes, profilesRes] = await Promise.all([
                 sowApi.list(),
                 resourceRequestsApi.list(),
-                candidatesApi.list()
+                candidatesApi.list(),
+                jobProfileApi.list()
             ]);
 
             setSows(sowsRes || []);
+            setJobProfiles(profilesRes || []);
 
             const counts: Record<number, number> = {};
             const onboardedCandidates = (candidatesRes || []).filter(c => c.status === 'ONBOARDED');
@@ -160,6 +165,14 @@ export function Sows() {
                                                         )}
                                                     </div>
                                                     <p className="text-sm text-text-muted">{sow.client_name}</p>
+                                                    {sow.job_profile_id && (
+                                                        <div className="flex items-center gap-1 mt-0.5">
+                                                            <Briefcase size={11} className="text-cta" />
+                                                            <span className="text-[11px] text-cta font-medium">
+                                                                {jobProfiles.find(p => p.id === sow.job_profile_id)?.role_name || 'Unknown Profile'}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </td>
@@ -168,7 +181,19 @@ export function Sows() {
                                                 <Calendar size={14} />
                                                 <span>{sow.start_date || 'N/A'}</span>
                                                 <span>→</span>
-                                                <span>{sow.end_date || 'N/A'}</span>
+                                                <span className={cn(
+                                                    (() => {
+                                                        if (!sow.target_date) return '';
+                                                        const target = new Date(sow.target_date);
+                                                        const now = new Date();
+                                                        const diffDays = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                                                        if (diffDays < 0) return 'text-red-500 font-semibold';
+                                                        if (diffDays <= 7) return 'text-amber-500 font-semibold';
+                                                        return 'text-emerald-500';
+                                                    })()
+                                                )}>
+                                                    {sow.target_date || 'N/A'}
+                                                </span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">

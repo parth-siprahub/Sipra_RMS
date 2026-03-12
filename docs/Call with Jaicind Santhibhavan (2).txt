@@ -1,0 +1,564 @@
+﻿Call with Jaicind Santhibhavan-20260305_140334-Meeting Recording
+March 5, 2026, 8:33AM
+30m 7s
+
+Parth Patojoshi started transcription  
+
+Parth Patojoshi   0:03
+Yeah, sir, yes.  
+
+Jaicind Santhibhavan   0:04
+Yes.  
+
+Parth Patojoshi   0:06
+So starting off with the flow for RMS platform, we start with statement of work. So a statement of work is created before any profile is created before any other process is done. So there will be a SOW number, client name, start and end date, and maximum resources.  
+
+Jaicind Santhibhavan   0:21
+Yeah.  
+
+Parth Patojoshi   0:26
+So the whole point of SOW is just to say how much is maximum resource.  
+
+Jaicind Santhibhavan   0:31
+Yeah, correct.  
+
+Parth Patojoshi   0:33
+And after.  
+
+Jaicind Santhibhavan   0:35
+Sorry, just go back to so client name.
+when you get a SOW, you always need the technology, right? Like what profile you're looking for that is concern.  
+
+Parth Patojoshi   0:53
+Yes, Sir, after SOW is created, job profile comes in.
+Job profile has to be created.  
+
+Jaicind Santhibhavan   0:58
+Okay, yes, okay, then go with the flow. We'll see. Yeah, go ahead, go ahead.  
+
+Parth Patojoshi   1:01
+Yes, so after SOW is created, we go and create a job profile which is just a description of what their work will be.
+So details of that particular position or job description, we can say job description, yes. OK, so role name, technology, and experience level. How about Amandi? Where do we keep the entire JD job description, the detailed job description?
+OK, so we have to have an option to attach a file file or in any box some into where we can paste them in the entire you know details. OK, for example, we get a requirement, right? The summary of the role responsibility of the person, right? Few bulletins there summary will be on small paragraph and responsibilities are not just bulletins what he has to.
+Do an on job and then required skills, whatever the skill set that we are looking out for in that particular person, what are all skills he has to be there you know and his expertise. So these are the job description you know break up. So it may be like you know somewhere around some 20 to you know 3040 lines between 20 to 40 lines of I mean job description description will be there okay.
+Yeah, so when we are creating a job profile should be here itself. Yes, better convenient. Yes, OK, done. Yeah, right. Jason, so we can keep that box in a below this and you can enable option of you know attaching the file as well file as well, yes yeah.  
+
+Jaicind Santhibhavan   2:25
+Yes, yeah.
+Bye.
+But I I'm still not convinced that job profiles are created inside SOW because one SOW should map to.  
+
+Parth Patojoshi   2:39
+It is not inside SOW, Sir. It is just separately maintained. Close this and you just go there. Yes, Sir. So continuing with the flow after SOW and job profile is created, we go to resource request. So when we create a resource request, then the SOW.  
+
+Jaicind Santhibhavan   2:42
+Okay.
+okay, fine, fine. Alright, so that's what I was yeah.
+Yeah.
+Yeah, okay.  
+
+Parth Patojoshi   2:58
+And the job profile is linked here.  
+
+Jaicind Santhibhavan   3:01
+Yeah, perfect, perfect. That's what that's looking at. Yeah, sorry, this is good. I'm good with that.  
+
+Parth Patojoshi   3:03
+Yes, so here I mean the benefit is I mean like in a adjacent for example for us I know node Js and react Js are very continuous requirements. So if I just I mean like in a say that job profile will be we are going to create only one time for a node Js.  
+
+Jaicind Santhibhavan   3:21
+Correct, yeah.  
+
+Parth Patojoshi   3:22
+So every time we create a SOW we can you know tag these 2 in a resource request both SOW and *** profile.  
+
+Jaicind Santhibhavan   3:28
+Yes.
+Yeah, that's good. That's good. Yeah, that's.  
+
+Parth Patojoshi   3:32
+Yes, so resource request will be mapped to SOW and job profile along with priority and source. Right now we have left it this way, but it can be edited later. Yes, here I mean like you know the sources I think okay anyhow, you didn't made it mandatory so no problem.
+Yeah, yes, okay. So once the resource request is created, we can go and add a candidate. Okay. So when we add candidate, then we can select vendor here as welland vendor option in separate screen, we can add more vendors, correct? Which vendor we can add a target here, yes.
+And the connection will be to the request ID. Okay, yes, so.  
+
+Jaicind Santhibhavan   4:13
+Very good. Can you also show what the request job profile is so that now when you add a candidate, so on the drop down you showed the request ID, right? Can you also show the yeah.  
+
+Parth Patojoshi   4:25
+Yes, sir.
+The request ID number will reflect, so whatever request ID is created for the map SOW and job profile, we can select that here. Yes.  
+
+Jaicind Santhibhavan   4:32
+Yeah.
+Yeah, no, I'm good with that. After urgent, can you also say it's an RJS request or you know what I mean in the drop down wherever you're selecting, but.  
+
+Parth Patojoshi   4:45
+Okay, sir, yes, so a manual input so that it's visible.  
+
+Jaicind Santhibhavan   4:49
+No, you click on the drop down global talent, yeah, click there. So now I'm seeing a request ID pipe priority correct? Can you also say what job profile is it a not js profile or so that when I look at the request IDI know this is against it.  
+
+Parth Patojoshi   4:59
+Yes.
+Okay.  
+
+Jaicind Santhibhavan   5:08
+Node JS and it is urgent. Okay, so yeah.  
+
+Parth Patojoshi   5:11
+Okay, so should be visible. Should it be a hyphen along profile or should it be mentioned in the request IDs? Is it? No, I have a suggestion. I have a suggestion here. So sorry Jason, I am really sorry to come in between. So once someone like, okay, where is that?  
+
+Jaicind Santhibhavan   5:18
+No, you can just, yeah, go ahead.  
+
+Parth Patojoshi   5:28
+This one right resource resource request right once here you know we add a new resource if we are tagging another resource to any SOW right correct yes no I think how it works here resource request not resource candidates right sorry candidates.
+Once we add a new candidate, right? Once we select this one, if we select this one, OK, somewhere here in this below fields, OK, you can I know tab that I mean like in a profile name so that it auto fills auto fills, right? Yes, that will that be good an adjacent?  
+
+Jaicind Santhibhavan   6:06
+This is GERD.  
+
+Parth Patojoshi   6:10
+See once we sell, once we select this below right first name, second name, you know before this and anything personal information here we can have that tab job profile you know should be visible. Yes, yeah yes job profile and SOW both so both will get auto fill yes so that we will get to know what skill and we will get to know how many I know numbers also required.  
+
+Jaicind Santhibhavan   6:11
+Okay.
+yes.
+Yeah.  
+
+Parth Patojoshi   6:32
+Yes, done. That's my suggestion. If anything, that you can suggest for me.  
+
+Jaicind Santhibhavan   6:38
+No, that's good. That's good. I know basically I am my only gap I felt was when you look at the request ID, it is difficult to remember which job profile it is. So that's all.  
+
+Parth Patojoshi   6:43
+Yeah.
+Correct, correct. Yes, sir, understood.
+So after this is create, after the candidate is added, then the it can be seen in these both views and the candidate status, the candidate interview audit this L1, L2 feedback score and then.
+Interactions locked. This is not a feature yet. This is for phase 2. So this as you had suggested, it's manual right now, right? And here also for L1 or L2, the file upload option should be enabled. Yes, we will get a now majority of our feedbacks you know through forms.
+So going forward, so if all internal panels also come in Jason for our process, that's the next step that we are going to make. I mean all our resources soon we have had rather we will reduce the dependency of the vendor and we will see that I mean like you know these resources will pitch in for us enough for L1 or L2 interviews.  
+
+Jaicind Santhibhavan   7:45
+Yeah.
+Yeah.  
+
+Parth Patojoshi   7:50
+And we are creating a form OK for either Excel or in a word form where basic very simple and easy form so that the panels can easily fill and we can also easily understand enough from that form that whether this can be what is this candidate all about, right? So once we have those forms, it is mandatory for us to enable enough form uploading option.  
+
+Jaicind Santhibhavan   7:53
+Hey.
+Yeah.  
+
+Parth Patojoshi   8:12
+So that it will be visible here under L1 and L2 and manual feedback entry. At the same time, the one small box below that we can upload M&A form as well.
+Yes.
+So we have to enable here L1 for L2 so any form attachment yes and there is a transition as well this is in case of an overlap period with previous company okay and then candidate status can be updated automatically this way in active pipeline you just drag it and drop in the other place.
+Okay, it's not working, but usually this works or manually it can be updated. That is an option.
+Okay, that feature is lost.
+Yes, sir, I think that's pretty much it.  
+
+Jaicind Santhibhavan   9:10
+Yeah, this is good. Okay. Can you go show us the industry?  
+
+Parth Patojoshi   9:19
+Vendors, yes, so this is very simple.  
+
+Jaicind Santhibhavan   9:19
+Windows.
+Okay, yeah, I got it. Okay, fine now.  
+
+Parth Patojoshi   9:26
+Morefield Surf.
+Contact person email ID make it contact person email ID also mandatory okay and phone number also mandatory because we should have that those details in the portal anytime that if see I've created a vendor okay but next person came in after that he has to have those information you know in the same you know field.
+Right. So that okay. And vendors should have limited access whatever the requirements we assign to that particular vendor he should be the only those requirements should be visible for him. And when it comes to the data from the candidates, he should be able to see only the profiles what has been submitted by that particular vendor.
+No other candidate can be visible. No other requirement enough from our portal can be visible enough other.
+So that is what it right Jason, if anything else I need to be added here to.  
+
+Jaicind Santhibhavan   10:18
+Yes, yeah, I'm that is very correct. We need those details for vendor. So, but I'm just doing the entire screen. Okay, so if you can make a note, vendor needs those contact details all to be made mandatory. and.  
+
+Parth Patojoshi   10:20
+Okay.
+Correct.
+Correct. Yes, sir.  
+
+Jaicind Santhibhavan   10:38
+Yeah, can you come to the next screen? So if you have made it not, otherwise we can just go through some. So vendor need that change and can you go to the SOW? I was just thinking something was wrong. Okay, nowhere. What is missing? What is zero of 10? Where did you capture that?  
+
+Parth Patojoshi   10:46
+Yes.
+Sir, when we are creating SOW maximum resources here.  
+
+Jaicind Santhibhavan   11:01
+Yeah.
+Max resources. Okay, so you are.
+The That I understood, so that is the other part slash 10 is the max resources. Now, what comes on the first part?  
+
+Parth Patojoshi   11:14
+Yes.  
+
+Jaicind Santhibhavan   11:20
+You're putting zero slash 10, right? What is that 2? For example, the 4th SOW, you have 2, yeah.  
+
+Parth Patojoshi   11:22
+Yeah.
+2 out of them.
+Yes, so this SOW is mapped to 2 candidates. Okay, you said as the 10 max resources is 10. Max resources under this SOW is only 1010, so 2 resources are already mapped to this SOW. Okay, yes.  
+
+Jaicind Santhibhavan   11:34
+Means.
+Yeah.
+Yeah.
+Okay, I when you say mapped, I know I need to know what status they are in.  
+
+Parth Patojoshi   11:51
+Okay, so you will okay, so the SOW should show which candidates it is map to, which request ID it is map to. Okay, so there is a point Jason and Parth, right? So if see if this particular SOW has maximum resources that we can hire is 2.  
+
+Jaicind Santhibhavan   12:11
+Yeah.  
+
+Parth Patojoshi   12:12
+We cannot. So is this 2 what you have mentioned here is those 2 under higher status?  
+
+Jaicind Santhibhavan   12:19
+Exactly, that's that's that is my question. Ashwin, what state is they are in? Are they onboard?  
+
+Parth Patojoshi   12:21
+Okay, yes, it is, yeah, correct. If onboarded then only they have to in a pop up under and against SOW till that stage, that resource cannot be tagged them into the SOW till after hired, then it has to be pop up out of you know, see the maximum resources we can hire for the 001 is 10 people. Yes, so if 2 tagged means 2 already should be onboarded, not even hired onboarded.  
+
+Jaicind Santhibhavan   12:27
+Yes.  
+
+Parth Patojoshi   12:45
+If resource has been onboarded to against to this SOW, then it can pop up here too. So we can this screen is very simple and neat so that way that I mean anybody can see this, they can easily understand. Okay, this 001 has I mean like 3 resources maximum we can we need to hire out of which as of only zero.
+Right, if 001, we need to hire 10 people, we have hired 2 people as of yes. Okay, so Jason, I have one more suggestion here, right duration also here and so here also can we include I mean this job profile next to SOW details.  
+
+Jaicind Santhibhavan   13:12
+Yeah.
+That's what I was asking because for me it sounded SOW is always one, SOW is for a job profile, so it was good to capture that here.  
+
+Parth Patojoshi   13:23
+Yeah.
+Correct.
+So the SOW details will capture the job profile for me that's going to be useful. Yeah, see if somebody you know if like a kind of persona kind of person came in, he really don't want to get into because he will not have that time to go through all the things he'll come to SOW enough status.  
+
+Jaicind Santhibhavan   13:36
+Job.
+Yeah.  
+
+Parth Patojoshi   13:51
+SOW, I mean like tab, he will see this only screen and he will just log off. You don't want anything else. You know, see, he will see here, he will come SOW 001, okay, what is the duration? I know that we have I mean set for okay, we have 3 you know resources required and out of 3 that we have you know hired one yes.
+So we have hired one, so that's all he need to status. But against to that, if there is a job profile, it will be easy for him to understand you know which skill that is I mean that we are working working upon. So it will be easy for him to take it forward. Okay, so usually is SOW always mapped to the same job profile?
+Obviously, right, it's a unique SOW. SOW is every time it is unique, right? Okay, so all the resources will be with the same job profile itself. Yes, right. So if there is 2, so today you got 2 resources required, one is for you know, one is for node, then you are going to create 2 SOW's. We cannot create one SOW for both the resources. Understood, yes.  
+
+Jaicind Santhibhavan   14:30
+Yes.
+Correct.  
+
+Parth Patojoshi   14:51
+Okay, because if it is you are creating only one, which job profile you will tag enough for that as well, you cannot. That is what I was thinking for the column, correct? Yes, understood. Yeah, okay. So yeah, so about you Jason. Sorry, I just came in.  
+
+Jaicind Santhibhavan   15:05
+Yeah, that is exactly what I was first asking because an SOW should be linked to a job profile. And can you also keep what is what comes on the actions, the edit button?  
+
+Parth Patojoshi   15:09
+Yes.
+Correct.
+Hello.  
+
+Jaicind Santhibhavan   15:21
+Yeah, here there is an end date, end date, let it be because there is active or inactive. OK, if there any time there is an end date, it means what does end date mean here?
+The end date, end date.
+yeah.
+Yeah.  
+
+Parth Patojoshi   15:55
+Let me know and our target to hire this resources, I mean, for the 4th of am in January, right? so.  
+
+Jaicind Santhibhavan   16:01
+Yeah.  
+
+Parth Patojoshi   16:03
+4th of January 2027 maybe.  
+
+Jaicind Santhibhavan   16:03
+OK, yeah, it is not an end date, it is a target date. Yeah, because end date gave me a picture that this SOW is only valid till so and so day. That's the way it is coming from now.  
+
+Parth Patojoshi   16:09
+We will close, correct, correct. Okay, target, we can we can change it as targeted, targeted, so targeted and targeted. Yeah, and yeah, and here one more reno suggestion I have right, maybe next next version or sometime that we can you know see that if any SOW.  
+
+Jaicind Santhibhavan   16:15
+yeah.
+Correct.  
+
+Parth Patojoshi   16:29
+Right is nearing to end it. So then one any colour code should be pop up, right? If we have a sufficient time, that colour should be in a green, and if it is enough next we have crossed them in the target date, then it should be in a red somewhere. I mean like similar up to 3 colour codes.
+I suggest so that it will be easy for anybody to come into this SOWN status to understand you know where we are and they will be easy for us. That's what maybe now only 4:00 in future if you see at any given day we will have a 1015 SOW S you know or 20 SOW S will be active for us to close it.
+So with one glass, we can easily identify so how many are you know nearing and how many we closed, right? So yeah.  
+
+Jaicind Santhibhavan   17:14
+Yeah.
+OK.  
+
+Parth Patojoshi   17:18
+It.  
+
+Jaicind Santhibhavan   17:20
+And one more, sorry Partha. So we create an SOW as senity number.
+Prasanna sensitive client, so I need a flag to say whether it is sent to client or not. SOW submitted.  
+
+Parth Patojoshi   17:28
+Yes.
+SOW submitted to client or not? Okay.  
+
+Jaicind Santhibhavan   17:40
+Yeah, just a flat. You can put a checkbox.  
+
+Parth Patojoshi   17:44
+I think that we will have to create role based access for vendor and then for panel and admin access.  
+
+Jaicind Santhibhavan   17:52
+No.
+Now Ro road road based, we can do later. Sorry, instead of submitted flag, can you put a submitted date so that no if it is empty, we know it is not submitted?  
+
+Parth Patojoshi   18:06
+Okay, so yes, yeah, here the submitted is we have a all terminology within Sibra Hub submitted means we have submitted them and those resources to customer. Okay, so another column here for submitted status. Sorry, Jason.  
+
+Jaicind Santhibhavan   18:07
+Is that better? Singh, I'm just yeah.
+no, then change the technology.
+What I'm saying is it's not submitted. There is something that Prasanna can help. Prasanna sends an SOW to client. so I.  
+
+Parth Patojoshi   18:30
+OK.
+okay.
+SOW approved or?
+SOW status.
+I think we need to check there what exactly we need.
+So Prasanna sends him in this SOW to customer, not him in the resources, right? Not about resources. So then client client will approve that SOW for he will send it for approval for what I mean the exactly that he do with the SOW S.  
+
+Jaicind Santhibhavan   18:57
+Custom, yes, correct, yes.
+No, see I generate an SOW, there's a format in which he sends it to a client because you see this number SOW 001002, all those right? He takes that number and then I think he creates a document or something probably I have not seen that, but he sends it to client and that's what is up approved.  
+
+Parth Patojoshi   19:13
+OK.
+Okay.
+Okay, what?
+Okay, what will happen after he sends some in that SOW?  
+
+Jaicind Santhibhavan   19:30
+Yeah, that is the one that we track for the billing. So whatever.  
+
+Parth Patojoshi   19:33
+OK, so if it is submitted means that's all the activity is closed. I mean then there is no any further activity. And then I can.  
+
+Jaicind Santhibhavan   19:36
+Yeah, correct. Yes, no further mention after that it is like yeah.  
+
+Parth Patojoshi   19:43
+I think SOW sub submitted date or yeah, you said as you said submitted date, we can mention as submitted date. If it is blank, it is blank means not yet submitted. If it is, I mean like an any date particular date then it's submitted already under that particular date, correct?  
+
+Jaicind Santhibhavan   19:55
+Correct.
+Yeah, correct.  
+
+Parth Patojoshi   20:01
+Okay, understood. Yes, Sir. Okay, understood.  
+
+Jaicind Santhibhavan   20:09
+Okay, so SOW is also covered. Now come to job profile, job profile we saw. I think we just need an attachment and a field which will say what their job profile is. Yeah, that is good. Yeah, now can you go to.  
+
+Parth Patojoshi   20:11
+Yeah.
+Job description, yes.  
+
+Jaicind Santhibhavan   20:25
+Candidates.
+Okay, candidate should be after resource request, right? Resource request first and then you put a candidate against it.  
+
+Parth Patojoshi   20:38
+Yes, sir, this order should it remain the same or should I put SOW first and then?  
+
+Jaicind Santhibhavan   20:42
+No, I am just trying to understand my flow. Yeah, the order may not be the same because that's okay. Yeah, resource request, yeah.  
+
+Parth Patojoshi   20:48
+Yes Sir, that way resource request first, but then candidate can be added by putting global pull. So I think this is the order right? SOW job profile and resource request then candidates yes right vendor should be in at bottom right? So yeah.  
+
+Jaicind Santhibhavan   20:52
+Yeah.
+Yeah, correct. Okay.
+Yeah, that's fine.
+Can you go to resource release? Yeah.  
+
+Parth Patojoshi   21:07
+I'll change the order.
+Got it.  
+
+Jaicind Santhibhavan   21:14
+Resource request. Can you get a new resource request?
+Yeah, here now you're selecting job profile, right? That should get automatically populated from the SOW because SOW you're going to add job profile, OK.  
+
+Parth Patojoshi   21:27
+Yes, sir.  
+
+Jaicind Santhibhavan   21:29
+That's fine. Then you show me the other fields priority source. Source is vendor, right?  
+
+Parth Patojoshi   21:37
+Vendor and internal we should have them in both I know email chat. What is this email and chat?  
+
+Jaicind Santhibhavan   21:43
+Yeah, no, but I think let me do that. So, sources really, when somebody has asked for a resource, how did it come to us? Like, did you send an email or something? Yeah, that just capture that. Yeah, that's fine.  
+
+Parth Patojoshi   21:44
+This is just dummy data, dummy data. Okay, yeah, so.
+Correct.
+This list, I will give it to Partha Jason. We have multiple sources. So like now we are updating our Shipra Hub portal so somebody applies there that is through portal, through I mean like in a job boards, through network so and vendor all these things we will try to enable here.  
+
+Jaicind Santhibhavan   21:59
+Yeah, it's.
+Yeah, this is also good. And then you go to the candidates. Yeah. Can you go to candidate?  
+
+Parth Patojoshi   22:17
+Yes.
+Creative, yes, and once we create a request, do we have an option to add him in his resume?
+That will be in candidates, right? Okay, sorry, candidates, yes. Then we create the new candidate, yes, and click on the new candidate and add candidate. Okay, so.  
+
+Jaicind Santhibhavan   22:26
+That can comes in candidate, right? Yeah.  
+
+Parth Patojoshi   22:42
+Staffing connection. What is this first one first one staffing connection? This is the request ID request ID. Okay, got it. So we will get them in the both popped up here job profile and you know SOW and so it is let us keep tagging any requirement is not mandatory. For example, this is not mandatory. Yeah, because I got a resume today.
+I wanted to keep in our database, I'll just simply upload them in the profile in the portal. I'll leave it so that when we get the next requirement, our team can search, pull that candidate, talk to him, and submit it. Yes, that's global pool has been implemented right now. Yes, great. Okay.
+Okay.
+I'm good here. Okay, choose fine, yeah.  
+
+Jaicind Santhibhavan   23:33
+Yeah, so far good, so far good. But when I look at a candidate, let's assume we have one node JS requirement. So see you may take 5 profiles and then interview and finally you may take one. So I see.  
+
+Parth Patojoshi   23:34
+Anything from your side here, Jason?
+Thank you.
+Correct.  
+
+Jaicind Santhibhavan   23:53
+4 or 5 candidates and then finally, how does it work? Like if somebody goes to the next phase, otherwise it is closed there itself, right?  
+
+Parth Patojoshi   24:03
+Correct, correct, correct. So.  
+
+Jaicind Santhibhavan   24:04
+Okay, now that is also. Can you go to the other view where you could see the?
+Yeah, so here if somebody selected it goes to submit interface and then with admin with admin and then with client.  
+
+Parth Patojoshi   24:25
+Sir, I think this order is wrong again.  
+
+Jaicind Santhibhavan   24:26
+Yeah.  
+
+Parth Patojoshi   24:30
+And this data is on what basis it is for all the candidates we have uploaded in the portal? Yes.
+I think this view is a little inconvenient. Yes, no, this require this is really not required. It is always like we should have an option for a open SOWs, close SOWs against to that particular SOWs. I can select for that I can see the status of them in the candidates. It's not required for everybody, right, Jason?  
+
+Jaicind Santhibhavan   24:39
+No, actually, that is.  
+
+Parth Patojoshi   24:58
+So candidate pipeline should be structured in the from SOW how it is linked, correct? That's what I said. But yeah, let listen from Jason also, so his time.  
+
+Jaicind Santhibhavan   25:10
+Okay, I am still still lost here because I am taking the flow. So you have a resource request, say for example, you have a UI architect request now you may get 6 profiles. So will on the active pipeline, will you have 6 profiles?  
+
+Parth Patojoshi   25:24
+Correct.
+Yes, we will see all the status and all those 6 profiles on what status, whether they are at a new or submitted or with admin or with the client L1 schedule.  
+
+Jaicind Santhibhavan   25:39
+No, that is where I'm getting confused. So you have one opening, you have 6 profiles. So you may be now doing L1, L2 and finally out of 2 you select one and that one only goes to submitted, right?  
+
+Parth Patojoshi   25:42
+Hello.
+Okay.
+Correct.
+Correct that only one goes to submit it remaining all at a different status whatever that their status was if it is selected or rejected under that you can see that go to right side in a path go to right side you see here L1 completed L1 shortlist see if for example there are L2 L2 shortlisted candidates for no JS.  
+
+Jaicind Santhibhavan   25:57
+So.
+Yeah.
+Okay, yes.  
+
+Parth Patojoshi   26:14
+But we are hiring only one as of now. The other candidate will be at L2 short list status only, we which we may use in a in future.  
+
+Jaicind Santhibhavan   26:15
+Yeah.
+Yes, hello.
+In future, okay, now just can you bring these 2 closer to the first status L1, L2 because then you see that new L1, L2 okay.  
+
+Parth Patojoshi   26:23
+Yeah.
+Yes, sir, the order should be new, submitted, and then screen.  
+
+Jaicind Santhibhavan   26:38
+No, submitted is later. Submitted is later.  
+
+Parth Patojoshi   26:41
+Later last after all after all L2 selected, then it will go to select, it will be in the end, yes, submitted goes that side, yes, submitted means after all our screening L1, L2 interview once we present it to client, that is a submission for us. OK, yeah, we don't have any layers here, so there will be our submission. OK, so L1.
+Status interview and selected should all go to that side, correct, correct. Okay.
+After submission, after submission.  
+
+Jaicind Santhibhavan   27:09
+And after submission, you don't need with admin with admin submitted is with admin, right? Admin submits it to the client.  
+
+Parth Patojoshi   27:20
+Client admin submitted client yes admin then client then submitted then it'll it's going to be onboarded admin client submitted onboarded okay.  
+
+Jaicind Santhibhavan   27:27
+Yeah, correct.  
+
+Parth Patojoshi   27:33
+And closed and enter statuses inactive rejected rejected L2 screen reject L1 reject. What is this first one? Rejected admin or admin rejection admin rejections will not happen. Okay yeah so that you can remove it.  
+
+Jaicind Santhibhavan   27:49
+Yeah, normally.  
+
+Parth Patojoshi   27:53
+Done and on hold then exit and we need you need to include one offer back out offer back out after we now offer the candidate right? Yes, they will want it 2 back outs will happen, one interview back out and offer back out. Those 2 should be there with us in future if we come across some in that particular candidate again.  
+
+Jaicind Santhibhavan   28:04
+Yeah.  
+
+Parth Patojoshi   28:13
+We should be in a position to know that what was the activity on this guy, at what status you have been robbed with us. Okay, if interview is entered, we cannot consider interview drop, we cannot consider if offer breakout also we cannot consider yes reconsider we can't consider them. That's a red for us, yes.
+I am just thinking, Jason, all these things are coming from my side because I really don't want any our application at very, very high level, right? I wanted, I mean, like, our application to be so comfort and convenient for the ground, another actual user level, people.  
+
+Jaicind Santhibhavan   28:53
+Yeah, operational.  
+
+Parth Patojoshi   29:02
+So that if anybody get into the application, they should feel that comfort that yes, this application is worth and it is reducing my manual enough time for sure.  
+
+Jaicind Santhibhavan   29:02
+Yeah.
+Exactly, I'm completely with you. So this is till this I'm very happy if these changes are done. Okay, now part now my questions if I need to know how many people are now working with a client. Okay, let's assume we only have one client, so let's assume that where do we see that?  
+
+Parth Patojoshi   29:14
+Yes, and the yeah.
+Correct. Yes, sir. Yeah.
+Yes, sir.
+Okay.
+Yes, sir, we will need.
+Yes, Sir. Can I say so? I think Jason, our 230 calls started. Can I join that? Is there any?  
+
+Jaicind Santhibhavan   29:44
+****, okay, so just make a summary of these observations. We will continue again tomorrow morning.  
+
+Parth Patojoshi   29:51
+Yes, sir. Done. Okay. Thank you very much, sir. Thank you for your time. Thank you, sir.
+Yes, we're done. Yes.  
+
+Parth Patojoshi stopped transcription

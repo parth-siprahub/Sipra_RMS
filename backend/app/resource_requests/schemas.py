@@ -18,9 +18,10 @@ class RequestStatus(str, Enum):
 
 
 class RequestSource(str, Enum):
-    EMAIL = "EMAIL"
-    CHAT = "CHAT"
     PORTAL = "PORTAL"
+    JOB_BOARDS = "JOB_BOARDS"
+    NETWORK = "NETWORK"
+    VENDORS = "VENDORS"
 
 
 class ResourceRequestCreate(BaseModel):

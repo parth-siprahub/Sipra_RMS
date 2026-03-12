@@ -20,9 +20,15 @@ router = APIRouter(prefix="/candidates", tags=["Candidates"])
 # Valid status transitions for pipeline stages
 ADMIN_REVIEW_TRANSITIONS = {
     CandidateStatus.NEW: [
+        CandidateStatus.SCREENING,
         CandidateStatus.SUBMITTED_TO_ADMIN,
         CandidateStatus.WITH_ADMIN,
         CandidateStatus.REJECTED_BY_ADMIN,
+        CandidateStatus.SCREEN_REJECT,
+    ],
+    CandidateStatus.SCREENING: [
+        CandidateStatus.SUBMITTED_TO_ADMIN,
+        CandidateStatus.WITH_ADMIN,
         CandidateStatus.SCREEN_REJECT,
     ],
     CandidateStatus.SUBMITTED_TO_ADMIN: [
@@ -44,6 +50,7 @@ ADMIN_REVIEW_TRANSITIONS = {
     CandidateStatus.L1_SCHEDULED: [
         CandidateStatus.L1_COMPLETED,
         CandidateStatus.L1_REJECT,
+        CandidateStatus.INTERVIEW_BACK_OUT,
     ],
     CandidateStatus.L1_COMPLETED: [
         CandidateStatus.L1_SHORTLIST,
@@ -59,18 +66,22 @@ ADMIN_REVIEW_TRANSITIONS = {
         CandidateStatus.SELECTED,
         CandidateStatus.REJECTED_BY_CLIENT,
         CandidateStatus.ON_HOLD,
+        CandidateStatus.INTERVIEW_BACK_OUT,
     ],
     CandidateStatus.SELECTED: [
         CandidateStatus.ONBOARDED,
+        CandidateStatus.OFFER_BACK_OUT,
     ],
     # Terminal statuses — no transitions out
     CandidateStatus.L1_REJECT: [],
     CandidateStatus.SCREEN_REJECT: [],
+    CandidateStatus.INTERVIEW_BACK_OUT: [],
+    CandidateStatus.OFFER_BACK_OUT: [],
 }
 
 
 @router.get("/", response_model=list[CandidateResponse])
-def list_candidates(
+async def list_candidates(
     request_id: int | None = None,
     candidate_status: str | None = Query(None, alias="status"),
     current_user: dict = Depends(get_current_user),
@@ -82,6 +93,12 @@ def list_candidates(
 
     client = await get_supabase_admin_async()
     query = client.table("candidates").select("*")
+    # Application-level RLS: vendors can only see their own candidates
+    user_role = current_user.get("role", "").upper()
+    if user_role == "VENDOR":
+        vendor_id = current_user.get("vendor_id")
+        if vendor_id:
+            query = query.eq("vendor_id", vendor_id)
     if request_id:
         query = query.eq("request_id", request_id)
     if candidate_status:
@@ -92,11 +109,11 @@ def list_candidates(
 
 
 @router.post("/", response_model=CandidateResponse, status_code=status.HTTP_201_CREATED)
-def create_candidate(
+async def create_candidate(
     payload: CandidateCreate,
     current_user: dict = Depends(get_current_user),
 ):
-    client = get_supabase_admin()
+    client = await get_supabase_admin_async()
     data = payload.model_dump(exclude_none=True, mode="json")
     data["owner_id"] = current_user["id"]
     data["status"] = CandidateStatus.NEW.value
@@ -107,78 +124,107 @@ def create_candidate(
 
 
 @router.get("/{candidate_id}", response_model=CandidateResponse)
-def get_candidate(candidate_id: int, current_user: dict = Depends(get_current_user)):
-    client = get_supabase_admin()
-    result = client.table("candidates").select("*").eq("id", candidate_id).single().execute()
+async def get_candidate(candidate_id: int, current_user: dict = Depends(get_current_user)):
+    client = await get_supabase_admin_async()
+    result = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
     if not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found")
     return result.data
 
 
 @router.patch("/{candidate_id}", response_model=CandidateResponse)
-def update_candidate(
+async def update_candidate(
     candidate_id: int,
     payload: CandidateUpdate,
     current_user: dict = Depends(get_current_user),
 ):
-    client = get_supabase_admin()
+    client = await get_supabase_admin_async()
     data = payload.model_dump(exclude_none=True, mode="json")
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
-    result = client.table("candidates").update(data).eq("id", candidate_id).execute()
-    if not result.data:
+    try:
+        await client.table("candidates").update(data).eq("id", candidate_id).execute()
+    except Exception as e:
+        logger.exception("Supabase update failed for candidate %s: %s", candidate_id, e)
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Database update failed: {str(e)}")
+
+    # Re-fetch the full row to guarantee complete response
+    refreshed = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
+    if not refreshed.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found")
     api_cache.clear_prefix("candidates_")
     api_cache.clear_prefix("dashboard_")
-    return result.data[0]
+    return refreshed.data
 
 
 @router.patch("/{candidate_id}/review", response_model=CandidateResponse)
-def admin_review_candidate(
+async def admin_review_candidate(
     candidate_id: int,
     payload: AdminReview,
     current_user: dict = Depends(get_current_user),
 ):
-    """Admin approves/rejects candidate or sends to client."""
+    """Move candidate to a new pipeline status (drag-drop or manual)."""
     client = await get_supabase_admin_async()
-    # Fetch current status
-    existing = await client.table("candidates").select("status").eq("id", candidate_id).single().execute()
+    existing = await client.table("candidates").select("*").eq("id", candidate_id).execute()
     if not existing.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found")
 
-    current_status = CandidateStatus(existing.data["status"])
-    allowed = ADMIN_REVIEW_TRANSITIONS.get(current_status, [])
-    if payload.status not in allowed:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            f"Cannot transition from {current_status.value} to {payload.status.value}. "
-            f"Allowed: {[s.value for s in allowed]}",
-        )
+    current_status_str = existing.data[0].get("status", "")
+    if current_status_str == payload.status.value:
+        # No change needed — return current record
+        return existing.data[0]
+
+    # Admin/HR can make any transition; vendor users must follow the pipeline
+    user_role = current_user.get("role", "").upper()
+    if user_role == "VENDOR":
+        try:
+            current_status = CandidateStatus(current_status_str)
+        except ValueError:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"Current status '{current_status_str}' is not a recognized pipeline stage.",
+            )
+        allowed = ADMIN_REVIEW_TRANSITIONS.get(current_status, [])
+        if payload.status not in allowed:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"Cannot transition from {current_status.value} to {payload.status.value}. "
+                f"Allowed: {[s.value for s in allowed]}",
+            )
 
     update_data: dict = {"status": payload.status.value}
     if payload.remarks:
         update_data["remarks"] = payload.remarks
 
-    result = await client.table("candidates").update(update_data).eq("id", candidate_id).execute()
+    try:
+        await client.table("candidates").update(update_data).eq("id", candidate_id).execute()
+    except Exception as e:
+        logger.exception("Supabase update failed for candidate %s: %s", candidate_id, e)
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Database update failed: {str(e)}")
+
+    # Re-fetch the full row to guarantee we return complete data
+    refreshed = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
+    if not refreshed.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found after update")
+
     api_cache.clear_prefix("candidates_")
     api_cache.clear_prefix("dashboard_")
-    return result.data[0]
+    return refreshed.data
 
 
 @router.patch("/{candidate_id}/exit", response_model=CandidateResponse)
-def process_exit(
+async def process_exit(
     candidate_id: int,
     payload: ExitRequest,
     current_user: dict = Depends(get_current_user),
 ):
     """Process candidate exit and optionally create a backfill request."""
     client = await get_supabase_admin_async()
-    # Fetch current candidate
-    existing = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
+    existing = await client.table("candidates").select("*").eq("id", candidate_id).execute()
     if not existing.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found")
 
-    if existing.data["status"] != CandidateStatus.ONBOARDED.value:
+    if existing.data[0]["status"] != CandidateStatus.ONBOARDED.value:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "Only ONBOARDED candidates can be exited",

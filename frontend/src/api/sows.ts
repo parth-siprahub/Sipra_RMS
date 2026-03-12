@@ -5,8 +5,10 @@ export interface SOW {
     sow_number: string;
     client_name: string;
     start_date: string | null;
-    end_date: string | null;
+    target_date: string | null;
+    submitted_date: string | null;
     max_resources: number | null;
+    job_profile_id: number | null;
     is_active?: boolean;
     created_at?: string;
 }
@@ -15,16 +17,20 @@ export interface SowCreate {
     sow_number: string;
     client_name: string;
     start_date?: string;
-    end_date?: string;
+    target_date?: string;
+    submitted_date?: string;
     max_resources?: number;
+    job_profile_id?: number;
 }
 
 export interface SowUpdate {
     sow_number?: string;
     client_name?: string;
     start_date?: string;
-    end_date?: string;
+    target_date?: string;
+    submitted_date?: string;
     max_resources?: number;
+    job_profile_id?: number;
     is_active?: boolean;
 }
 

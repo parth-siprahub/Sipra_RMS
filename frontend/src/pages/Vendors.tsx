@@ -76,35 +76,44 @@ function VendorModal({ isOpen, onClose, onSuccess, vendor }: VendorModalProps) {
                     />
                 </div>
                 <div>
-                    <label className="input-label" htmlFor="v-contact">Contact Person</label>
+                    <label className="input-label" htmlFor="v-contact">
+                        Contact Person <span className="text-danger">*</span>
+                    </label>
                     <input
                         id="v-contact"
                         className="input-field"
                         placeholder="John Doe"
+                        required
                         value={form.contact_person || ''}
-                        onChange={(e) => setForm(f => ({ ...f, contact_person: e.target.value || undefined }))}
+                        onChange={(e) => setForm(f => ({ ...f, contact_person: e.target.value }))}
                     />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                     <div>
-                        <label className="input-label" htmlFor="v-email">Email</label>
+                        <label className="input-label" htmlFor="v-email">
+                            Email <span className="text-danger">*</span>
+                        </label>
                         <input
                             id="v-email"
                             type="email"
                             className="input-field"
                             placeholder="vendor@example.com"
+                            required
                             value={form.contact_email || ''}
-                            onChange={(e) => setForm(f => ({ ...f, contact_email: e.target.value || undefined }))}
+                            onChange={(e) => setForm(f => ({ ...f, contact_email: e.target.value }))}
                         />
                     </div>
                     <div>
-                        <label className="input-label" htmlFor="v-phone">Phone</label>
+                        <label className="input-label" htmlFor="v-phone">
+                            Phone <span className="text-danger">*</span>
+                        </label>
                         <input
                             id="v-phone"
                             className="input-field"
                             placeholder="+91 98765 43210"
+                            required
                             value={form.contact_phone || ''}
-                            onChange={(e) => setForm(f => ({ ...f, contact_phone: e.target.value || undefined }))}
+                            onChange={(e) => setForm(f => ({ ...f, contact_phone: e.target.value }))}
                         />
                     </div>
                 </div>

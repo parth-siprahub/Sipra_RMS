@@ -42,6 +42,52 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
+
+def get_cors_headers(request: Request) -> dict:
+    origin = request.headers.get("origin")
+    if origin in settings.CORS_ORIGINS:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET, POST, PATCH, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, X-Requested-With",
+        }
+    return {}
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    headers = get_cors_headers(request)
+    if getattr(exc, "headers", None):
+        headers.update(exc.headers)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=headers
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    headers = get_cors_headers(request)
+    return JSONResponse(
+        status_code=422,
+        content={"detail": jsonable_encoder(exc.errors())},
+        headers=headers
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception: %s", exc)
+    headers = get_cors_headers(request)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"},
+        headers=headers
+    )
+
 
 # ─── Security Headers Middleware ───────────────────────────────────────────────
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -78,7 +124,14 @@ async def add_process_time_header(request: Request, call_next):
 
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
-# Middleware order matters — add CORS before SecurityHeaders
+# Middleware order matters in Starlette: middleware added LAST wraps outermost.
+# SecurityHeaders should be inner, CORS should be outer, so CORS headers are
+# always present — even on 400/500 error responses.
+
+# Inner: SecurityHeaders (runs after CORS on request, before CORS on response)
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Outer: CORS (wraps everything — ensures CORS headers on ALL responses)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -87,9 +140,6 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
     expose_headers=["X-Process-Time"],
 )
-
-# Add SecurityHeaders after CORS so it wraps all responses
-app.add_middleware(SecurityHeadersMiddleware)
 
 # ─── Routers ──────────────────────────────────────────────────────────────────
 app.include_router(auth_router)

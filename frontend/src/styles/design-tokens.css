@@ -125,6 +125,10 @@
   /* 12px */
   --radius-xl: 1rem;
   /* 16px */
+  --radius-2xl: 1.25rem;
+  /* 20px */
+  --radius-3xl: 1.5rem;
+  /* 24px */
   --radius-full: 9999px;
 
   /* Layout */

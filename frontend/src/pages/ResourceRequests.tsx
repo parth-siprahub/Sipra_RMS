@@ -6,13 +6,13 @@ import type {
     ResourceRequest,
     RequestStatus,
     RequestPriority,
-    RequestSource,
     CreateResourceRequestPayload,
 } from '../api/resourceRequests';
 
 import { Modal } from '../components/ui/Modal';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
+import { TableRowSkeleton } from '../components/ui/Skeleton';
 import { sowApi, type SOW } from '../api/sows';
 import { jobProfileApi, type JobProfile } from '../api/jobProfiles';
 
@@ -88,7 +88,6 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
     const [sowId, setSowId] = useState<number | ''>('');
     const [jobProfileId, setJobProfileId] = useState<number | ''>('');
     const [priority, setPriority] = useState<RequestPriority>('MEDIUM');
-    const [source, setSource] = useState<RequestSource | ''>('');
     const [isBackfill, setIsBackfill] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
@@ -123,7 +122,6 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
                 is_backfill: isBackfill,
                 sow_id: Number(sowId),
                 job_profile_id: Number(jobProfileId),
-                ...(source ? { source } : {}),
             };
             await resourceRequestsApi.create(payload);
             toast.success('Resource request created!');
@@ -133,7 +131,6 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
             setSowId('');
             setJobProfileId('');
             setPriority('MEDIUM');
-            setSource('');
             setIsBackfill(false);
         } catch {
             // error toast handled by client.ts
@@ -154,7 +151,19 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
                         id="rr-sow"
                         className="input-field"
                         value={sowId}
-                        onChange={(e) => setSowId(e.target.value ? Number(e.target.value) : '')}
+                        onChange={(e) => {
+                            const selectedSowId = e.target.value ? Number(e.target.value) : '';
+                            setSowId(selectedSowId);
+                            // Auto-select the SOW's linked job profile, or first available
+                            if (selectedSowId) {
+                                const selectedSow = sows.find(s => s.id === selectedSowId);
+                                if (selectedSow?.job_profile_id) {
+                                    setJobProfileId(selectedSow.job_profile_id);
+                                } else if (jobProfiles.length > 0 && !jobProfileId) {
+                                    setJobProfileId(jobProfiles[0].id);
+                                }
+                            }
+                        }}
                         required
                     >
                         <option value="">— Select SOW —</option>
@@ -202,26 +211,6 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
                         {(['URGENT', 'HIGH', 'MEDIUM', 'LOW'] as RequestPriority[]).map((p) => (
                             <option key={p} value={p}>
                                 {p}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* Source */}
-                <div>
-                    <label className="input-label" htmlFor="rr-source">
-                        Source
-                    </label>
-                    <select
-                        id="rr-source"
-                        className="input-field"
-                        value={source}
-                        onChange={(e) => setSource(e.target.value as RequestSource | '')}
-                    >
-                        <option value="">— Select source —</option>
-                        {(['EMAIL', 'CHAT', 'PORTAL'] as RequestSource[]).map((s) => (
-                            <option key={s} value={s}>
-                                {s}
                             </option>
                         ))}
                     </select>
@@ -388,21 +377,26 @@ export function ResourceRequests() {
             {/* Data Table */}
             <div className="card p-0 overflow-hidden">
                 {loading ? (
-                    <div className="flex items-center justify-center h-48">
-                        <div className="spinner w-8 h-8" />
+                    <div className="divide-y divide-border/50">
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                            <TableRowSkeleton key={i} />
+                        ))}
                     </div>
                 ) : requests.length === 0 ? (
-                    <EmptyState
-                        message="No resource requests found."
-                        action={
-                            <button
-                                onClick={() => setIsModalOpen(true)}
-                                className="btn btn-cta btn-sm"
-                            >
-                                <Plus size={14} /> Create your first request
-                            </button>
-                        }
-                    />
+                    <div className="p-8">
+                        <EmptyState
+                            title="No Staffing Requests"
+                            message="All clear! There are no active or pending resource requests at the moment."
+                            action={
+                                <button
+                                    onClick={() => setIsModalOpen(true)}
+                                    className="btn btn-cta btn-sm"
+                                >
+                                    <Plus size={14} /> Create your first request
+                                </button>
+                            }
+                        />
+                    </div>
                 ) : (
                     <div className="table-container border-none">
                         <table className="data-table">

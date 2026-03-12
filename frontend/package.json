@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "start": "serve -s dist -l $PORT",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "playwright test",
@@ -21,6 +22,7 @@
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.13.0",
     "recharts": "^3.7.0",
+    "serve": "^14.2.4",
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {

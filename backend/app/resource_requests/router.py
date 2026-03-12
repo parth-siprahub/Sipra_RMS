@@ -26,7 +26,7 @@ REQUEST_STATUS_TRANSITIONS = {
 
 
 @router.get("/", response_model=list[ResourceRequestResponse])
-def list_requests(
+async def list_requests(
     request_status: str | None = Query(None, alias="status"),
     priority: str | None = None,
     current_user: dict = Depends(get_current_user),
@@ -48,7 +48,7 @@ def list_requests(
 
 
 @router.post("/", response_model=ResourceRequestResponse, status_code=status.HTTP_201_CREATED)
-def create_request(
+async def create_request(
     payload: ResourceRequestCreate,
     current_user: dict = Depends(get_current_user),
 ):
@@ -70,16 +70,16 @@ def create_request(
 
 
 @router.get("/{request_id}", response_model=ResourceRequestResponse)
-def get_request(request_id: int, current_user: dict = Depends(get_current_user)):
-    client = get_supabase_admin()
-    result = client.table("resource_requests").select("*").eq("id", request_id).single().execute()
+async def get_request(request_id: int, current_user: dict = Depends(get_current_user)):
+    client = await get_supabase_admin_async()
+    result = await client.table("resource_requests").select("*").eq("id", request_id).single().execute()
     if not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Request not found")
     return result.data
 
 
 @router.put("/{request_id}", response_model=ResourceRequestResponse)
-def update_request(
+async def update_request(
     request_id: int,
     payload: ResourceRequestUpdate,
     current_user: dict = Depends(get_current_user),
@@ -97,7 +97,7 @@ def update_request(
 
 
 @router.patch("/{request_id}/status", response_model=ResourceRequestResponse)
-def transition_status(
+async def transition_status(
     request_id: int,
     payload: StatusTransition,
     current_user: dict = Depends(get_current_user),
