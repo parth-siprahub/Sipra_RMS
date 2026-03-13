@@ -25,6 +25,15 @@ from app.communication_logs.router import router as communication_logs_router
 from app.dashboard.router import router as dashboard_router
 from app.vendors.router import router as vendors_router
 
+# Configure file logging for error capture
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("backend_errors.log"),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
 
@@ -80,7 +89,12 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.exception("Unhandled exception: %s", exc)
+    import traceback
+    error_trace = traceback.format_exc()
+    logger.error("Unhandled exception: %s\n%s", exc, error_trace)
+    # Write to a specific file just to be double sure
+    with open("critical_error.txt", "a") as f:
+        f.write(f"\n\n--- ERROR {time.ctime()} ---\n{error_trace}")
     headers = get_cors_headers(request)
     return JSONResponse(
         status_code=500,

@@ -1,0 +1,58 @@
+[
+  {
+    "id": 1,
+    "role_name": "React Developer",
+    "technology": "React, TypeScript",
+    "experience_level": "Mid",
+    "created_at": "2026-02-19T09:32:00.384937+00:00"
+  },
+  {
+    "id": 2,
+    "role_name": "Python Backend Engineer",
+    "technology": "Python, FastAPI",
+    "experience_level": "Senior",
+    "created_at": "2026-02-19T09:32:49.82029+00:00"
+  },
+  {
+    "id": 6,
+    "role_name": "frontend developer ",
+    "technology": "React/Node.js",
+    "experience_level": "MID",
+    "created_at": "2026-02-25T06:59:56.454664+00:00"
+  },
+  {
+    "id": 3,
+    "role_name": "DevOps Engineer",
+    "technology": "AWS, Docker, Kubernetes",
+    "experience_level": "ENTRY",
+    "created_at": "2026-02-19T09:32:49.964195+00:00"
+  },
+  {
+    "id": 7,
+    "role_name": "E2E Test Engineer",
+    "technology": "Playwright",
+    "experience_level": "MID",
+    "created_at": "2026-03-13T06:25:14.518867+00:00"
+  },
+  {
+    "id": 8,
+    "role_name": "PW Engineer 592342",
+    "technology": "Playwright",
+    "experience_level": "MID",
+    "created_at": "2026-03-13T06:33:13.842461+00:00"
+  },
+  {
+    "id": 9,
+    "role_name": "Debug Role",
+    "technology": "Python",
+    "experience_level": null,
+    "created_at": "2026-03-13T06:50:58.08264+00:00"
+  },
+  {
+    "id": 10,
+    "role_name": "Verify Fix Engineer",
+    "technology": "React Testing",
+    "experience_level": null,
+    "created_at": "2026-03-13T06:57:50.780418+00:00"
+  }
+]
