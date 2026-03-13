@@ -21,15 +21,31 @@ async def create_sow(
     current_user: dict = Depends(require_admin),
 ):
     client = await get_supabase_admin_async()
+    
     # Duplicate check on sow_number (unique column)
     dup = await client.table("sows").select("id").eq("sow_number", payload.sow_number).execute()
     if dup.data:
         raise HTTPException(status.HTTP_409_CONFLICT, f"SOW '{payload.sow_number}' already exists")
+    
+    # Sanitization: convert empty strings to None
     data = payload.model_dump(exclude_none=True, mode="json")
-    result = await client.table("sows").insert(data).execute()
-    api_cache.clear_prefix("sows_")
-    api_cache.clear_prefix("dashboard_")
-    return result.data[0]
+    for key, value in data.items():
+        if value == "":
+            data[key] = None
+
+    try:
+        result = await client.table("sows").insert(data).execute()
+        if not result.data:
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to create SOW: No data returned")
+        api_cache.clear_prefix("sows_")
+        api_cache.clear_prefix("dashboard_")
+        return result.data[0]
+    except Exception as e:
+        logger.error("SOW Creation Error: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Database error: {str(e)}"
+        )
 
 
 @router.get("/{sow_id}", response_model=SowResponse)

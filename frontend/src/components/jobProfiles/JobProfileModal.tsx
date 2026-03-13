@@ -49,16 +49,22 @@ export function JobProfileModal({ isOpen, onClose, onSuccess, jobProfile }: JobP
         setLoading(true);
 
         try {
-            const payload = {
-                ...formData,
-                ...(jdFile ? { jd_file_url: jdFile.name } : {}),
+            console.log('JobProfileModal Form Data:', formData);
+            // Strip empty strings to undefined so they are omitted from JSON
+            const sanitized = {
+                role_name: formData.role_name.trim(),
+                technology: formData.technology.trim(),
+                experience_level: formData.experience_level || undefined,
+                job_description: formData.job_description || undefined,
+                jd_file_url: jdFile ? jdFile.name : (formData.jd_file_url || undefined),
             };
+            console.log('Submitting sanitized payload:', sanitized);
 
             if (jobProfile?.id) {
-                await jobProfileApi.update(jobProfile.id, payload);
+                await jobProfileApi.update(jobProfile.id, sanitized);
                 toast.success('Job Profile updated successfully');
             } else {
-                await jobProfileApi.create(payload);
+                await jobProfileApi.create(sanitized);
                 toast.success('Job Profile created successfully');
             }
             onSuccess();

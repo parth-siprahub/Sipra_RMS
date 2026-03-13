@@ -64,11 +64,23 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
         setLoading(true);
 
         try {
+            // Strip empty strings to null/undefined so Pydantic doesn't reject them
+            const sanitized = {
+                sow_number: formData.sow_number,
+                client_name: formData.client_name,
+                start_date: formData.start_date || undefined,
+                target_date: formData.target_date || undefined,
+                submitted_date: formData.submitted_date || undefined,
+                max_resources: formData.max_resources || undefined,
+                job_profile_id: formData.job_profile_id,
+                is_active: formData.is_active,
+            };
+
             if (sow?.id) {
-                await sowApi.update(sow.id, formData);
+                await sowApi.update(sow.id, sanitized);
                 toast.success('SOW updated successfully');
             } else {
-                await sowApi.create(formData);
+                await sowApi.create(sanitized);
                 toast.success('SOW created successfully');
             }
             onSuccess();
