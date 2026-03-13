@@ -145,8 +145,15 @@ async def update_candidate(
     try:
         await client.table("candidates").update(data).eq("id", candidate_id).execute()
     except Exception as e:
+        error_str = str(e)
         logger.exception("Supabase update failed for candidate %s: %s", candidate_id, e)
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Database update failed: {str(e)}")
+        if "22P02" in error_str or "invalid input value for enum" in error_str:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "A status value is not registered in the database enum. "
+                "Run migration 002_add_missing_candidate_statuses.sql in Supabase SQL Editor.",
+            )
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Database update failed: {error_str}")
 
     # Re-fetch the full row to guarantee complete response
     refreshed = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
@@ -199,8 +206,17 @@ async def admin_review_candidate(
     try:
         await client.table("candidates").update(update_data).eq("id", candidate_id).execute()
     except Exception as e:
+        error_str = str(e)
         logger.exception("Supabase update failed for candidate %s: %s", candidate_id, e)
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Database update failed: {str(e)}")
+        # Detect PostgreSQL enum mismatch (22P02) and give actionable message
+        if "22P02" in error_str or "invalid input value for enum" in error_str:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"Status '{payload.status.value}' is not yet registered in the database enum. "
+                "Please run the migration SQL (backend/migrations/002_add_missing_candidate_statuses.sql) "
+                "in Supabase SQL Editor.",
+            )
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Database update failed: {error_str}")
 
     # Re-fetch the full row to guarantee we return complete data
     refreshed = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
@@ -239,7 +255,7 @@ async def process_exit(
     result = await client.table("candidates").update(update_data).eq("id", candidate_id).execute()
 
     # Auto-create backfill request if requested
-    if payload.create_backfill and existing.data.get("request_id"):
+    if payload.create_backfill and existing.data[0].get("request_id"):
         from app.resource_requests.service import generate_request_id
 
         count_result = await client.table("resource_requests").select("id", count="exact").execute()
@@ -250,7 +266,7 @@ async def process_exit(
         original_req = (
             await client.table("resource_requests")
             .select("job_profile_id,sow_id")
-            .eq("id", existing.data["request_id"])
+            .eq("id", existing.data[0]["request_id"])
             .single()
             .execute()
         )

@@ -25,13 +25,30 @@ async def create_job_profile(
     current_user: dict = Depends(require_admin),
 ):
     client = await get_supabase_admin_async()
+    
     # Duplicate check on role_name (unique column)
     dup = await client.table("job_profiles").select("id").eq("role_name", payload.role_name).execute()
     if dup.data:
         raise HTTPException(status.HTTP_409_CONFLICT, f"Job profile '{payload.role_name}' already exists")
-    result = await client.table("job_profiles").insert(payload.model_dump(exclude_none=True)).execute()
-    api_cache.clear_prefix("jobprofiles_")
-    return result.data[0]
+    
+    # Sanitize: Convert empty strings to None before inserting to avoid DB constraint issues
+    data = payload.model_dump(exclude_none=True)
+    for key, value in data.items():
+        if value == "":
+            data[key] = None
+
+    try:
+        result = await client.table("job_profiles").insert(data).execute()
+        if not result.data:
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to create job profile: No data returned")
+        api_cache.clear_prefix("jobprofiles_")
+        return result.data[0]
+    except Exception as e:
+        logger.error("Job Profile Creation Error: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Database error: {str(e)}"
+        )
 
 
 @router.get("/{profile_id}", response_model=JobProfileResponse)
