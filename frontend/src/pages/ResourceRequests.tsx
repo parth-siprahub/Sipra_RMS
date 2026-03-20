@@ -20,7 +20,7 @@ import { jobProfileApi, type JobProfile } from '../api/jobProfiles';
 const STATUS_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
     OPEN: ['HOLD', 'CLOSED'],
     HOLD: ['OPEN', 'CLOSED'],
-    CLOSED: [],
+    CLOSED: ['OPEN'],  // Allow reopening
 };
 
 // ─── Quick-Status Dropdown ────────────────────────────────────────────────────

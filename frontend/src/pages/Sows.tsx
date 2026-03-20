@@ -16,8 +16,11 @@ import { cn } from '../lib/utils';
 import { resourceRequestsApi } from '../api/resourceRequests';
 import { candidatesApi } from '../api/candidates';
 import { jobProfileApi, type JobProfile } from '../api/jobProfiles';
+import { useAuth, isAdminRole } from '../context/AuthContext';
 
 export function Sows() {
+    const { user } = useAuth();
+    const isAdmin = isAdminRole(user?.role);
     const [sows, setSows] = useState<SOW[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -92,13 +95,15 @@ export function Sows() {
                     <h1 className="text-2xl font-bold text-text">Statements of Work</h1>
                     <p className="text-text-muted mt-1">Manage client contracts and resource allocations</p>
                 </div>
-                <button
-                    onClick={handleCreate}
-                    className="btn btn-primary flex items-center gap-2 shadow-lg shadow-cta/20"
-                >
-                    <Plus size={20} />
-                    <span>New SOW</span>
-                </button>
+                {isAdmin && (
+                    <button
+                        onClick={handleCreate}
+                        className="btn btn-primary flex items-center gap-2 shadow-lg shadow-cta/20"
+                    >
+                        <Plus size={20} />
+                        <span>New SOW</span>
+                    </button>
+                )}
             </div>
 
             {/* Filter Bar */}

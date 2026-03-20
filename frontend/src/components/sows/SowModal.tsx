@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal';
 import { sowApi } from '../../api/sows';
 import { type SOW } from '../../api/sows';
 import { jobProfileApi, type JobProfile } from '../../api/jobProfiles';
+import { clientsApi, type Client } from '../../api/clients';
 import toast from 'react-hot-toast';
 import { Calendar, Users, Hash, Building2, Briefcase } from 'lucide-react';
 
@@ -16,6 +17,7 @@ interface SowModalProps {
 export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
     const [loading, setLoading] = useState(false);
     const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
+    const [clients, setClients] = useState<Client[]>([]);
     const [formData, setFormData] = useState({
         sow_number: '',
         client_name: '',
@@ -29,7 +31,13 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
 
     useEffect(() => {
         if (isOpen) {
-            jobProfileApi.list().then(setJobProfiles).catch(() => {});
+            Promise.all([
+                jobProfileApi.list(),
+                clientsApi.list(),
+            ]).then(([profiles, clientsList]) => {
+                setJobProfiles(profiles);
+                setClients(clientsList.filter(c => c.is_active !== false));
+            }).catch(() => {});
         }
     }, [isOpen]);
 
@@ -117,17 +125,23 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
                     </div>
 
                     <div className="md:col-span-2">
-                        <label className="input-label" htmlFor="client_name">Client Name *</label>
+                        <label className="input-label" htmlFor="client_name">Client *</label>
                         <div className="relative">
                             <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
-                            <input
+                            <select
                                 id="client_name"
-                                className="input-field pl-10"
+                                className="input-field pl-10 appearance-none"
                                 value={formData.client_name}
                                 onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
                                 required
-                                placeholder="Client Alpha Inc."
-                            />
+                            >
+                                <option value="">— Select Client —</option>
+                                {clients.map((c) => (
+                                    <option key={c.id} value={c.client_name}>
+                                        {c.client_name}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 

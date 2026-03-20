@@ -21,7 +21,7 @@ router = APIRouter(prefix="/requests", tags=["Resource Requests"])
 REQUEST_STATUS_TRANSITIONS = {
     RequestStatus.OPEN: [RequestStatus.CLOSED, RequestStatus.HOLD],
     RequestStatus.HOLD: [RequestStatus.OPEN, RequestStatus.CLOSED],
-    RequestStatus.CLOSED: [],  # Terminal — no transitions out
+    RequestStatus.CLOSED: [RequestStatus.OPEN],  # Allow reopening
 }
 
 

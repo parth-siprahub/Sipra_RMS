@@ -48,6 +48,22 @@ interface SkillEntry {
     count: number;
 }
 
+interface MissingIdentifier {
+    employee_id: number;
+    rms_name: string;
+    missing_fields: string[];
+}
+
+interface TriadEntry {
+    employee_id: number;
+    rms_name: string;
+    jira_hours: number;
+    capped_hours: number;
+    aws_hours: number | null;
+    compliance_75_pct: boolean | null;
+    is_billable: boolean;
+}
+
 interface DashboardMetrics {
     total_requests: number;
     requests_by_status: Record<string, number>;
@@ -59,6 +75,11 @@ interface DashboardMetrics {
     sow_utilization: SOWUtilization[];
     timeline: TimelineEntry[];
     candidates_by_skill: SkillEntry[];
+    total_employees?: number;
+    active_employees?: number;
+    missing_identifiers?: MissingIdentifier[];
+    triad_summary?: TriadEntry[];
+    triad_billing_month?: string;
 }
 
 // ─── Human-readable Labels ───────────────────────────────────────────────────
@@ -816,6 +837,119 @@ export function Dashboard() {
                     </div>
                 </div>
             </div>
+
+            {/* ── Section: Verification Triad (Phase 2) ──────────────────────── */}
+            {(metrics?.total_employees !== undefined && metrics.total_employees > 0) && (
+                <div className="space-y-6">
+                    {/* Employee KPIs */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <KPICard
+                            label="Total Employees"
+                            value={metrics.total_employees || 0}
+                            accent={KPI_ACCENT_COLORS.blue}
+                            sub="Registry count"
+                            icon={UserCheck}
+                        />
+                        <KPICard
+                            label="Active Employees"
+                            value={metrics.active_employees || 0}
+                            accent={KPI_ACCENT_COLORS.green}
+                            sub="Currently engaged"
+                            icon={UserCheck}
+                        />
+                        <KPICard
+                            label="Missing Identifiers"
+                            value={metrics.missing_identifiers?.length || 0}
+                            accent={KPI_ACCENT_COLORS.orange}
+                            sub="Incomplete triad mapping"
+                            icon={XCircle}
+                        />
+                    </div>
+
+                    {/* Compliance Tracker */}
+                    {metrics.missing_identifiers && metrics.missing_identifiers.length > 0 && (
+                        <div className="card">
+                            <h2 className="text-base font-bold mb-4 flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-warning" />
+                                Compliance Tracker — Missing Triad IDs
+                            </h2>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border">
+                                            <th className="text-left py-2 text-xs text-text-muted uppercase">Employee</th>
+                                            <th className="text-left py-2 text-xs text-text-muted uppercase">Missing Fields</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {metrics.missing_identifiers.map(mi => (
+                                            <tr key={mi.employee_id} className="border-b border-border/50">
+                                                <td className="py-2 font-medium text-text">{mi.rms_name}</td>
+                                                <td className="py-2">
+                                                    <div className="flex gap-1.5 flex-wrap">
+                                                        {mi.missing_fields.map(f => (
+                                                            <span key={f} className="badge badge-warning text-[10px] px-2 py-0.5">
+                                                                {f.replace('_', ' ')}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Triad Billing Summary */}
+                    {metrics.triad_summary && metrics.triad_summary.length > 0 && (
+                        <div className="card">
+                            <h2 className="text-base font-bold mb-4 flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-cta" />
+                                Verification Triad — {metrics.triad_billing_month || 'Latest'}
+                            </h2>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border">
+                                            <th className="text-left py-2 text-xs text-text-muted uppercase">Employee</th>
+                                            <th className="text-center py-2 text-xs text-text-muted uppercase">Jira Hours</th>
+                                            <th className="text-center py-2 text-xs text-text-muted uppercase">Capped Hours</th>
+                                            <th className="text-center py-2 text-xs text-text-muted uppercase">AWS Hours</th>
+                                            <th className="text-center py-2 text-xs text-text-muted uppercase">75% Rule</th>
+                                            <th className="text-center py-2 text-xs text-text-muted uppercase">Billable</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {metrics.triad_summary.map(t => (
+                                            <tr key={t.employee_id} className="border-b border-border/50">
+                                                <td className="py-2 font-medium text-text">{t.rms_name}</td>
+                                                <td className="py-2 text-center">{t.jira_hours?.toFixed(1) ?? '—'}</td>
+                                                <td className="py-2 text-center font-bold">{t.capped_hours?.toFixed(1) ?? '—'}</td>
+                                                <td className="py-2 text-center">{t.aws_hours?.toFixed(1) ?? 'N/A'}</td>
+                                                <td className="py-2 text-center">
+                                                    {t.compliance_75_pct === true && <CheckCircle size={16} className="text-success mx-auto" />}
+                                                    {t.compliance_75_pct === false && <XCircle size={16} className="text-danger mx-auto" />}
+                                                    {t.compliance_75_pct === null && <span className="text-text-muted">—</span>}
+                                                </td>
+                                                <td className="py-2 text-center">
+                                                    <span className={cn(
+                                                        "text-xs font-bold px-2 py-0.5 rounded-full",
+                                                        t.is_billable ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
+                                                    )}>
+                                                        {t.is_billable ? 'YES' : 'NO'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

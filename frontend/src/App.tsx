@@ -12,6 +12,9 @@ import { Sows } from './pages/Sows';
 import { JobProfiles } from './pages/JobProfiles';
 import { CommunicationLogs } from './pages/CommunicationLogs';
 import { Vendors } from './pages/Vendors';
+import { Employees } from './pages/Employees';
+import { Timesheets } from './pages/Timesheets';
+import { Clients } from './pages/Clients';
 
 const NotFound = () => <div className="p-10 text-center text-2xl">404 - Page Not Found</div>;
 
@@ -37,6 +40,9 @@ function App() {
               <Route path="sows" element={<Sows />} />
               <Route path="communication-logs" element={<CommunicationLogs />} />
               <Route path="vendors" element={<Vendors />} />
+              <Route path="employees" element={<Employees />} />
+              <Route path="timesheets" element={<Timesheets />} />
+              <Route path="clients" element={<Clients />} />
             </Route>
 
             {/* Dashboard alias – direct nav to /dashboard redirects to root */}
