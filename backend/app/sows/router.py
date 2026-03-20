@@ -1,9 +1,12 @@
 """SOW CRUD — aligned with public.sows table."""
+import logging
 from fastapi import APIRouter, HTTPException, status, Depends
 from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
 from app.sows.schemas import SowCreate, SowUpdate, SowResponse
 from app.utils.cache import api_cache
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/sows", tags=["SOWs"])
 

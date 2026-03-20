@@ -13,8 +13,11 @@ import {
 } from 'lucide-react';
 import { EmptyState } from '../components/ui/EmptyState';
 import toast from 'react-hot-toast';
+import { useAuth, isAdminRole } from '../context/AuthContext';
 
 export function JobProfiles() {
+    const { user } = useAuth();
+    const isAdmin = isAdminRole(user?.role);
     const [profiles, setProfiles] = useState<JobProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -73,13 +76,15 @@ export function JobProfiles() {
                     <h1 className="text-2xl font-bold text-text">Job Profiles</h1>
                     <p className="text-text-muted mt-1">Define standard roles and required technologies</p>
                 </div>
-                <button
-                    onClick={handleCreate}
-                    className="btn btn-primary flex items-center gap-2 shadow-lg shadow-cta/20"
-                >
-                    <Plus size={20} />
-                    <span>New Profile</span>
-                </button>
+                {isAdmin && (
+                    <button
+                        onClick={handleCreate}
+                        className="btn btn-primary flex items-center gap-2 shadow-lg shadow-cta/20"
+                    >
+                        <Plus size={20} />
+                        <span>New Profile</span>
+                    </button>
+                )}
             </div>
 
             {/* Filter Bar */}
@@ -111,6 +116,7 @@ export function JobProfiles() {
                                     <Briefcase size={24} />
                                 </div>
                                 <div className="flex gap-1">
+                                    {isAdmin && (
                                     <button
                                         onClick={() => handleEdit(profile)}
                                         className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors"
@@ -119,6 +125,8 @@ export function JobProfiles() {
                                     >
                                         <Edit2 size={16} />
                                     </button>
+                                    )}
+                                    {isAdmin && (
                                     <button
                                         onClick={() => handleDelete(profile.id)}
                                         className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-danger transition-colors"
@@ -127,6 +135,7 @@ export function JobProfiles() {
                                     >
                                         <Trash2 size={16} />
                                     </button>
+                                    )}
                                 </div>
                             </div>
 

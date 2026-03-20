@@ -10,6 +10,9 @@ import {
     ChevronLeft,
     ChevronRight,
     LogOut,
+    UserCheck,
+    Clock,
+    Landmark,
 } from 'lucide-react';
 
 import { cn } from '../lib/utils';
@@ -26,6 +29,9 @@ const navItems = [
     { to: '/job-profiles', icon: FileText, label: 'Job Profiles' },
     { to: '/resource-requests', icon: Briefcase, label: 'Resource Requests' },
     { to: '/candidates', icon: Users, label: 'Candidates' },
+    { to: '/employees', icon: UserCheck, label: 'Employees' },
+    { to: '/timesheets', icon: Clock, label: 'Timesheets' },
+    { to: '/clients', icon: Landmark, label: 'Clients' },
     { to: '/communication-logs', icon: MessageSquare, label: 'Comm. Logs' },
     { to: '/vendors', icon: Building2, label: 'Vendors' },
 ];
@@ -41,9 +47,11 @@ function getInitials(name: string) {
 
 function getRoleBadge(role: string) {
     const map: Record<string, { label: string; color: string }> = {
+        SUPER_ADMIN: { label: 'Super Admin', color: '#EF4444' },
         ADMIN: { label: 'Admin', color: '#22C55E' },
+        MANAGER: { label: 'Manager', color: '#A855F7' },
         RECRUITER: { label: 'Recruiter', color: '#38BDF8' },
-        MANAGEMENT: { label: 'Management', color: '#F59E0B' },
+        VENDOR: { label: 'Vendor', color: '#F59E0B' },
     };
     return map[role] ?? { label: role, color: '#94A3B8' };
 }

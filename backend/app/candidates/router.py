@@ -223,6 +223,28 @@ async def admin_review_candidate(
     if not refreshed.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found after update")
 
+    # Transition trigger: auto-create Employee record when status reaches ONBOARDED
+    if payload.status == CandidateStatus.ONBOARDED:
+        c = refreshed.data
+        # Only create if no employee record exists yet
+        existing_emp = await client.table("employees").select("id").eq("candidate_id", candidate_id).execute()
+        if not existing_emp.data:
+            employee_data = {
+                "candidate_id": candidate_id,
+                "rms_name": f"{c.get('first_name', '')} {c.get('last_name', '')}".strip(),
+                "client_name": c.get("client_email", "").split("@")[0] if c.get("client_email") else None,
+                "jira_username": c.get("client_jira_id"),
+                "start_date": c.get("onboarding_date"),
+                "status": "ACTIVE",
+            }
+            employee_data = {k: v for k, v in employee_data.items() if v is not None}
+            try:
+                await client.table("employees").insert(employee_data).execute()
+                api_cache.clear_prefix("employees_")
+                logger.info("Auto-created employee record for candidate %s", candidate_id)
+            except Exception as emp_err:
+                logger.warning("Employee auto-creation failed for candidate %s: %s", candidate_id, emp_err)
+
     api_cache.clear_prefix("candidates_")
     api_cache.clear_prefix("dashboard_")
     return refreshed.data
