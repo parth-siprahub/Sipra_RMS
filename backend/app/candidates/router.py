@@ -17,35 +17,17 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
 
-# Valid status transitions for pipeline stages
+# Valid status transitions — sequential pipeline enforcement
+# Correct sequence: NEW → SCREENING → L1_SCHEDULED → L1_COMPLETED → L1_SHORTLIST
+# → INTERVIEW_SCHEDULED → SELECTED → WITH_ADMIN → WITH_CLIENT → SUBMITTED_TO_ADMIN → ONBOARDED
 ADMIN_REVIEW_TRANSITIONS = {
     CandidateStatus.NEW: [
         CandidateStatus.SCREENING,
-        CandidateStatus.SUBMITTED_TO_ADMIN,
-        CandidateStatus.WITH_ADMIN,
-        CandidateStatus.REJECTED_BY_ADMIN,
         CandidateStatus.SCREEN_REJECT,
     ],
     CandidateStatus.SCREENING: [
-        CandidateStatus.SUBMITTED_TO_ADMIN,
-        CandidateStatus.WITH_ADMIN,
-        CandidateStatus.SCREEN_REJECT,
-    ],
-    CandidateStatus.SUBMITTED_TO_ADMIN: [
-        CandidateStatus.WITH_ADMIN,
-        CandidateStatus.REJECTED_BY_ADMIN,
-        CandidateStatus.SCREEN_REJECT,
-    ],
-    CandidateStatus.WITH_ADMIN: [
-        CandidateStatus.WITH_CLIENT,
-        CandidateStatus.REJECTED_BY_ADMIN,
-    ],
-    CandidateStatus.WITH_CLIENT: [
         CandidateStatus.L1_SCHEDULED,
-        CandidateStatus.INTERVIEW_SCHEDULED,
-        CandidateStatus.SELECTED,
-        CandidateStatus.REJECTED_BY_CLIENT,
-        CandidateStatus.ON_HOLD,
+        CandidateStatus.SCREEN_REJECT,
     ],
     CandidateStatus.L1_SCHEDULED: [
         CandidateStatus.L1_COMPLETED,
@@ -58,25 +40,42 @@ ADMIN_REVIEW_TRANSITIONS = {
     ],
     CandidateStatus.L1_SHORTLIST: [
         CandidateStatus.INTERVIEW_SCHEDULED,
-        CandidateStatus.SELECTED,
-        CandidateStatus.REJECTED_BY_CLIENT,
-        CandidateStatus.ON_HOLD,
+        CandidateStatus.L1_REJECT,
     ],
     CandidateStatus.INTERVIEW_SCHEDULED: [
         CandidateStatus.SELECTED,
         CandidateStatus.REJECTED_BY_CLIENT,
-        CandidateStatus.ON_HOLD,
         CandidateStatus.INTERVIEW_BACK_OUT,
     ],
     CandidateStatus.SELECTED: [
-        CandidateStatus.ONBOARDED,
+        CandidateStatus.WITH_ADMIN,
         CandidateStatus.OFFER_BACK_OUT,
     ],
-    # Terminal statuses — no transitions out
+    CandidateStatus.WITH_ADMIN: [
+        CandidateStatus.WITH_CLIENT,
+        CandidateStatus.REJECTED_BY_ADMIN,
+    ],
+    CandidateStatus.WITH_CLIENT: [
+        CandidateStatus.SUBMITTED_TO_ADMIN,
+        CandidateStatus.ONBOARDED,  # same-day scenario: direct move allowed
+        CandidateStatus.REJECTED_BY_CLIENT,
+    ],
+    CandidateStatus.SUBMITTED_TO_ADMIN: [
+        CandidateStatus.ONBOARDED,
+        CandidateStatus.REJECTED_BY_ADMIN,
+    ],
+    CandidateStatus.ONBOARDED: [
+        CandidateStatus.EXIT,
+    ],
+    # Terminal statuses
     CandidateStatus.L1_REJECT: [],
     CandidateStatus.SCREEN_REJECT: [],
     CandidateStatus.INTERVIEW_BACK_OUT: [],
     CandidateStatus.OFFER_BACK_OUT: [],
+    CandidateStatus.REJECTED_BY_ADMIN: [CandidateStatus.ON_HOLD],
+    CandidateStatus.REJECTED_BY_CLIENT: [CandidateStatus.ON_HOLD],
+    CandidateStatus.ON_HOLD: [CandidateStatus.NEW],
+    CandidateStatus.EXIT: [],
 }
 
 
@@ -114,6 +113,41 @@ async def create_candidate(
     current_user: dict = Depends(get_current_user),
 ):
     client = await get_supabase_admin_async()
+
+    # Duplicate check: first_name + last_name + email OR phone
+    dup_query = (
+        client.table("candidates")
+        .select("id, first_name, last_name, email, phone")
+        .ilike("email", payload.email.strip())
+        .limit(1)
+    )
+    dup_result = await dup_query.execute()
+    if dup_result.data:
+        d = dup_result.data[0]
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Duplicate candidate found: {d['first_name']} {d['last_name']} ({d['email']}). ID: {d['id']}",
+        )
+
+    # Also check by name + phone if phone is provided
+    if payload.phone:
+        stripped = "".join(c for c in payload.phone if c.isdigit())[-10:]
+        if stripped and len(stripped) == 10:
+            name_dup = await (
+                client.table("candidates")
+                .select("id, first_name, last_name, email, phone")
+                .ilike("first_name", payload.first_name.strip())
+                .ilike("last_name", payload.last_name.strip())
+                .execute()
+            )
+            for d in (name_dup.data or []):
+                existing_phone = "".join(c for c in (d.get("phone") or "") if c.isdigit())[-10:]
+                if existing_phone == stripped:
+                    raise HTTPException(
+                        status.HTTP_409_CONFLICT,
+                        f"Duplicate candidate found: {d['first_name']} {d['last_name']} ({d['email']}). ID: {d['id']}",
+                    )
+
     data = payload.model_dump(exclude_none=True, mode="json")
     data["owner_id"] = current_user["id"]
     data["status"] = CandidateStatus.NEW.value
@@ -181,23 +215,21 @@ async def admin_review_candidate(
         # No change needed — return current record
         return existing.data[0]
 
-    # Admin/HR can make any transition; vendor users must follow the pipeline
-    user_role = current_user.get("role", "").upper()
-    if user_role == "VENDOR":
-        try:
-            current_status = CandidateStatus(current_status_str)
-        except ValueError:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                f"Current status '{current_status_str}' is not a recognized pipeline stage.",
-            )
-        allowed = ADMIN_REVIEW_TRANSITIONS.get(current_status, [])
-        if payload.status not in allowed:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                f"Cannot transition from {current_status.value} to {payload.status.value}. "
-                f"Allowed: {[s.value for s in allowed]}",
-            )
+    # All users must follow the pipeline — sequential transitions only
+    try:
+        current_status = CandidateStatus(current_status_str)
+    except ValueError:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Current status '{current_status_str}' is not a recognized pipeline stage.",
+        )
+    allowed = ADMIN_REVIEW_TRANSITIONS.get(current_status, [])
+    if payload.status not in allowed:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Cannot transition from {current_status.value} to {payload.status.value}. "
+            f"Allowed: {[s.value for s in allowed]}",
+        )
 
     update_data: dict = {"status": payload.status.value}
     if payload.remarks:
@@ -222,6 +254,43 @@ async def admin_review_candidate(
     refreshed = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
     if not refreshed.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found after update")
+
+    # Transition trigger: auto-create Employee record when status reaches ONBOARDED
+    if payload.status == CandidateStatus.ONBOARDED:
+        c = refreshed.data
+        # Only create if no employee record exists yet
+        existing_emp = await client.table("employees").select("id").eq("candidate_id", candidate_id).execute()
+        if not existing_emp.data:
+            employee_data = {
+                "candidate_id": candidate_id,
+                "rms_name": f"{c.get('first_name', '')} {c.get('last_name', '')}".strip(),
+                "client_name": c.get("client_email", "").split("@")[0] if c.get("client_email") else None,
+                "jira_username": c.get("client_jira_id"),
+                "start_date": c.get("onboarding_date"),
+                "status": "ACTIVE",
+            }
+            employee_data = {k: v for k, v in employee_data.items() if v is not None}
+            try:
+                await client.table("employees").insert(employee_data).execute()
+                api_cache.clear_prefix("employees_")
+                logger.info("Auto-created employee record for candidate %s", candidate_id)
+            except Exception as emp_err:
+                logger.warning("Employee auto-creation failed for candidate %s: %s", candidate_id, emp_err)
+
+        # Auto-close the linked Resource Request when candidate is onboarded
+        request_id = c.get("request_id")
+        if request_id:
+            try:
+                await (
+                    client.table("resource_requests")
+                    .update({"status": "CLOSED"})
+                    .eq("id", request_id)
+                    .execute()
+                )
+                api_cache.clear_prefix("requests_")
+                logger.info("Auto-closed resource request %s after candidate %s onboarded", request_id, candidate_id)
+            except Exception as rr_err:
+                logger.warning("RR auto-close failed for request %s: %s", request_id, rr_err)
 
     api_cache.clear_prefix("candidates_")
     api_cache.clear_prefix("dashboard_")

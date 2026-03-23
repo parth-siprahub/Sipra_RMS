@@ -3,10 +3,17 @@ import toast from 'react-hot-toast';
 
 const TOKEN_EXPIRY_MINUTES = 55; // slightly less than backend's 60min to avoid boundary issues
 
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'RECRUITER' | 'VENDOR';
+
+/** Helper: checks if the given role has admin-level privileges */
+export function isAdminRole(role?: string): boolean {
+    return role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'MANAGER';
+}
+
 interface UserProfile {
     id: string;
     email: string;
-    role: 'ADMIN' | 'RECRUITER';
+    role: UserRole;
     full_name: string;
 }
 

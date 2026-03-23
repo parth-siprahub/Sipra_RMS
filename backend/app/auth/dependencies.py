@@ -57,10 +57,20 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
 
 
 async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
-    """Ensure the user has ADMIN role."""
-    if current_user.get("role") != "ADMIN":
+    """Ensure the user has ADMIN, SUPER_ADMIN, or MANAGER role."""
+    if current_user.get("role") not in ("ADMIN", "SUPER_ADMIN", "MANAGER"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
+        )
+    return current_user
+
+
+async def require_super_admin(current_user: dict = Depends(get_current_user)) -> dict:
+    """Ensure the user has SUPER_ADMIN role."""
+    if current_user.get("role") != "SUPER_ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super Admin access required",
         )
     return current_user

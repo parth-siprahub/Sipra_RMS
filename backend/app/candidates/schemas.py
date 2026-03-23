@@ -1,7 +1,18 @@
 """Candidate schemas — aligned with public.candidates table (28 columns)."""
-from pydantic import BaseModel, EmailStr
+import re
+from pydantic import BaseModel, EmailStr, field_validator
 from datetime import datetime, date, time
 from enum import Enum
+
+
+def _validate_phone_10_digit(v: str | None) -> str | None:
+    """Strip non-digits and enforce exactly 10 digits."""
+    if v is None:
+        return v
+    digits = re.sub(r"\D", "", v)
+    if len(digits) != 10:
+        raise ValueError("Phone must be exactly 10 digits")
+    return digits
 
 
 
@@ -36,6 +47,8 @@ class CandidateCreate(BaseModel):
     email: str
     phone: str | None = None
     source: str | None = None
+
+    _normalize_phone = field_validator("phone", mode="before")(_validate_phone_10_digit)
     vendor: str | None = None
     vendor_id: int | None = None
     current_company: str | None = None
@@ -60,6 +73,8 @@ class CandidateUpdate(BaseModel):
     email: str | None = None
     phone: str | None = None
     request_id: int | None = None
+
+    _normalize_phone = field_validator("phone", mode="before")(_validate_phone_10_digit)
     source: str | None = None
     vendor: str | None = None
     vendor_id: int | None = None
