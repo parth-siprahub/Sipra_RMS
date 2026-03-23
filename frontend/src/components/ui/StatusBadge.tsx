@@ -53,7 +53,11 @@ export function StatusBadge({ value, type }: StatusBadgeProps) {
                 : PRIORITY_MAP;
 
     const colorClass = map[value] ?? 'badge-neutral';
-    const label = value.replace(/_/g, ' ');
+    // Title Case normalization: "SCREEN_REJECT" → "Screen Reject"
+    const label = value
+        .replace(/_/g, ' ')
+        .toLowerCase()
+        .replace(/\b\w/g, (c) => c.toUpperCase());
 
     return <span className={`badge ${colorClass}`}>{label}</span>;
 }

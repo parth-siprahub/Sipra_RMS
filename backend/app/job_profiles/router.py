@@ -1,5 +1,8 @@
 """Job Profiles CRUD — aligned with public.job_profiles table."""
-from fastapi import APIRouter, HTTPException, status, Depends
+import logging
+from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File
+
+logger = logging.getLogger(__name__)
 from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
 from app.job_profiles.schemas import (
@@ -77,15 +80,101 @@ async def update_job_profile(
     return result.data[0]
 
 
-@router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{profile_id}")
 async def delete_job_profile(
     profile_id: int,
     current_user: dict = Depends(require_admin),
 ):
     client = await get_supabase_admin_async()
-    # Guard: prevent deletion if linked to resource requests
-    linked = await client.table("resource_requests").select("id").eq("job_profile_id", profile_id).limit(1).execute()
+    # Guard: prevent deletion if linked to non-CLOSED resource requests
+    linked = await (
+        client.table("resource_requests")
+        .select("id, status")
+        .eq("job_profile_id", profile_id)
+        .execute()
+    )
     if linked.data:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Cannot delete: linked to resource requests")
+        open_requests = [r for r in linked.data if r.get("status") != "CLOSED"]
+        if open_requests:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Cannot delete: linked to open resource requests. Close all linked requests first.",
+            )
     await client.table("job_profiles").delete().eq("id", profile_id).execute()
     api_cache.clear_prefix("jobprofiles_")
+    return {"message": "Job profile deleted"}
+
+
+JD_ALLOWED_MIME_TYPES = {
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+JD_ALLOWED_EXTENSIONS = {"pdf", "doc", "docx"}
+JD_MAX_SIZE_MB = 5
+
+
+@router.post("/{profile_id}/jd")
+async def upload_jd_file(
+    profile_id: int,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(require_admin),
+):
+    """Upload JD file (PDF/DOCX, max 5MB) for a job profile."""
+    if file.content_type not in JD_ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Invalid file type. Allowed: PDF, DOC, DOCX",
+        )
+
+    raw_ext = (file.filename or "").rsplit(".", 1)[-1].lower().strip()
+    if raw_ext not in JD_ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Invalid file extension. Allowed: .pdf, .doc, .docx",
+        )
+
+    content = await file.read()
+    if len(content) > JD_MAX_SIZE_MB * 1024 * 1024:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"File too large. Max size: {JD_MAX_SIZE_MB}MB",
+        )
+
+    client = await get_supabase_admin_async()
+
+    # Verify profile exists
+    existing = await client.table("job_profiles").select("id").eq("id", profile_id).single().execute()
+    if not existing.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Job profile not found")
+
+    storage_path = f"job_profile_{profile_id}/jd.{raw_ext}"
+
+    try:
+        try:
+            await client.storage.from_("resumes").remove([storage_path])
+        except Exception:
+            pass
+
+        await client.storage.from_("resumes").upload(
+            storage_path,
+            content,
+            file_options={"content-type": file.content_type},
+        )
+    except Exception as e:
+        logger.error("JD upload failed for profile %d: %s", profile_id, str(e))
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "JD file upload failed. Please try again.",
+        )
+
+    public_url = client.storage.from_("resumes").get_public_url(storage_path)
+
+    await client.table("job_profiles").update({"jd_file_url": public_url}).eq("id", profile_id).execute()
+    api_cache.clear_prefix("jobprofiles_")
+
+    return {
+        "message": "JD file uploaded successfully",
+        "jd_file_url": public_url,
+        "profile_id": profile_id,
+    }

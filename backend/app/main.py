@@ -24,6 +24,10 @@ from app.sows.router import router as sows_router
 from app.communication_logs.router import router as communication_logs_router
 from app.dashboard.router import router as dashboard_router
 from app.vendors.router import router as vendors_router
+from app.employees.router import router as employees_router
+from app.timesheets.router import router as timesheets_router
+from app.billing.router import router as billing_router
+from app.clients.router import router as clients_router
 
 # Configure file logging for error capture
 logging.basicConfig(
@@ -165,6 +169,10 @@ app.include_router(sows_router)
 app.include_router(communication_logs_router)
 app.include_router(dashboard_router)
 app.include_router(vendors_router)
+app.include_router(employees_router)
+app.include_router(timesheets_router)
+app.include_router(billing_router)
+app.include_router(clients_router)
 
 
 # ─── Health ───────────────────────────────────────────────────────────────────

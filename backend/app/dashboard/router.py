@@ -116,6 +116,72 @@ async def get_metrics(current_user: dict = Depends(get_current_user)):
         total = stats["total"]
         stats["rejection_rate"] = round(stats["rejected"] / total * 100, 1) if total > 0 else 0.0
 
+    # 8. Employee & Triad Metrics
+    employees_raw = await client.table("employees").select("*").execute()
+    all_employees = employees_raw.data or []
+    active_employees = [e for e in all_employees if e.get("status") == "ACTIVE"]
+
+    # Compliance tracker: employees with missing triad identifiers
+    missing_identifiers = []
+    for emp in active_employees:
+        missing = []
+        if not emp.get("jira_username"):
+            missing.append("jira_username")
+        if not emp.get("aws_email"):
+            missing.append("aws_email")
+        if not emp.get("github_id"):
+            missing.append("github_id")
+        if missing:
+            missing_identifiers.append({
+                "employee_id": emp["id"],
+                "rms_name": emp.get("rms_name", "Unknown"),
+                "missing_fields": missing,
+            })
+
+    # Billing compliance summary (latest month)
+    billing_raw = await client.table("billing_records").select("*").order("billing_month", desc=True).limit(200).execute()
+    billing_records = billing_raw.data or []
+    latest_month = billing_records[0]["billing_month"] if billing_records else None
+    triad_summary = []
+    if latest_month:
+        month_records = [b for b in billing_records if b["billing_month"] == latest_month]
+        for br in month_records:
+            emp = next((e for e in all_employees if e["id"] == br["employee_id"]), None)
+            triad_summary.append({
+                "employee_id": br["employee_id"],
+                "rms_name": emp.get("rms_name", "Unknown") if emp else "Unknown",
+                "jira_hours": br.get("total_logged_hours", 0),
+                "capped_hours": br.get("capped_hours", 0),
+                "aws_hours": br.get("aws_active_hours"),
+                "compliance_75_pct": br.get("compliance_75_pct"),
+                "is_billable": br.get("is_billable", True),
+            })
+
+    # 9. Active Resources Per Client
+    resources_per_client: dict[str, int] = defaultdict(int)
+    for emp in active_employees:
+        client_name = emp.get("client_name") or "Unassigned"
+        resources_per_client[client_name] += 1
+    active_resources_per_client = sorted(
+        [{"client": k, "count": v} for k, v in resources_per_client.items()],
+        key=lambda x: x["count"],
+        reverse=True,
+    )
+
+    # 10. Average Time to Onboard (days from candidate created_at to onboarding)
+    onboard_days = []
+    for c in all_candidates:
+        if c.get("status") == "ONBOARDED" and c.get("created_at") and c.get("onboarding_date"):
+            try:
+                created = datetime.fromisoformat(c["created_at"].replace("Z", "+00:00"))
+                onboarded = datetime.fromisoformat(c["onboarding_date"])
+                diff = (onboarded - created.replace(tzinfo=None)).days
+                if diff >= 0:
+                    onboard_days.append(diff)
+            except (ValueError, TypeError):
+                pass
+    avg_time_to_onboard = round(sum(onboard_days) / len(onboard_days), 1) if onboard_days else None
+
     result = {
         "total_requests": len(all_requests),
         "requests_by_status": by_status,
@@ -127,7 +193,14 @@ async def get_metrics(current_user: dict = Depends(get_current_user)):
         "sow_utilization": sow_utilization,
         "timeline": timeline,
         "candidates_by_skill": candidates_by_skill,
+        "total_employees": len(all_employees),
+        "active_employees": len(active_employees),
+        "missing_identifiers": missing_identifiers,
+        "triad_summary": triad_summary,
+        "triad_billing_month": latest_month,
+        "active_resources_per_client": active_resources_per_client,
+        "avg_time_to_onboard": avg_time_to_onboard,
     }
-    
+
     api_cache.set(cache_key, result)
     return result

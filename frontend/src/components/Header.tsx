@@ -3,13 +3,16 @@ import { useTheme } from '../context/ThemeContext';
 import { Sun, Moon, Bell } from 'lucide-react';
 
 const ROUTE_LABELS: Record<string, string> = {
-    '/': 'Dashboard Overview',
-    '/resource-requests': 'Staffing Requests',
-    '/candidates': 'Candidate Pipeline',
+    '/': 'Dashboard',
+    '/resource-requests': 'Resource Requests',
+    '/candidates': 'Candidates',
     '/job-profiles': 'Job Profiles',
-    '/sows': 'Statement of Work',
-    '/communication-logs': 'Interaction History',
-    '/vendors': 'Partner Vendors',
+    '/sows': 'SOWs',
+    '/communication-logs': 'Communication Logs',
+    '/vendors': 'Vendors',
+    '/employees': 'Employees',
+    '/timesheets': 'Timesheets',
+    '/clients': 'Clients',
 };
 
 export function Header() {

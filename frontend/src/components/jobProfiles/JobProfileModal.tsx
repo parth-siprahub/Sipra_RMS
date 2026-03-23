@@ -49,24 +49,37 @@ export function JobProfileModal({ isOpen, onClose, onSuccess, jobProfile }: JobP
         setLoading(true);
 
         try {
-            console.log('JobProfileModal Form Data:', formData);
             // Strip empty strings to undefined so they are omitted from JSON
             const sanitized = {
                 role_name: formData.role_name.trim(),
                 technology: formData.technology.trim(),
                 experience_level: formData.experience_level || undefined,
                 job_description: formData.job_description || undefined,
-                jd_file_url: jdFile ? jdFile.name : (formData.jd_file_url || undefined),
+                // Don't pass jd_file_url here — file upload is handled separately
+                jd_file_url: formData.jd_file_url || undefined,
             };
-            console.log('Submitting sanitized payload:', sanitized);
 
+            let profileId: number;
             if (jobProfile?.id) {
                 await jobProfileApi.update(jobProfile.id, sanitized);
+                profileId = jobProfile.id;
                 toast.success('Job Profile updated successfully');
             } else {
-                await jobProfileApi.create(sanitized);
+                const created = await jobProfileApi.create(sanitized);
+                profileId = created.id;
                 toast.success('Job Profile created successfully');
             }
+
+            // Upload JD file if selected
+            if (jdFile && profileId) {
+                try {
+                    await jobProfileApi.uploadJd(profileId, jdFile);
+                    toast.success('JD file uploaded');
+                } catch {
+                    toast.error('Profile saved, but JD file upload failed');
+                }
+            }
+
             onSuccess();
             onClose();
         } catch (error: any) {
@@ -157,7 +170,14 @@ export function JobProfileModal({ isOpen, onClose, onSuccess, jobProfile }: JobP
                         <div className="bg-surface p-3 rounded-xl border border-border hover:border-cta/30 transition-all">
                             {formData.jd_file_url && !jdFile && (
                                 <p className="text-xs text-text-muted mb-2">
-                                    Current file: <span className="font-medium text-cta">{formData.jd_file_url}</span>
+                                    Current file:{' '}
+                                    {formData.jd_file_url.startsWith('http') ? (
+                                        <a href={formData.jd_file_url} target="_blank" rel="noopener noreferrer" className="font-medium text-cta hover:underline">
+                                            View JD File
+                                        </a>
+                                    ) : (
+                                        <span className="font-medium text-cta">{formData.jd_file_url}</span>
+                                    )}
                                 </p>
                             )}
                             <input
