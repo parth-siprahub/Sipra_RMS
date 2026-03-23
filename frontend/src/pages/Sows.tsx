@@ -92,10 +92,9 @@ export function Sows() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-text">Statements of Work</h1>
-                    <p className="text-text-muted mt-1">Manage client contracts and resource allocations</p>
+                    <p className="text-text-muted">Manage client contracts and resource allocations</p>
                 </div>
-                {isAdmin && (
+                {isAdmin && statusFilter !== 'INACTIVE' && (
                     <button
                         onClick={handleCreate}
                         className="btn btn-primary flex items-center gap-2 shadow-lg shadow-cta/20"

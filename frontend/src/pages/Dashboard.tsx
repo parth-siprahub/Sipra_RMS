@@ -64,6 +64,11 @@ interface TriadEntry {
     is_billable: boolean;
 }
 
+interface ClientResourceEntry {
+    client: string;
+    count: number;
+}
+
 interface DashboardMetrics {
     total_requests: number;
     requests_by_status: Record<string, number>;
@@ -78,6 +83,8 @@ interface DashboardMetrics {
     total_employees?: number;
     active_employees?: number;
     missing_identifiers?: MissingIdentifier[];
+    active_resources_per_client?: ClientResourceEntry[];
+    avg_time_to_onboard?: number | null;
     triad_summary?: TriadEntry[];
     triad_billing_month?: string;
 }
@@ -316,8 +323,7 @@ export function Dashboard() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-text">Market Intelligence</h1>
-                    <p className="text-sm text-text-muted mt-1">Real-time resource and candidate analytics</p>
+                    <p className="text-sm text-text-muted">Real-time resource and candidate analytics</p>
                 </div>
                 <div className="flex items-center gap-2 text-xs font-bold text-text-muted bg-surface-hover px-3 py-1.5 rounded-full border border-border">
                     <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
@@ -837,6 +843,55 @@ export function Dashboard() {
                     </div>
                 </div>
             </div>
+
+            {/* ── Section: Active Resources Per Client ─────────────────────────── */}
+            {metrics?.active_resources_per_client && metrics.active_resources_per_client.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="card">
+                        <h2 className="text-base font-bold mb-4 flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-cta" />
+                            Active Resources Per Client
+                        </h2>
+                        <ResponsiveContainer width="100%" height={Math.max(200, metrics.active_resources_per_client.length * 40)}>
+                            <BarChart
+                                data={metrics.active_resources_per_client}
+                                layout="vertical"
+                                margin={{ left: 10, right: 30, top: 5, bottom: 5 }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                                <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
+                                <YAxis
+                                    type="category"
+                                    dataKey="client"
+                                    width={120}
+                                    tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                                />
+                                <Tooltip
+                                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }}
+                                />
+                                <Bar dataKey="count" fill="#3B82F6" radius={[0, 6, 6, 0]} name="Active Resources" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    {/* Avg Time to Onboard */}
+                    <div className="card flex flex-col justify-center items-center text-center">
+                        <h2 className="text-base font-bold mb-4 flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-success" />
+                            Average Time to Onboard
+                        </h2>
+                        {metrics.avg_time_to_onboard != null ? (
+                            <div>
+                                <p className="text-5xl font-extrabold text-success">{metrics.avg_time_to_onboard}</p>
+                                <p className="text-sm text-text-muted mt-2 uppercase font-bold tracking-wider">Days</p>
+                                <p className="text-xs text-text-muted mt-1">From candidate creation to onboarding</p>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-text-muted">No onboarded candidates yet</p>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* ── Section: Verification Triad (Phase 2) ──────────────────────── */}
             {(metrics?.total_employees !== undefined && metrics.total_employees > 0) && (

@@ -133,8 +133,7 @@ export function Employees() {
         <div className="space-y-6 animate-fade-in">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-text">Employee Registry</h1>
-                    <p className="text-text-muted mt-1">Manage employee identifiers and the Verification Triad</p>
+                    <p className="text-text-muted">Manage employee identifiers and the Verification Triad</p>
                 </div>
             </div>
 
@@ -150,7 +149,7 @@ export function Employees() {
                     />
                 </div>
                 <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
-                    {['ACTIVE', 'EXITED', ''].map(s => (
+                    {['ACTIVE', 'EXITED'].map(s => (
                         <button
                             key={s}
                             onClick={() => setStatusFilter(s)}
@@ -161,7 +160,7 @@ export function Employees() {
                                     : 'bg-surface text-text-muted hover:bg-surface-hover'
                             )}
                         >
-                            {s || 'ALL'}
+                            {s === 'ACTIVE' ? 'Active' : 'Exited'}
                         </button>
                     ))}
                 </div>

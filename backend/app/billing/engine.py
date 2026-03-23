@@ -66,6 +66,7 @@ def check_75_percent_rule(jira_hours: float, aws_hours: float | None) -> bool | 
 
 def calculate_billing(
     entries: list[dict],
+    employee_start_date: date | None = None,
     employee_exit_date: date | None = None,
     aws_active_hours: float | None = None,
 ) -> dict:
@@ -74,12 +75,20 @@ def calculate_billing(
 
     Args:
         entries: list of timesheet entries for a single month
+        employee_start_date: if set, entries before this date are excluded
         employee_exit_date: if set, entries after this date are excluded
         aws_active_hours: optional AWS active hours for compliance check
 
     Returns:
         dict with billing calculation results
     """
+    # Start date logic: filter out entries before employee joined
+    if employee_start_date:
+        entries = [
+            e for e in entries
+            if date.fromisoformat(str(e["log_date"])) >= employee_start_date
+        ]
+
     # Exit logic: filter out entries after exit date
     if employee_exit_date:
         entries = [

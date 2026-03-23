@@ -73,8 +73,7 @@ export function JobProfiles() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-text">Job Profiles</h1>
-                    <p className="text-text-muted mt-1">Define standard roles and required technologies</p>
+                    <p className="text-text-muted">Define standard roles and required technologies</p>
                 </div>
                 {isAdmin && (
                     <button

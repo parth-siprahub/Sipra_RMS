@@ -167,11 +167,16 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
                         required
                     >
                         <option value="">— Select SOW —</option>
-                        {sows.map((s) => (
-                            <option key={s.id} value={s.id}>
-                                {s.sow_number} - {s.client_name}
-                            </option>
-                        ))}
+                        {sows.map((s) => {
+                            const linkedProfile = s.job_profile_id
+                                ? jobProfiles.find(p => p.id === s.job_profile_id)
+                                : null;
+                            return (
+                                <option key={s.id} value={s.id}>
+                                    {s.sow_number} - {s.client_name}{linkedProfile ? ` (${linkedProfile.role_name})` : ''}
+                                </option>
+                            );
+                        })}
                     </select>
                 </div>
 
@@ -210,7 +215,7 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
                     >
                         {(['URGENT', 'HIGH', 'MEDIUM', 'LOW'] as RequestPriority[]).map((p) => (
                             <option key={p} value={p}>
-                                {p}
+                                {p.charAt(0) + p.slice(1).toLowerCase()}
                             </option>
                         ))}
                     </select>
@@ -310,8 +315,7 @@ export function ResourceRequests() {
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-text">Resource Requests</h1>
-                    <p className="text-sm text-text-muted mt-1">
+                    <p className="text-sm text-text-muted">
                         Track and manage all staffing requests
                     </p>
                 </div>
@@ -407,7 +411,6 @@ export function ResourceRequests() {
                                     <th>Role / Profile</th>
                                     <th>Priority</th>
                                     <th>Status</th>
-                                    <th>Source</th>
                                     <th>Created</th>
                                 </tr>
                             </thead>
@@ -448,7 +451,6 @@ export function ResourceRequests() {
                                                 onStatusChange={handleStatusChange}
                                             />
                                         </td>
-                                        <td className="text-text-muted">{req.source ?? '—'}</td>
                                         <td>
                                             <span className="text-xs text-text-muted">
                                                 {req.created_at ? new Date(req.created_at).toLocaleDateString() : '—'}

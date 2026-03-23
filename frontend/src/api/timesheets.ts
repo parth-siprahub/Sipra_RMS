@@ -26,6 +26,6 @@ export const timesheetsApi = {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('import_month', importMonth);
-        return api.post<ImportResult>('/timesheets/import', formData);
+        return api.upload<ImportResult>('/timesheets/import', formData);
     },
 };

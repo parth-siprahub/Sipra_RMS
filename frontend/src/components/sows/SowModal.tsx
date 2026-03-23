@@ -67,9 +67,32 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
         }
     }, [sow, isOpen]);
 
+    const today = new Date().toISOString().split('T')[0];
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
+
+        // Validation: start_date must not be in the past (only for new SOWs)
+        if (!sow && formData.start_date && formData.start_date < today) {
+            toast.error('Start Date cannot be in the past');
+            setLoading(false);
+            return;
+        }
+
+        // Validation: start_date must be before target_date
+        if (formData.start_date && formData.target_date && formData.start_date >= formData.target_date) {
+            toast.error('Start Date must be before Target Date');
+            setLoading(false);
+            return;
+        }
+
+        // Validation: max_resources cannot exceed 100
+        if (formData.max_resources > 100) {
+            toast.error('Max Resources cannot exceed 100');
+            setLoading(false);
+            return;
+        }
 
         try {
             // Strip empty strings to null/undefined so Pydantic doesn't reject them
@@ -78,7 +101,7 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
                 client_name: formData.client_name,
                 start_date: formData.start_date || undefined,
                 target_date: formData.target_date || undefined,
-                submitted_date: formData.submitted_date || undefined,
+                submitted_date: sow ? (formData.submitted_date || undefined) : undefined,
                 max_resources: formData.max_resources || undefined,
                 job_profile_id: formData.job_profile_id,
                 is_active: formData.is_active,
@@ -93,8 +116,9 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
             }
             onSuccess();
             onClose();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to save SOW');
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : 'Failed to save SOW';
+            toast.error(msg);
         } finally {
             setLoading(false);
         }
@@ -169,7 +193,7 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
                     </div>
 
                     <div>
-                        <label className="input-label" htmlFor="start_date">Start Date</label>
+                        <label className="input-label" htmlFor="start_date">Start Date {!sow && <span className="text-danger">*</span>}</label>
                         <div className="relative">
                             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
                             <input
@@ -178,12 +202,14 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
                                 className="input-field pl-10"
                                 value={formData.start_date}
                                 onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                                min={!sow ? today : undefined}
+                                required={!sow}
                             />
                         </div>
                     </div>
 
                     <div>
-                        <label className="input-label" htmlFor="target_date">Target Date</label>
+                        <label className="input-label" htmlFor="target_date">Target Date {!sow && <span className="text-danger">*</span>}</label>
                         <div className="relative">
                             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
                             <input
@@ -192,23 +218,27 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
                                 className="input-field pl-10"
                                 value={formData.target_date}
                                 onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
+                                min={formData.start_date || (!sow ? today : undefined)}
+                                required={!sow}
                             />
                         </div>
                     </div>
 
-                    <div>
-                        <label className="input-label" htmlFor="submitted_date">Submitted Date</label>
-                        <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
-                            <input
-                                id="submitted_date"
-                                type="date"
-                                className="input-field pl-10"
-                                value={formData.submitted_date}
-                                onChange={(e) => setFormData({ ...formData, submitted_date: e.target.value })}
-                            />
+                    {sow && (
+                        <div>
+                            <label className="input-label" htmlFor="submitted_date">Submitted Date</label>
+                            <div className="relative">
+                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+                                <input
+                                    id="submitted_date"
+                                    type="date"
+                                    className="input-field pl-10"
+                                    value={formData.submitted_date}
+                                    onChange={(e) => setFormData({ ...formData, submitted_date: e.target.value })}
+                                />
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     <div className="md:col-span-2 space-y-4">
                         <div className="flex items-center gap-3">
@@ -222,6 +252,7 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
                                     value={formData.max_resources}
                                     onChange={(e) => setFormData({ ...formData, max_resources: parseInt(e.target.value) || 0 })}
                                     min="0"
+                                    max="100"
                                 />
                             </div>
                         </div>

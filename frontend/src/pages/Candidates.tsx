@@ -165,6 +165,14 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick }: 
             draggingIdRef.current = null;
             return;
         }
+        // Enforce sequential pipeline movement
+        const allowed = NEXT_STEP_TRANSITIONS[candidate.status as CandidateStatus] || [];
+        if (!allowed.includes(targetStatus)) {
+            toast.error(`Cannot jump from "${STAGE_LABELS[candidate.status as CandidateStatus]}" to "${STAGE_LABELS[targetStatus]}". Only the next step is allowed.`);
+            setDraggingId(null);
+            draggingIdRef.current = null;
+            return;
+        }
         onStatusChange(id, targetStatus);
         setDraggingId(null);
         draggingIdRef.current = null;
@@ -240,7 +248,7 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick }: 
                                 <p className="text-xs text-text-muted truncate">{c.current_company}</p>
                             )}
                             <span className="badge badge-neutral mt-2 text-[10px]">
-                                {vendors.find(v => v.id === c.vendor_id)?.name || c.vendor || 'INTERNAL'}
+                                {vendors.find(v => v.id === c.vendor_id)?.name || c.vendor || 'Internal'}
                             </span>
                         </div>
                     ))}
@@ -282,13 +290,40 @@ interface DetailsModalProps {
     onClose: () => void;
     onUpdated: () => void;
     vendors: Vendor[];
+    requests: ResourceRequest[];
     onStatusChange: (id: number, status: CandidateStatus) => void;
 }
 
 // All valid statuses for the manual status dropdown
 const ALL_CANDIDATE_STATUSES: CandidateStatus[] = [...PIPELINE_STAGES, ...CLOSED_STAGES];
 
-function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors, onStatusChange }: DetailsModalProps) {
+// Allowed next-step transitions for pipeline enforcement
+// Correct sequence: NEW → SCREENING → L1_SCHEDULED → L1_COMPLETED → L1_SHORTLIST
+// → INTERVIEW_SCHEDULED → SELECTED → WITH_ADMIN → WITH_CLIENT → SUBMITTED_TO_ADMIN → ONBOARDED
+const NEXT_STEP_TRANSITIONS: Record<CandidateStatus, CandidateStatus[]> = {
+    NEW: ['SCREENING', 'SCREEN_REJECT'],
+    SCREENING: ['L1_SCHEDULED', 'SCREEN_REJECT'],
+    L1_SCHEDULED: ['L1_COMPLETED', 'L1_REJECT', 'INTERVIEW_BACK_OUT'],
+    L1_COMPLETED: ['L1_SHORTLIST', 'L1_REJECT'],
+    L1_SHORTLIST: ['INTERVIEW_SCHEDULED', 'L1_REJECT'],
+    INTERVIEW_SCHEDULED: ['SELECTED', 'REJECTED_BY_CLIENT', 'INTERVIEW_BACK_OUT'],
+    SELECTED: ['WITH_ADMIN', 'OFFER_BACK_OUT'],
+    WITH_ADMIN: ['WITH_CLIENT', 'REJECTED_BY_ADMIN'],
+    WITH_CLIENT: ['SUBMITTED_TO_ADMIN', 'ONBOARDED', 'REJECTED_BY_CLIENT'],
+    SUBMITTED_TO_ADMIN: ['ONBOARDED', 'REJECTED_BY_ADMIN'],
+    ONBOARDED: ['EXIT'],
+    // Terminal / closed statuses — no forward transitions
+    REJECTED_BY_ADMIN: ['ON_HOLD'],
+    REJECTED_BY_CLIENT: ['ON_HOLD'],
+    SCREEN_REJECT: [],
+    L1_REJECT: [],
+    INTERVIEW_BACK_OUT: [],
+    OFFER_BACK_OUT: [],
+    ON_HOLD: ['NEW'],
+    EXIT: [],
+};
+
+function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors, requests, onStatusChange }: DetailsModalProps) {
     const [activeTab, setActiveTab] = useState<'info' | 'interview' | 'transition'>('info');
     const [submitting, setSubmitting] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Candidate>>({});
@@ -367,12 +402,13 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                         <span className="text-text-muted text-xs">→</span>
                         <select
                             className="input-field text-sm py-1.5 flex-1 max-w-[220px]"
-                            value={candidate.status || ''}
+                            value=""
                             onChange={(e) => handleManualStatusChange(e.target.value as CandidateStatus)}
                             disabled={changingStatus}
                             aria-label="Change candidate status"
                         >
-                            {ALL_CANDIDATE_STATUSES.map((s) => (
+                            <option value="" disabled>Move to...</option>
+                            {(NEXT_STEP_TRANSITIONS[candidate.status as CandidateStatus] || []).map((s) => (
                                 <option key={s} value={s}>
                                     {STAGE_LABELS[s]}
                                 </option>
@@ -420,11 +456,19 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                         <span className="text-sm font-medium text-text">{candidate.phone || '—'}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-sm text-text-muted">Vendor</span>
+                                        <span className="text-sm text-text-muted">Source</span>
                                         <span className="badge badge-neutral">
-                                            {vendors.find(v => v.id === candidate.vendor_id)?.name || candidate.vendor || 'INTERNAL'}
+                                            {candidate.source ? candidate.source.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) : '—'}
                                         </span>
                                     </div>
+                                    {candidate.source === 'VENDORS' && (
+                                        <div className="flex justify-between">
+                                            <span className="text-sm text-text-muted">Vendor</span>
+                                            <span className="badge badge-neutral">
+                                                {vendors.find(v => v.id === candidate.vendor_id)?.name || candidate.vendor || '—'}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div>
@@ -440,6 +484,21 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                             {candidate.total_experience || 0}y / {candidate.relevant_experience || 0}y
                                         </span>
                                     </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-text-muted">Resume</span>
+                                        {candidate.resume_url ? (
+                                            <a
+                                                href={candidate.resume_url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm font-medium text-cta hover:underline"
+                                            >
+                                                View Resume
+                                            </a>
+                                        ) : (
+                                            <span className="text-sm text-text-muted italic">Not uploaded</span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -449,16 +508,19 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                         <div className="space-y-6">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-3">
-                                    <label className="input-label">L1 Feedback</label>
+                                    <label className="input-label" htmlFor="l1-feedback">L1 Feedback</label>
                                     <textarea
+                                        id="l1-feedback"
                                         className="input-field min-h-[100px] text-sm"
                                         value={editForm.l1_feedback || ''}
                                         onChange={(e) => setEditForm(prev => ({ ...prev, l1_feedback: e.target.value }))}
                                         placeholder="Enter technical interview notes..."
+                                        title="L1 Feedback"
                                     />
                                     <div className="flex items-center gap-2">
-                                        <label className="text-xs font-medium text-text-muted">L1 Score (0-10):</label>
+                                        <label className="text-xs font-medium text-text-muted" htmlFor="l1-score">L1 Score (0-10):</label>
                                         <input
+                                            id="l1-score"
                                             type="number"
                                             className="input-field w-16 py-1 px-2 text-xs"
                                             min={0} max={10}
@@ -468,7 +530,7 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                         />
                                     </div>
                                     <div className="bg-surface p-3 rounded-xl border border-border hover:border-cta/30 transition-all">
-                                        <label className="text-[11px] font-semibold text-text-muted block mb-2">
+                                        <label className="text-[11px] font-semibold text-text-muted block mb-2" htmlFor="l1-file">
                                             L1 Feedback File (PDF/DOCX)
                                         </label>
                                         {candidate.l1_feedback_file_url && (
@@ -477,9 +539,11 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                             </p>
                                         )}
                                         <input
+                                            id="l1-file"
                                             type="file"
                                             accept=".pdf,.doc,.docx"
                                             className="text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-surface-hover file:text-cta hover:file:bg-cta/10 file:cursor-pointer transition-all w-full"
+                                            title="Upload L1 Feedback File"
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (file) {
@@ -490,16 +554,19 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                     </div>
                                 </div>
                                 <div className="space-y-3">
-                                    <label className="input-label">L2 Feedback</label>
+                                    <label className="input-label" htmlFor="l2-feedback">L2 Feedback</label>
                                     <textarea
+                                        id="l2-feedback"
                                         className="input-field min-h-[100px] text-sm"
                                         value={editForm.l2_feedback || ''}
                                         onChange={(e) => setEditForm(prev => ({ ...prev, l2_feedback: e.target.value }))}
                                         placeholder="Enter client interview notes..."
+                                        title="L2 Feedback"
                                     />
                                     <div className="flex items-center gap-2">
-                                        <label className="text-xs font-medium text-text-muted">L2 Score (0-10):</label>
+                                        <label className="text-xs font-medium text-text-muted" htmlFor="l2-score">L2 Score (0-10):</label>
                                         <input
+                                            id="l2-score"
                                             type="number"
                                             className="input-field w-16 py-1 px-2 text-xs"
                                             min={0} max={10}
@@ -509,7 +576,7 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                         />
                                     </div>
                                     <div className="bg-surface p-3 rounded-xl border border-border hover:border-cta/30 transition-all">
-                                        <label className="text-[11px] font-semibold text-text-muted block mb-2">
+                                        <label className="text-[11px] font-semibold text-text-muted block mb-2" htmlFor="l2-file">
                                             L2 Feedback File (PDF/DOCX)
                                         </label>
                                         {candidate.l2_feedback_file_url && (
@@ -518,9 +585,11 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                             </p>
                                         )}
                                         <input
+                                            id="l2-file"
                                             type="file"
                                             accept=".pdf,.doc,.docx"
                                             className="text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-surface-hover file:text-cta hover:file:bg-cta/10 file:cursor-pointer transition-all w-full"
+                                            title="Upload L2 Feedback File"
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (file) {
@@ -534,29 +603,45 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                         </div>
                     )}
 
-                    {activeTab === 'transition' && (
-                        <div className="space-y-4 max-w-sm">
-                            <div className="space-y-3">
-                                <label className="input-label flex items-center gap-2">
-                                    <Calendar size={14} className="text-cta" />
-                                    Overlap Until (Transition Period)
-                                </label>
-                                <input
-                                    type="date"
-                                    className="input-field"
-                                    value={editForm.overlap_until || ''}
-                                    onChange={(e) => setEditForm(prev => ({ ...prev, overlap_until: e.target.value }))}
-                                    title="Overlap Until"
-                                />
-                                <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/10">
-                                    <p className="text-[11px] text-text-muted leading-relaxed">
-                                        Specify a date if this candidate is serving as a backfill.
-                                        This helps in calculating resource overlap and dual-budget requirements.
-                                    </p>
-                                </div>
+                    {activeTab === 'transition' && (() => {
+                        const linkedReq = candidate.request_id
+                            ? requests.find(r => r.id === candidate.request_id)
+                            : null;
+                        const isBackfill = linkedReq?.is_backfill === true;
+
+                        return (
+                            <div className="space-y-4 max-w-sm">
+                                {isBackfill ? (
+                                    <div className="space-y-3">
+                                        <label className="input-label flex items-center gap-2" htmlFor="overlap-until">
+                                            <Calendar size={14} className="text-cta" />
+                                            Overlap Until (Transition Period)
+                                        </label>
+                                        <input
+                                            id="overlap-until"
+                                            type="date"
+                                            className="input-field"
+                                            value={editForm.overlap_until || ''}
+                                            onChange={(e) => setEditForm(prev => ({ ...prev, overlap_until: e.target.value }))}
+                                            title="Overlap Until"
+                                        />
+                                        <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/10">
+                                            <p className="text-[11px] text-text-muted leading-relaxed">
+                                                This candidate is serving as a backfill. Specify the overlap end date
+                                                to calculate resource overlap and dual-budget requirements.
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-4 text-center border-2 border-dashed border-border rounded-xl">
+                                        <p className="text-sm text-text-muted">
+                                            Overlap / Transition Period is only applicable for backfill requests.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
                 </div>
 
                 {/* Interaction Logs (Always visible at bottom) */}
@@ -635,13 +720,27 @@ interface CreateCandidateModalProps {
     isOpen: boolean;
     onClose: () => void;
     onCreated: () => void;
+    onViewDuplicate: (candidate: Candidate) => void;
     requests: ResourceRequest[];
     vendors: Vendor[];
     sows: SOW[];
     jobProfiles: JobProfile[];
 }
 
-function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors, sows, jobProfiles }: CreateCandidateModalProps) {
+const COUNTRY_CODES = [
+    { code: '+91', label: 'IN +91' },
+    { code: '+1', label: 'US +1' },
+    { code: '+44', label: 'UK +44' },
+    { code: '+61', label: 'AU +61' },
+    { code: '+971', label: 'AE +971' },
+    { code: '+65', label: 'SG +65' },
+    { code: '+49', label: 'DE +49' },
+    { code: '+33', label: 'FR +33' },
+    { code: '+81', label: 'JP +81' },
+    { code: '+86', label: 'CN +86' },
+];
+
+function CreateCandidateModal({ isOpen, onClose, onCreated, onViewDuplicate, requests, vendors, sows, jobProfiles }: CreateCandidateModalProps) {
     const emptyForm = (): CreateCandidatePayload => ({
         first_name: '',
         last_name: '',
@@ -653,15 +752,77 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors, s
     const [form, setForm] = useState<CreateCandidatePayload>(emptyForm());
     const [resumeFile, setResumeFile] = useState<File | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [countryCode, setCountryCode] = useState('+91');
+    const [phoneDigits, setPhoneDigits] = useState('');
+    const [phoneError, setPhoneError] = useState('');
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+    const [duplicateCandidate, setDuplicateCandidate] = useState<Candidate | null>(null);
 
     const set = (field: keyof CreateCandidatePayload, value: unknown) =>
         setForm((f) => ({ ...f, [field]: value }));
 
+    // Check for duplicate candidate
+    const checkDuplicate = useCallback(async (firstName: string, lastName: string, email: string, phone: string | undefined) => {
+        if (!firstName || !lastName || !email) return;
+        try {
+            const existing = await candidatesApi.list();
+            const normalizedEmail = email.toLowerCase().trim();
+            const normalizedFirst = firstName.toLowerCase().trim();
+            const normalizedLast = lastName.toLowerCase().trim();
+            const strippedPhone = phone ? phone.replace(/\D/g, '').slice(-10) : '';
+
+            const dup = existing.find(c => {
+                const matchName = c.first_name.toLowerCase().trim() === normalizedFirst
+                    && c.last_name.toLowerCase().trim() === normalizedLast;
+                const matchEmail = c.email.toLowerCase().trim() === normalizedEmail;
+                const matchPhone = strippedPhone && c.phone
+                    ? c.phone.replace(/\D/g, '').slice(-10) === strippedPhone
+                    : false;
+                return matchEmail || (matchName && matchPhone);
+            });
+            setDuplicateCandidate(dup || null);
+        } catch {
+            // silent
+        }
+    }, []);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        const errors: Record<string, string> = {};
+
+        if (!form.first_name.trim()) errors.first_name = 'First name is required';
+        if (!form.last_name.trim()) errors.last_name = 'Last name is required';
+        if (!form.email.trim()) errors.email = 'Email is required';
+        if (!form.source) errors.source = 'Source is required';
+        if (form.source === 'VENDORS' && !form.vendor_id) errors.vendor_id = 'Vendor is required when source is Vendors';
+
+        // Phone validation: if provided, must be exactly 10 digits
+        if (phoneDigits) {
+            const digitsOnly = phoneDigits.replace(/\D/g, '');
+            if (digitsOnly.length !== 10) {
+                errors.phone = 'Phone number must be exactly 10 digits';
+            }
+        }
+
+        if (Object.keys(errors).length > 0) {
+            setValidationErrors(errors);
+            toast.error('Please fix the highlighted errors');
+            return;
+        }
+        setValidationErrors({});
+
+        if (duplicateCandidate) {
+            toast.error(`Duplicate candidate found: ${duplicateCandidate.first_name} ${duplicateCandidate.last_name} (${duplicateCandidate.email})`);
+            return;
+        }
+
+        // Compose phone with country code
+        const fullPhone = phoneDigits ? `${countryCode}${phoneDigits.replace(/\D/g, '')}` : undefined;
+
         setSubmitting(true);
         try {
-            const candidate = await candidatesApi.create(form);
+            const payload = { ...form, phone: fullPhone };
+            const candidate = await candidatesApi.create(payload);
 
             if (resumeFile && candidate.id) {
                 try {
@@ -678,6 +839,9 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors, s
             onClose();
             setForm(emptyForm());
             setResumeFile(null);
+            setPhoneDigits('');
+            setCountryCode('+91');
+            setDuplicateCandidate(null);
         } catch {
             // toast handled by client.ts
         } finally {
@@ -745,59 +909,111 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors, s
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-semibold text-text-muted px-1" htmlFor="c-first">
-                                    First Name
+                                    First Name <span className="text-danger">*</span>
                                 </label>
                                 <input
                                     id="c-first"
-                                    className="input-field"
+                                    className={cn("input-field", validationErrors.first_name && "border-danger")}
                                     placeholder="e.g. Rahul"
                                     required
                                     value={form.first_name}
-                                    onChange={(e) => set('first_name', e.target.value)}
+                                    onChange={(e) => { set('first_name', e.target.value); setValidationErrors(p => ({ ...p, first_name: '' })); }}
+                                    onBlur={() => checkDuplicate(form.first_name, form.last_name, form.email, phoneDigits)}
                                 />
+                                {validationErrors.first_name && <p className="text-[10px] text-danger px-1">{validationErrors.first_name}</p>}
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-semibold text-text-muted px-1" htmlFor="c-last">
-                                    Last Name
+                                    Last Name <span className="text-danger">*</span>
                                 </label>
                                 <input
                                     id="c-last"
-                                    className="input-field"
+                                    className={cn("input-field", validationErrors.last_name && "border-danger")}
                                     placeholder="e.g. Sharma"
                                     required
                                     value={form.last_name}
-                                    onChange={(e) => set('last_name', e.target.value)}
+                                    onChange={(e) => { set('last_name', e.target.value); setValidationErrors(p => ({ ...p, last_name: '' })); }}
+                                    onBlur={() => checkDuplicate(form.first_name, form.last_name, form.email, phoneDigits)}
                                 />
+                                {validationErrors.last_name && <p className="text-[10px] text-danger px-1">{validationErrors.last_name}</p>}
                             </div>
                         </div>
 
                         <div className="space-y-1.5">
                             <label className="text-[11px] font-semibold text-text-muted px-1 flex items-center gap-1" htmlFor="c-email">
-                                <Mail size={12} /> Email Address
+                                <Mail size={12} /> Email Address <span className="text-danger">*</span>
                             </label>
                             <input
                                 id="c-email"
                                 type="email"
-                                className="input-field"
+                                className={cn("input-field", validationErrors.email && "border-danger")}
                                 placeholder="name@company.com"
                                 required
                                 value={form.email}
-                                onChange={(e) => set('email', e.target.value)}
+                                onChange={(e) => { set('email', e.target.value); setValidationErrors(p => ({ ...p, email: '' })); }}
+                                onBlur={() => checkDuplicate(form.first_name, form.last_name, form.email, phoneDigits)}
                             />
+                            {validationErrors.email && <p className="text-[10px] text-danger px-1">{validationErrors.email}</p>}
                         </div>
 
                         <div className="space-y-1.5">
                             <label className="text-[11px] font-semibold text-text-muted px-1 flex items-center gap-1" htmlFor="c-phone">
                                 <Phone size={12} /> Phone Number
                             </label>
-                            <input
-                                id="c-phone"
-                                className="input-field"
-                                placeholder="+91 XXXX XXX XXX"
-                                value={form.phone ?? ''}
-                                onChange={(e) => set('phone', e.target.value || undefined)}
-                            />
+                            <div className="flex gap-2">
+                                <select
+                                    className="input-field w-28 shrink-0"
+                                    value={countryCode}
+                                    onChange={(e) => setCountryCode(e.target.value)}
+                                    title="Country Code"
+                                >
+                                    {COUNTRY_CODES.map(cc => (
+                                        <option key={cc.code} value={cc.code}>{cc.label}</option>
+                                    ))}
+                                </select>
+                                <input
+                                    id="c-phone"
+                                    className={cn("input-field flex-1", (validationErrors.phone || phoneError) && "border-danger")}
+                                    placeholder="10-digit number"
+                                    maxLength={10}
+                                    value={phoneDigits}
+                                    onChange={(e) => {
+                                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                        setPhoneDigits(digits);
+                                        setPhoneError(digits && digits.length !== 10 ? 'Must be 10 digits' : '');
+                                        setValidationErrors(p => ({ ...p, phone: '' }));
+                                    }}
+                                    onBlur={() => checkDuplicate(form.first_name, form.last_name, form.email, phoneDigits)}
+                                />
+                            </div>
+                            {(validationErrors.phone || phoneError) && (
+                                <p className="text-[10px] text-danger px-1">{validationErrors.phone || phoneError}</p>
+                            )}
                         </div>
+
+                        {/* Duplicate Warning */}
+                        {duplicateCandidate && (
+                            <div className="p-3 bg-danger/10 border border-danger/30 rounded-lg">
+                                <p className="text-xs font-bold text-danger mb-1">Duplicate Candidate Found</p>
+                                <p className="text-[11px] text-text">
+                                    {duplicateCandidate.first_name} {duplicateCandidate.last_name} — {duplicateCandidate.email}
+                                    {duplicateCandidate.phone && ` — ${duplicateCandidate.phone}`}
+                                </p>
+                                <p className="text-[10px] text-text-muted mt-1">
+                                    Status: {STAGE_LABELS[duplicateCandidate.status as CandidateStatus] || duplicateCandidate.status}
+                                </p>
+                                <button
+                                    type="button"
+                                    className="mt-2 text-xs font-semibold text-cta hover:underline"
+                                    onClick={() => {
+                                        onClose();
+                                        onViewDuplicate(duplicateCandidate);
+                                    }}
+                                >
+                                    View Existing Candidate Details →
+                                </button>
+                            </div>
+                        )}
 
                         <div className="space-y-1.5">
                             <label className="text-[11px] font-semibold text-text-muted px-1 flex items-center gap-1" htmlFor="c-location">
@@ -822,16 +1038,16 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors, s
 
                         <div className="space-y-1.5">
                             <label className="text-[11px] font-semibold text-text-muted px-1 flex items-center gap-1" htmlFor="c-source">
-                                <LinkIcon size={12} /> Source
+                                <LinkIcon size={12} /> Source <span className="text-danger">*</span>
                             </label>
                             <select
                                 id="c-source"
-                                className="input-field"
+                                className={cn("input-field", validationErrors.source && "border-danger")}
                                 value={form.source || ''}
                                 onChange={(e) => {
                                     const val = e.target.value as CandidateSource | '';
                                     set('source', val || undefined);
-                                    // Clear vendor when source changes away from VENDORS
+                                    setValidationErrors(p => ({ ...p, source: '', vendor_id: '' }));
                                     if (val !== 'VENDORS') {
                                         set('vendor_id', undefined);
                                     }
@@ -842,10 +1058,11 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors, s
                                 <option value="">— Select Source —</option>
                                 {(['PORTAL', 'JOB_BOARDS', 'NETWORK', 'VENDORS', 'LINKEDIN', 'INTERNAL'] as CandidateSource[]).map((s) => (
                                     <option key={s} value={s}>
-                                        {s.replace(/_/g, ' ')}
+                                        {s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
                                     </option>
                                 ))}
                             </select>
+                            {validationErrors.source && <p className="text-[10px] text-danger px-1">{validationErrors.source}</p>}
                         </div>
 
                         {form.source === 'VENDORS' && (
@@ -953,6 +1170,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors, s
                             placeholder="React, TypeScript, Node.js, AWS..."
                             value={form.skills ?? ''}
                             onChange={(e) => set('skills', e.target.value || undefined)}
+                            title="Skills List"
                         />
                     </div>
 
@@ -965,6 +1183,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, requests, vendors, s
                             type="file"
                             accept=".pdf,.doc,.docx"
                             className="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-surface-hover file:text-cta hover:file:bg-cta/10 file:cursor-pointer transition-all"
+                            title="Upload Resume File"
                             onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
                         />
                     </div>
@@ -1067,8 +1286,7 @@ export function Candidates() {
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-text">Candidates Pipeline</h1>
-                    <p className="text-sm text-text-muted mt-1">
+                    <p className="text-sm text-text-muted">
                         Manage your candidate journey from submission to onboarding
                     </p>
                 </div>
@@ -1254,6 +1472,7 @@ export function Candidates() {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onCreated={fetchCandidates}
+                onViewDuplicate={(c) => { setSelectedCandidate(c); setIsDetailsOpen(true); }}
                 requests={requests}
                 vendors={vendors}
                 sows={sows}
@@ -1267,6 +1486,7 @@ export function Candidates() {
                 onClose={() => { setIsDetailsOpen(false); setSelectedCandidate(null); }}
                 onUpdated={fetchCandidates}
                 vendors={vendors}
+                requests={requests}
                 onStatusChange={handleStatusChange}
             />
         </div>

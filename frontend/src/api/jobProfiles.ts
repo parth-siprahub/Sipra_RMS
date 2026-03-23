@@ -32,4 +32,12 @@ export const jobProfileApi = {
     create: (data: JobProfileCreate) => api.post<JobProfile>('/job-profiles/', data),
     update: (id: number, data: JobProfileUpdate) => api.put<JobProfile>(`/job-profiles/${id}/`, data),
     delete: (id: number) => api.delete<void>(`/job-profiles/${id}/`),
+    uploadJd: (id: number, file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.upload<{ message: string; jd_file_url: string; profile_id: number }>(
+            `/job-profiles/${id}/jd`,
+            formData
+        );
+    },
 };
