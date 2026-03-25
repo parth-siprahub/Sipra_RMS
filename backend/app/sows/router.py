@@ -1,6 +1,6 @@
 """SOW CRUD — aligned with public.sows table."""
 import logging
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Query
 from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
 from app.sows.schemas import SowCreate, SowUpdate, SowResponse
@@ -12,9 +12,14 @@ router = APIRouter(prefix="/sows", tags=["SOWs"])
 
 
 @router.get("/", response_model=list[SowResponse])
-async def list_sows(current_user: dict = Depends(get_current_user)):
+async def list_sows(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    current_user: dict = Depends(get_current_user),
+):
     client = await get_supabase_admin_async()
-    result = await client.table("sows").select("*").order("created_at", desc=True).execute()
+    offset = (page - 1) * page_size
+    result = await client.table("sows").select("*").order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
     return result.data
 
 
@@ -47,7 +52,7 @@ async def create_sow(
         logger.error("SOW Creation Error: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Database error: {str(e)}"
+            detail="Failed to create SOW. Please check your input and try again."
         )
 
 

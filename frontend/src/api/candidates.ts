@@ -95,7 +95,7 @@ export const candidatesApi = {
     uploadResume: (id: number, file: File) => {
         const formData = new FormData();
         formData.append('file', file);
-        return api.post<{ message: string; resume_url: string; candidate_id: number }>(
+        return api.upload<{ message: string; resume_url: string; candidate_id: number }>(
             `/candidates/${id}/resume`,
             formData
         );

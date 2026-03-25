@@ -93,8 +93,9 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
             }
             onSuccess();
             onClose();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to save SOW');
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'An unexpected error occurred';
+            toast.error(message || 'Failed to save SOW');
         } finally {
             setLoading(false);
         }

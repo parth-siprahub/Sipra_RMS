@@ -47,7 +47,7 @@ async def create_client(
         return result.data[0]
     except Exception as e:
         logger.error("Client creation error: %s", str(e))
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Database error: {str(e)}")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Failed to create client. Please check input and try again.")
 
 
 @router.get("/{client_id}", response_model=ClientResponse)

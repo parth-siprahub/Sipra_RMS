@@ -63,8 +63,9 @@ export function JobProfiles() {
             await jobProfileApi.delete(id);
             toast.success('Job Profile deleted');
             fetchProfiles();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to delete Profile (it may be linked to requests)');
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'An unexpected error occurred';
+            toast.error(message || 'Failed to delete Profile (it may be linked to requests)');
         }
     };
 
@@ -73,8 +74,7 @@ export function JobProfiles() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-text">Job Profiles</h1>
-                    <p className="text-text-muted mt-1">Define standard roles and required technologies</p>
+                    <p className="text-text-muted">Define standard roles and required technologies</p>
                 </div>
                 {isAdmin && (
                     <button

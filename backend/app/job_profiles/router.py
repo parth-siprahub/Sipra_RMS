@@ -1,4 +1,5 @@
 """Job Profiles CRUD — aligned with public.job_profiles table."""
+import logging
 from fastapi import APIRouter, HTTPException, status, Depends
 from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
@@ -8,6 +9,8 @@ from app.job_profiles.schemas import (
     JobProfileResponse,
 )
 from app.utils.cache import api_cache
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/job-profiles", tags=["Job Profiles"])
 
@@ -47,7 +50,7 @@ async def create_job_profile(
         logger.error("Job Profile Creation Error: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Database error: {str(e)}"
+            detail="Failed to create job profile. Please check your input and try again."
         )
 
 

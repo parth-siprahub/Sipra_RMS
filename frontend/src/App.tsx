@@ -15,6 +15,7 @@ import { Vendors } from './pages/Vendors';
 import { Employees } from './pages/Employees';
 import { Timesheets } from './pages/Timesheets';
 import { Clients } from './pages/Clients';
+import { Reports } from './pages/Reports';
 
 const NotFound = () => <div className="p-10 text-center text-2xl">404 - Page Not Found</div>;
 
@@ -36,13 +37,42 @@ function App() {
               <Route index element={<Dashboard />} />
               <Route path="resource-requests" element={<ResourceRequests />} />
               <Route path="candidates" element={<Candidates />} />
-              <Route path="job-profiles" element={<JobProfiles />} />
-              <Route path="sows" element={<Sows />} />
+              <Route path="job-profiles" element={
+                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'RECRUITER']}>
+                  <JobProfiles />
+                </ProtectedRoute>
+              } />
+              <Route path="sows" element={
+                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN']}>
+                  <Sows />
+                </ProtectedRoute>
+              } />
               <Route path="communication-logs" element={<CommunicationLogs />} />
-              <Route path="vendors" element={<Vendors />} />
-              <Route path="employees" element={<Employees />} />
-              <Route path="timesheets" element={<Timesheets />} />
-              <Route path="clients" element={<Clients />} />
+              <Route path="vendors" element={
+                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER']}>
+                  <Vendors />
+                </ProtectedRoute>
+              } />
+              <Route path="employees" element={
+                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER']}>
+                  <Employees />
+                </ProtectedRoute>
+              } />
+              <Route path="timesheets" element={
+                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER']}>
+                  <Timesheets />
+                </ProtectedRoute>
+              } />
+              <Route path="clients" element={
+                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN']}>
+                  <Clients />
+                </ProtectedRoute>
+              } />
+              <Route path="reports" element={
+                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER']}>
+                  <Reports />
+                </ProtectedRoute>
+              } />
             </Route>
 
             {/* Dashboard alias – direct nav to /dashboard redirects to root */}

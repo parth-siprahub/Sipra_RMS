@@ -69,8 +69,9 @@ export function JobProfileModal({ isOpen, onClose, onSuccess, jobProfile }: JobP
             }
             onSuccess();
             onClose();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to save Job Profile');
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'An unexpected error occurred';
+            toast.error(message || 'Failed to save Job Profile');
         } finally {
             setLoading(false);
         }

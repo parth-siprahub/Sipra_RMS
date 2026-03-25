@@ -310,8 +310,7 @@ export function ResourceRequests() {
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-text">Resource Requests</h1>
-                    <p className="text-sm text-text-muted mt-1">
+                    <p className="text-sm text-text-muted">
                         Track and manage all staffing requests
                     </p>
                 </div>

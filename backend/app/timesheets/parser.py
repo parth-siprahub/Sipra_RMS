@@ -14,6 +14,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 OOO_VALUE = 1.0  # "01" or 1.0 means Out of Office
+DAILY_CAP = 8.0  # Maximum billable hours per day
 
 
 def parse_tempo_xls(file_bytes: bytes, import_month: str) -> list[dict]:
@@ -37,7 +38,7 @@ def parse_tempo_xls(file_bytes: bytes, import_month: str) -> list[dict]:
     # Derive year and month from import_month ("YYYY-MM")
     year, month = int(import_month[:4]), int(import_month[5:7])
 
-    entries = []
+    daily_agg: dict[tuple[str, str], dict] = {}  # (username, date) -> {hours, is_ooo}
     # First column is the identifier (username/name), rest are day columns
     id_col = df.columns[0]
     day_cols = df.columns[1:]
@@ -67,13 +68,25 @@ def parse_tempo_xls(file_bytes: bytes, import_month: str) -> list[dict]:
                 continue
 
             is_ooo = abs(hours - OOO_VALUE) < 0.01
-            entries.append({
-                "jira_username": username,
-                "log_date": str(log_date),
-                "hours_logged": 0.0 if is_ooo else hours,
-                "is_ooo": is_ooo,
-                "import_month": import_month,
-            })
+            key = (username, str(log_date))
+            if key not in daily_agg:
+                daily_agg[key] = {"hours": 0.0, "is_ooo": False}
+            if is_ooo:
+                daily_agg[key]["is_ooo"] = True
+            else:
+                daily_agg[key]["hours"] += hours
+
+    # Build entries with 8-hour daily cap
+    entries = []
+    for (username, log_date_str), agg in daily_agg.items():
+        capped_hours = min(agg["hours"], DAILY_CAP) if not agg["is_ooo"] else 0.0
+        entries.append({
+            "jira_username": username,
+            "log_date": log_date_str,
+            "hours_logged": capped_hours,
+            "is_ooo": agg["is_ooo"],
+            "import_month": import_month,
+        })
 
     logger.info("Parsed %d timesheet entries for month %s", len(entries), import_month)
     return entries

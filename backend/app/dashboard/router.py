@@ -143,10 +143,11 @@ async def get_metrics(current_user: dict = Depends(get_current_user)):
     billing_records = billing_raw.data or []
     latest_month = billing_records[0]["billing_month"] if billing_records else None
     triad_summary = []
+    emp_map = {e["id"]: e for e in all_employees}
     if latest_month:
         month_records = [b for b in billing_records if b["billing_month"] == latest_month]
         for br in month_records:
-            emp = next((e for e in all_employees if e["id"] == br["employee_id"]), None)
+            emp = emp_map.get(br["employee_id"])
             triad_summary.append({
                 "employee_id": br["employee_id"],
                 "rms_name": emp.get("rms_name", "Unknown") if emp else "Unknown",
