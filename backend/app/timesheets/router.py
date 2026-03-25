@@ -62,7 +62,10 @@ async def import_timesheet(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "import_month must be YYYY-MM format")
 
     file_bytes = await file.read()
-    entries = parse_tempo_xls(file_bytes, import_month)
+    try:
+        entries = parse_tempo_xls(file_bytes, import_month)
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
 
     if not entries:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No valid timesheet entries found in file")
