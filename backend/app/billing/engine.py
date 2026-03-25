@@ -91,11 +91,11 @@ def calculate_billing(
     total_logged, capped_hours = cap_daily_and_weekly(entries)
     compliance = check_75_percent_rule(capped_hours, aws_active_hours)
 
-    # Not billable if employee has exited or compliance fails
+    # Billable unless compliance fails (entries after exit_date already excluded above)
     is_billable = True
-    if employee_exit_date is not None:
-        is_billable = False
     if compliance is False:
+        is_billable = False
+    if capped_hours == 0:
         is_billable = False
 
     return {

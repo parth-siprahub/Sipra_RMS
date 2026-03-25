@@ -84,9 +84,11 @@ ADMIN_REVIEW_TRANSITIONS = {
 async def list_candidates(
     request_id: int | None = None,
     candidate_status: str | None = Query(None, alias="status"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
     current_user: dict = Depends(get_current_user),
 ):
-    cache_key = f"candidates_list_{request_id}_{candidate_status}"
+    cache_key = f"candidates_list_{request_id}_{candidate_status}_{page}_{page_size}"
     cached = api_cache.get(cache_key)
     if cached:
         return cached
@@ -103,7 +105,8 @@ async def list_candidates(
         query = query.eq("request_id", request_id)
     if candidate_status:
         query = query.eq("status", candidate_status)
-    result = await query.order("created_at", desc=True).execute()
+    offset = (page - 1) * page_size
+    result = await query.order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
     api_cache.set(cache_key, result.data)
     return result.data
 
@@ -153,7 +156,7 @@ async def update_candidate(
                 "A status value is not registered in the database enum. "
                 "Run migration 002_add_missing_candidate_statuses.sql in Supabase SQL Editor.",
             )
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Database update failed: {error_str}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Operation failed. Please try again.")
 
     # Re-fetch the full row to guarantee complete response
     refreshed = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
@@ -216,7 +219,7 @@ async def admin_review_candidate(
                 "Please run the migration SQL (backend/migrations/002_add_missing_candidate_statuses.sql) "
                 "in Supabase SQL Editor.",
             )
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Database update failed: {error_str}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Operation failed. Please try again.")
 
     # Re-fetch the full row to guarantee we return complete data
     refreshed = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()

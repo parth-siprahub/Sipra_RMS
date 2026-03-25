@@ -5,8 +5,10 @@ Security hardened for production:
   - SecurityHeadersMiddleware (X-Frame-Options, CSP, HSTS-ready)
   - SlowAPI rate limiting (global + per-route)
   - CORS restricted to explicit origins/methods/headers
+  - Request correlation ID middleware (X-Request-ID)
 """
 import time
+import uuid
 import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,6 +30,7 @@ from app.employees.router import router as employees_router
 from app.timesheets.router import router as timesheets_router
 from app.billing.router import router as billing_router
 from app.clients.router import router as clients_router
+from app.reports.router import router as reports_router
 
 # Configure file logging for error capture
 logging.basicConfig(
@@ -130,13 +133,26 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+# ─── Request Correlation ID Middleware ─────────────────────────────────────────
+@app.middleware("http")
+async def add_request_id_header(request: Request, call_next):
+    request_id = str(uuid.uuid4())
+    # Store on request state so downstream code can access it
+    request.state.request_id = request_id
+    logger.info("[%s] %s %s", request_id, request.method, request.url.path)
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
 # ─── Request Timing Middleware ─────────────────────────────────────────────────
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
-    logger.debug("%s %s completed in %.4fs", request.method, request.url.path, process_time)
+    request_id = getattr(request.state, "request_id", "N/A")
+    logger.debug("[%s] %s %s completed in %.4fs", request_id, request.method, request.url.path, process_time)
     response.headers["X-Process-Time"] = str(process_time)
     return response
 
@@ -156,7 +172,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
-    expose_headers=["X-Process-Time"],
+    expose_headers=["X-Process-Time", "X-Request-ID"],
 )
 
 # ─── Routers ──────────────────────────────────────────────────────────────────
@@ -173,9 +189,28 @@ app.include_router(employees_router)
 app.include_router(timesheets_router)
 app.include_router(billing_router)
 app.include_router(clients_router)
+app.include_router(reports_router)
 
 
 # ─── Health ───────────────────────────────────────────────────────────────────
 @app.get("/health", tags=["System"])
 async def health():
     return {"status": "ok", "environment": settings.ENVIRONMENT}
+
+
+@app.get("/ready", tags=["System"])
+async def readiness_check():
+    """Check database connectivity. Returns 503 if Supabase is unreachable."""
+    from app.database import get_supabase_admin_async
+    from fastapi.responses import JSONResponse
+    try:
+        client = await get_supabase_admin_async()
+        # Simple query to verify DB connectivity
+        await client.table("employees").select("id").limit(1).execute()
+        return {"status": "ready", "database": "connected"}
+    except Exception as exc:
+        logger.error("Readiness check failed: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "database": "disconnected", "error": str(exc)},
+        )

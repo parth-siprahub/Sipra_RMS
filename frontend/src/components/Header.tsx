@@ -7,9 +7,13 @@ const ROUTE_LABELS: Record<string, string> = {
     '/resource-requests': 'Staffing Requests',
     '/candidates': 'Candidate Pipeline',
     '/job-profiles': 'Job Profiles',
-    '/sows': 'Statement of Work',
+    '/sows': 'Statements of Work',
     '/communication-logs': 'Interaction History',
     '/vendors': 'Partner Vendors',
+    '/employees': 'Employee Directory',
+    '/timesheets': 'Timesheets',
+    '/clients': 'Clients',
+    '/reports': 'Reports & Analytics',
 };
 
 export function Header() {
@@ -45,6 +49,7 @@ export function Header() {
                 <button
                     className="relative p-2 rounded-xl text-text-muted hover:text-cta hover:bg-surface-hover transition-all cursor-pointer group"
                     title="Notifications"
+                    aria-label="Notifications"
                 >
                     <Bell size={19} />
                     <span className="absolute top-2 right-2 w-2 h-2 bg-cta rounded-full border-2 border-surface animate-pulse" />

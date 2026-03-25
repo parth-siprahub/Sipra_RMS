@@ -56,8 +56,7 @@ export function CommunicationLogs() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-text">Communication History</h1>
-                    <p className="text-text-muted mt-1">Timeline of all candidate and client interactions</p>
+                    <p className="text-text-muted">Timeline of all candidate and client interactions</p>
                 </div>
                 <button
                     onClick={() => setIsModalOpen(true)}

@@ -316,8 +316,7 @@ export function Dashboard() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-text">Market Intelligence</h1>
-                    <p className="text-sm text-text-muted mt-1">Real-time resource and candidate analytics</p>
+                    <p className="text-sm text-text-muted">Real-time resource and candidate analytics</p>
                 </div>
                 <div className="flex items-center gap-2 text-xs font-bold text-text-muted bg-surface-hover px-3 py-1.5 rounded-full border border-border">
                     <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
