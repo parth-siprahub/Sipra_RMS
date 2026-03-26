@@ -13,6 +13,7 @@ import {
     UserCheck,
     Clock,
     Landmark,
+    BarChart3,
 } from 'lucide-react';
 
 import { cn } from '../lib/utils';
@@ -31,6 +32,7 @@ const navItems = [
     { to: '/candidates', icon: Users, label: 'Candidates' },
     { to: '/employees', icon: UserCheck, label: 'Employees' },
     { to: '/timesheets', icon: Clock, label: 'Timesheets' },
+    { to: '/reports', icon: BarChart3, label: 'Reports' },
     { to: '/clients', icon: Landmark, label: 'Clients' },
     { to: '/communication-logs', icon: MessageSquare, label: 'Comm. Logs' },
     { to: '/vendors', icon: Building2, label: 'Vendors' },
@@ -230,6 +232,7 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                         (e.currentTarget as HTMLElement).style.color = 'var(--sidebar-text)';
                     }}
                     title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+                    aria-label={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
                 >
                     {collapsed ? (
                         <ChevronRight size={16} className="mx-auto" />
@@ -256,6 +259,7 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                         (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
                     }}
                     title={collapsed ? 'Logout' : undefined}
+                    aria-label="Logout"
                 >
                     <LogOut size={16} className="flex-shrink-0" />
                     <span

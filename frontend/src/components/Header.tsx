@@ -3,16 +3,17 @@ import { useTheme } from '../context/ThemeContext';
 import { Sun, Moon, Bell } from 'lucide-react';
 
 const ROUTE_LABELS: Record<string, string> = {
-    '/': 'Dashboard',
-    '/resource-requests': 'Resource Requests',
-    '/candidates': 'Candidates',
+    '/': 'Dashboard Overview',
+    '/resource-requests': 'Staffing Requests',
+    '/candidates': 'Candidate Pipeline',
     '/job-profiles': 'Job Profiles',
-    '/sows': 'SOWs',
-    '/communication-logs': 'Communication Logs',
-    '/vendors': 'Vendors',
-    '/employees': 'Employees',
+    '/sows': 'Statements of Work',
+    '/communication-logs': 'Interaction History',
+    '/vendors': 'Partner Vendors',
+    '/employees': 'Employee Directory',
     '/timesheets': 'Timesheets',
     '/clients': 'Clients',
+    '/reports': 'Reports & Analytics',
 };
 
 export function Header() {
@@ -48,6 +49,7 @@ export function Header() {
                 <button
                     className="relative p-2 rounded-xl text-text-muted hover:text-cta hover:bg-surface-hover transition-all cursor-pointer group"
                     title="Notifications"
+                    aria-label="Notifications"
                 >
                     <Bell size={19} />
                     <span className="absolute top-2 right-2 w-2 h-2 bg-cta rounded-full border-2 border-surface animate-pulse" />

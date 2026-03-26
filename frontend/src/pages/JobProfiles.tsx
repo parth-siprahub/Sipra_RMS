@@ -63,8 +63,9 @@ export function JobProfiles() {
             await jobProfileApi.delete(id);
             toast.success('Job Profile deleted');
             fetchProfiles();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to delete Profile (it may be linked to requests)');
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'An unexpected error occurred';
+            toast.error(message || 'Failed to delete Profile (it may be linked to requests)');
         }
     };
 

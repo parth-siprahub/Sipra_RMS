@@ -94,7 +94,7 @@ export function Sows() {
                 <div>
                     <p className="text-text-muted">Manage client contracts and resource allocations</p>
                 </div>
-                {isAdmin && statusFilter !== 'INACTIVE' && (
+                {isAdmin && (
                     <button
                         onClick={handleCreate}
                         className="btn btn-primary flex items-center gap-2 shadow-lg shadow-cta/20"

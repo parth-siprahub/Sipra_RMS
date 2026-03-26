@@ -34,8 +34,9 @@ export function LogModal({ isOpen, onClose, onSuccess, candidateId, requestId, c
             toast.success('Communication logged successfully');
             onSuccess();
             onClose();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to log communication');
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'An unexpected error occurred';
+            toast.error(message || 'Failed to log communication');
         } finally {
             setLoading(false);
         }

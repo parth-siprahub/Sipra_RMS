@@ -84,9 +84,11 @@ ADMIN_REVIEW_TRANSITIONS = {
 async def list_candidates(
     request_id: int | None = None,
     candidate_status: str | None = Query(None, alias="status"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
     current_user: dict = Depends(get_current_user),
 ):
-    cache_key = f"candidates_list_{request_id}_{candidate_status}"
+    cache_key = f"candidates_list_{request_id}_{candidate_status}_{page}_{page_size}"
     cached = api_cache.get(cache_key)
     if cached:
         return cached
@@ -103,7 +105,8 @@ async def list_candidates(
         query = query.eq("request_id", request_id)
     if candidate_status:
         query = query.eq("status", candidate_status)
-    result = await query.order("created_at", desc=True).execute()
+    offset = (page - 1) * page_size
+    result = await query.order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
     api_cache.set(cache_key, result.data)
     return result.data
 
@@ -262,6 +265,7 @@ async def admin_review_candidate(
         new_values={"status": payload.status.value, "remarks": payload.remarks},
     )
 
+
     # Transition trigger: auto-create Employee record when status reaches ONBOARDED
     if payload.status == CandidateStatus.ONBOARDED:
         c = refreshed.data
@@ -298,6 +302,7 @@ async def admin_review_candidate(
                 logger.info("Auto-closed resource request %s after candidate %s onboarded", request_id, candidate_id)
             except Exception as rr_err:
                 logger.warning("RR auto-close failed for request %s: %s", request_id, rr_err)
+
 
     api_cache.clear_prefix("candidates_")
     api_cache.clear_prefix("dashboard_")

@@ -67,10 +67,11 @@ export function Login() {
             login(data.access_token, userData);
             toast.success('Welcome back!');
             navigate(from, { replace: true });
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            setError(err.message || 'Invalid credentials');
-            toast.error(err.message || 'Login failed');
+            const message = err instanceof Error ? err.message : 'An unexpected error occurred';
+            setError(message);
+            toast.error(message);
         } finally {
             setLoading(false);
         }

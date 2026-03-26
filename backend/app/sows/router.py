@@ -1,6 +1,6 @@
 """SOW CRUD — aligned with public.sows table."""
 import logging
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Query
 from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
 from app.sows.schemas import SowCreate, SowUpdate, SowResponse
@@ -12,9 +12,14 @@ router = APIRouter(prefix="/sows", tags=["SOWs"])
 
 
 @router.get("/", response_model=list[SowResponse])
-async def list_sows(current_user: dict = Depends(get_current_user)):
+async def list_sows(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    current_user: dict = Depends(get_current_user),
+):
     client = await get_supabase_admin_async()
-    result = await client.table("sows").select("*").order("created_at", desc=True).execute()
+    offset = (page - 1) * page_size
+    result = await client.table("sows").select("*").order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
     return result.data
 
 
@@ -47,7 +52,7 @@ async def create_sow(
         logger.error("SOW Creation Error: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Database error: {str(e)}"
+            detail="Failed to create SOW. Please check your input and try again."
         )
 
 
@@ -70,44 +75,9 @@ async def update_sow(
     data = payload.model_dump(exclude_none=True, mode="json")
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
-
-    # Fetch current SOW state before update
-    current_sow = await client.table("sows").select("*").eq("id", sow_id).single().execute()
-    if not current_sow.data:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "SOW not found")
-
     result = await client.table("sows").update(data).eq("id", sow_id).execute()
     if not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "SOW not found")
-
-    # SOW lifecycle cascade: when SOW is deactivated, close all linked open RRs
-    was_active = current_sow.data.get("is_active", True)
-    now_active = data.get("is_active", was_active)
-    if was_active and not now_active:
-        try:
-            linked_rrs = await (
-                client.table("resource_requests")
-                .select("id, status")
-                .eq("sow_id", sow_id)
-                .neq("status", "CLOSED")
-                .execute()
-            )
-            if linked_rrs.data:
-                for rr in linked_rrs.data:
-                    await (
-                        client.table("resource_requests")
-                        .update({"status": "CLOSED"})
-                        .eq("id", rr["id"])
-                        .execute()
-                    )
-                api_cache.clear_prefix("requests_")
-                logger.info(
-                    "SOW %s deactivated: auto-closed %d linked resource requests",
-                    sow_id, len(linked_rrs.data),
-                )
-        except Exception as cascade_err:
-            logger.warning("SOW cascade close failed for SOW %s: %s", sow_id, cascade_err)
-
     api_cache.clear_prefix("sows_")
     api_cache.clear_prefix("dashboard_")
     return result.data[0]
