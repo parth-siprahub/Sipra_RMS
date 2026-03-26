@@ -14,7 +14,7 @@ class TimesheetComparison(BaseModel):
     aws_total_hours: float | None = None
     difference: float | None = None
     difference_pct: float | None = None
-    flag: str  # "green" | "red" | "no_aws"
+    flag: str  # "green" | "amber" | "red" | "no_aws"
 
 
 class ComplianceEntry(BaseModel):
@@ -41,3 +41,25 @@ class ComplianceReport(BaseModel):
     partial: int
     missing: int
     entries: list[ComplianceEntry]
+
+
+class DefaulterEntry(BaseModel):
+    employee_id: int
+    rms_name: str
+    jira_username: str | None = None
+    expected_hours: float
+    actual_hours: float
+    deficit: float
+    days_logged: int
+    working_days_elapsed: int
+    severity: str  # "critical" (0h), "warning" (<50% expected), "info" (<100% expected)
+
+
+class DefaulterReport(BaseModel):
+    month: str
+    check_date: str
+    total_active: int
+    defaulter_count: int
+    critical_count: int
+    warning_count: int
+    entries: list[DefaulterEntry]

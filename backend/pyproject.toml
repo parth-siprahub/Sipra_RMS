@@ -1,2 +1,8 @@
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "--cov=app --cov-report=term-missing --cov-report=html:htmlcov --cov-fail-under=0 -v"
+markers = [
+    "unit: Unit tests (no DB)",
+    "integration: Integration tests (requires DB mock)",
+]

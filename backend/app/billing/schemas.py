@@ -13,8 +13,17 @@ class BillingRecordResponse(BaseModel):
     aws_active_hours: float | None = None
     compliance_75_pct: bool | None = None
     is_billable: bool
+    processed: bool = False
+    processed_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+class BillingFreezeResponse(BaseModel):
+    billing_month: str
+    frozen_count: int  # Newly frozen records in this request
+    total_records: int = 0  # Total records for the month
+    processed_at: datetime
 
 
 class BillingCalculationResult(BaseModel):
