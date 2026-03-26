@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Plus, RefreshCw, LayoutGrid, List } from 'lucide-react';
+import { Plus, RefreshCw, LayoutGrid, List, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { candidatesApi } from '../api/candidates';
 import { resourceRequestsApi } from '../api/resourceRequests';
@@ -19,6 +19,7 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton, KanbanColumnSkeleton, TableRowSkeleton } from '../components/ui/Skeleton';
 import { communicationLogApi, type CommunicationLog } from '../api/communicationLogs';
+import { exportCandidates } from '../api/exports';
 import { cn } from '../lib/utils';
 import {
     User,
@@ -1290,13 +1291,18 @@ export function Candidates() {
                         Manage your candidate journey from submission to onboarding
                     </p>
                 </div>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="btn btn-cta shrink-0"
-                    id="add-candidate-btn"
-                >
-                    <Plus size={18} /> Add Candidate
-                </button>
+                <div className="flex gap-2 shrink-0">
+                    <button onClick={() => exportCandidates()} className="btn btn-secondary flex items-center gap-2">
+                        <Download size={18} /> Export CSV
+                    </button>
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="btn btn-cta"
+                        id="add-candidate-btn"
+                    >
+                        <Plus size={18} /> Add Candidate
+                    </button>
+                </div>
             </div>
 
             {/* Controls Bar */}
