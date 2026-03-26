@@ -13,9 +13,11 @@ import {
     Mail,
     GitBranch,
     Calendar,
+    Download,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
+import { exportEmployees } from '../api/exports';
 
 function EditEmployeeModal({
     isOpen,
@@ -105,7 +107,7 @@ export function Employees() {
     const fetchEmployees = async () => {
         setLoading(true);
         try {
-            const data = await employeesApi.list(statusFilter ? { status: statusFilter } : undefined);
+            const data = await employeesApi.list({ employee_status: statusFilter });
             setEmployees(data || []);
         } catch {
             toast.error('Failed to load employees');
@@ -135,6 +137,9 @@ export function Employees() {
                 <div>
                     <p className="text-text-muted">Manage employee identifiers and the Verification Triad</p>
                 </div>
+                <button onClick={() => exportEmployees()} className="btn btn-secondary flex items-center gap-2">
+                    <Download size={18} /> Export CSV
+                </button>
             </div>
 
             <div className="card flex flex-col md:flex-row items-center gap-4 py-3 px-4">
@@ -160,7 +165,7 @@ export function Employees() {
                                     : 'bg-surface text-text-muted hover:bg-surface-hover'
                             )}
                         >
-                            {s === 'ACTIVE' ? 'Active' : 'Exited'}
+                            {s}
                         </button>
                     ))}
                 </div>

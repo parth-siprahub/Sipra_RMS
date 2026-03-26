@@ -44,7 +44,7 @@ class CandidateCreate(BaseModel):
     request_id: int | None = None
     first_name: str
     last_name: str
-    email: str
+    email: EmailStr
     phone: str | None = None
     source: str | None = None
 
@@ -70,7 +70,7 @@ class CandidateCreate(BaseModel):
 class CandidateUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
-    email: str | None = None
+    email: EmailStr | None = None
     phone: str | None = None
     request_id: int | None = None
 
@@ -116,6 +116,15 @@ class ExitRequest(BaseModel):
     create_backfill: bool = True
 
 
+class RehireWarning(BaseModel):
+    """Warning returned when a new candidate matches a previously exited/terminated employee."""
+    previous_employee_id: int
+    previous_employee_name: str
+    exit_date: str | None = None
+    status: str
+    message: str
+
+
 class CandidateResponse(BaseModel):
     id: int
     request_id: int | None = None
@@ -154,3 +163,4 @@ class CandidateResponse(BaseModel):
     l2_feedback_file_url: str | None = None
     overlap_until: date | None = None
     created_at: datetime | None = None
+    rehire_warning: RehireWarning | None = None

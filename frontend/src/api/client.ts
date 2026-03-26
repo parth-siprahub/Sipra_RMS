@@ -123,6 +123,68 @@ class ApiClient {
     }
 
     /**
+     * Download a file from the API as a blob and trigger a browser download.
+     * Uses the same Bearer token auth as get().
+     */
+    async download(endpoint: string, filename: string): Promise<void> {
+        const url = `${API_URL}${endpoint}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: this.getAuthHeaders(),
+                signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+
+            if (response.status === 401) {
+                localStorage.removeItem('rms_access_token');
+                localStorage.removeItem('rms_user_profile');
+                if (!window.location.pathname.includes('/login')) {
+                    window.location.href = '/login';
+                    toast.error('Session expired. Please login again.');
+                }
+                throw new Error('Unauthorized');
+            }
+
+            if (!response.ok) {
+                let errorMessage = 'Download failed';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.detail || errorData.message || errorMessage;
+                } catch {
+                    // non-JSON error response
+                }
+                throw new Error(errorMessage);
+            }
+
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(objectUrl);
+        } catch (error) {
+            if (error instanceof Error) {
+                if (error.name === 'AbortError') {
+                    const msg = 'Download timed out (60s). The server might be busy.';
+                    toast.error(msg);
+                    throw new Error(msg);
+                }
+                if (error.message !== 'Unauthorized') {
+                    toast.error(error.message);
+                }
+            }
+            throw error;
+        }
+    }
+
+    /**
      * Upload a file (FormData) — does NOT set Content-Type header
      * so the browser auto-sets multipart/form-data with boundary.
      * C1 fix: Previously, upload went through post() which JSON.stringify'd the FormData.

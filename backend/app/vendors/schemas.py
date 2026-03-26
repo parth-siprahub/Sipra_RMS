@@ -1,12 +1,12 @@
 """Pydantic schemas for Vendor Management (F3)."""
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
 
 class VendorCreate(BaseModel):
     name: str
     contact_person: str
-    contact_email: str
+    contact_email: EmailStr
     contact_phone: str
     is_active: bool = True
 
@@ -14,7 +14,7 @@ class VendorCreate(BaseModel):
 class VendorUpdate(BaseModel):
     name: str | None = None
     contact_person: str | None = None
-    contact_email: str | None = None
+    contact_email: EmailStr | None = None
     contact_phone: str | None = None
     is_active: bool | None = None
 

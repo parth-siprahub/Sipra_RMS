@@ -5,9 +5,12 @@ Security hardened for production:
   - SecurityHeadersMiddleware (X-Frame-Options, CSP, HSTS-ready)
   - SlowAPI rate limiting (global + per-route)
   - CORS restricted to explicit origins/methods/headers
+  - Structured JSON logging with request correlation IDs
 """
 import time
+import uuid
 import logging
+import contextvars
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -15,6 +18,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
 from app.config import settings
+from app.logging_config import setup_logging
 from app.auth.router import router as auth_router
 from app.job_profiles.router import router as job_profiles_router
 from app.resource_requests.router import router as resource_requests_router
@@ -28,17 +32,16 @@ from app.employees.router import router as employees_router
 from app.timesheets.router import router as timesheets_router
 from app.billing.router import router as billing_router
 from app.clients.router import router as clients_router
+from app.exports.router import router as exports_router
+from app.audit.router import router as audit_router
+from app.reports.router import router as reports_router
 
-# Configure file logging for error capture
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("backend_errors.log"),
-        logging.StreamHandler()
-    ]
-)
+# Set up structured JSON logging (replaces basicConfig)
+setup_logging()
 logger = logging.getLogger(__name__)
+
+# Context variable for request correlation ID
+request_id_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("request_id", default=None)
 
 
 
@@ -130,13 +133,19 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
-# ─── Request Timing Middleware ─────────────────────────────────────────────────
+# ─── Request Correlation ID + Timing Middleware ──────────────────────────────
 @app.middleware("http")
-async def add_process_time_header(request: Request, call_next):
+async def add_request_id_and_timing(request: Request, call_next):
+    # Generate or accept a correlation ID
+    rid = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request_id_ctx.set(rid)
+
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
-    logger.debug("%s %s completed in %.4fs", request.method, request.url.path, process_time)
+
+    logger.debug("%s %s completed in %.4fs [rid=%s]", request.method, request.url.path, process_time, rid)
+    response.headers["X-Request-ID"] = rid
     response.headers["X-Process-Time"] = str(process_time)
     return response
 
@@ -156,7 +165,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
-    expose_headers=["X-Process-Time"],
+    expose_headers=["X-Process-Time", "X-Request-ID"],
 )
 
 # ─── Routers ──────────────────────────────────────────────────────────────────
@@ -173,9 +182,30 @@ app.include_router(employees_router)
 app.include_router(timesheets_router)
 app.include_router(billing_router)
 app.include_router(clients_router)
+app.include_router(exports_router)
+app.include_router(audit_router)
+app.include_router(reports_router)
 
 
 # ─── Health ───────────────────────────────────────────────────────────────────
 @app.get("/health", tags=["System"])
 async def health():
     return {"status": "ok", "environment": settings.ENVIRONMENT}
+
+
+@app.get("/ready", tags=["System"])
+async def readiness_check():
+    """Check database connectivity. Returns 503 if Supabase is unreachable."""
+    from app.database import get_supabase_admin_async
+    from fastapi.responses import JSONResponse
+    try:
+        client = await get_supabase_admin_async()
+        # Simple query to verify DB connectivity
+        await client.table("employees").select("id").limit(1).execute()
+        return {"status": "ready", "database": "connected"}
+    except Exception as exc:
+        logger.error("Readiness check failed: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "database": "disconnected", "error": str(exc)},
+        )
