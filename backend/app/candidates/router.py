@@ -9,6 +9,7 @@ from app.candidates.schemas import (
     CandidateStatus,
     AdminReview,
     ExitRequest,
+    RehireWarning,
 )
 from app.utils.cache import api_cache
 from app.audit.service import log_audit
@@ -152,13 +153,42 @@ async def create_candidate(
                         f"Duplicate candidate found: {d['first_name']} {d['last_name']} ({d['email']}). ID: {d['id']}",
                     )
 
+    # Rehire check: look for exited/terminated employees whose linked
+    # candidate record has a matching email (case-insensitive).
+    # Uses Supabase's embedded resource filtering via the candidates FK.
+    rehire_warning = None
+    try:
+        emp_check = await (
+            client.table("employees")
+            .select("id, rms_name, exit_date, status, candidates!inner(email)")
+            .in_("status", ["EXITED", "TERMINATED"])
+            .ilike("candidates.email", payload.email.strip())
+            .limit(1)
+            .execute()
+        )
+        if emp_check.data:
+            emp = emp_check.data[0]
+            rehire_warning = {
+                "previous_employee_id": emp["id"],
+                "previous_employee_name": emp.get("rms_name", "Unknown"),
+                "exit_date": emp.get("exit_date"),
+                "status": emp["status"],
+                "message": "This candidate was previously employed. Review before proceeding.",
+            }
+    except Exception as e:
+        logger.warning("Rehire check failed (non-blocking): %s", e)
+
     data = payload.model_dump(exclude_none=True, mode="json")
     data["owner_id"] = current_user["id"]
     data["status"] = CandidateStatus.NEW.value
     result = await client.table("candidates").insert(data).execute()
     api_cache.clear_prefix("candidates_")
     api_cache.clear_prefix("dashboard_")
-    return result.data[0]
+
+    response_data = result.data[0]
+    if rehire_warning:
+        response_data["rehire_warning"] = rehire_warning
+    return response_data
 
 
 @router.get("/{candidate_id}", response_model=CandidateResponse)

@@ -7,6 +7,7 @@ from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
 from app.timesheets.schemas import (
     TimesheetResponse,
+    TimesheetUpdate,
     ImportResult,
     AwsTimesheetResponse,
     AwsImportResult,
@@ -42,6 +43,42 @@ async def list_timesheets(
     offset = (page - 1) * page_size
     result = await query.order("log_date", desc=True).range(offset, offset + page_size - 1).execute()
     return result.data
+
+
+@router.put("/{log_id}", response_model=TimesheetResponse)
+async def update_timesheet(
+    log_id: int,
+    body: TimesheetUpdate,
+    current_user: dict = Depends(require_admin),
+):
+    """
+    Update a single timesheet entry.
+    Returns 409 if the entry has been processed (frozen).
+    """
+    client = await get_supabase_admin_async()
+
+    # Fetch existing entry
+    existing = await client.table("timesheet_logs").select("*").eq("id", log_id).single().execute()
+    if not existing.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Timesheet entry not found")
+
+    record = existing.data
+    if record.get("processed"):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Cannot modify a processed timesheet entry. The billing month has been frozen.",
+        )
+
+    update_data = body.model_dump(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
+
+    result = await client.table("timesheet_logs").update(update_data).eq("id", log_id).execute()
+    if not result.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Timesheet entry not found")
+
+    api_cache.clear_prefix("timesheets_")
+    return result.data[0]
 
 
 @router.post("/import", response_model=ImportResult)
@@ -116,8 +153,27 @@ async def import_timesheet(
                 unmatched_usernames.add(entry["jira_username"])
 
         if matched_entries:
-            # Idempotent upsert: delete existing entries for this month's matched employees
+            # Guard: check if any existing entries for this month are frozen (processed)
             matched_emp_ids = list({e["employee_id"] for e in matched_entries})
+            for emp_id in matched_emp_ids:
+                frozen_check = await (
+                    client.table("timesheet_logs")
+                    .select("id")
+                    .eq("employee_id", emp_id)
+                    .eq("import_month", import_month)
+                    .eq("processed", True)
+                    .limit(1)
+                    .execute()
+                )
+                if frozen_check.data:
+                    raise HTTPException(
+                        status.HTTP_409_CONFLICT,
+                        f"Cannot re-import: timesheet entries for employee {emp_id} "
+                        f"in {import_month} are frozen (billing processed). "
+                        "Unfreeze billing before re-importing.",
+                    )
+
+            # Idempotent upsert: delete existing entries for this month's matched employees
             for emp_id in matched_emp_ids:
                 await client.table("timesheet_logs").delete().eq("employee_id", emp_id).eq("import_month", import_month).execute()
 

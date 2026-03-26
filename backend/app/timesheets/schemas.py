@@ -23,6 +23,11 @@ class TimesheetEntry(BaseModel):
         return validate_import_month(v)
 
 
+class TimesheetUpdate(BaseModel):
+    hours_logged: float | None = None
+    is_ooo: bool | None = None
+
+
 class TimesheetResponse(BaseModel):
     id: int
     employee_id: int
@@ -30,6 +35,8 @@ class TimesheetResponse(BaseModel):
     hours_logged: float
     is_ooo: bool
     import_month: str
+    processed: bool = False
+    processed_at: datetime | None = None
     created_at: datetime | None = None
 
 

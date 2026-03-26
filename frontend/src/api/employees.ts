@@ -37,7 +37,7 @@ export interface EmployeeUpdate {
 }
 
 export const employeesApi = {
-    list: (filters?: { status?: string; page_size?: number }) =>
+    list: (filters?: { employee_status?: string; page_size?: number }) =>
         api.get<Employee[]>('/employees/', filters),
 
     get: (id: number) =>

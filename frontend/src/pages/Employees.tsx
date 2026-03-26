@@ -107,7 +107,7 @@ export function Employees() {
     const fetchEmployees = async () => {
         setLoading(true);
         try {
-            const data = await employeesApi.list(statusFilter ? { status: statusFilter } : undefined);
+            const data = await employeesApi.list({ employee_status: statusFilter });
             setEmployees(data || []);
         } catch {
             toast.error('Failed to load employees');
@@ -154,7 +154,7 @@ export function Employees() {
                     />
                 </div>
                 <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
-                    {['ACTIVE', 'EXITED', ''].map(s => (
+                    {['ACTIVE', 'EXITED'].map(s => (
                         <button
                             key={s}
                             onClick={() => setStatusFilter(s)}
@@ -165,7 +165,7 @@ export function Employees() {
                                     : 'bg-surface text-text-muted hover:bg-surface-hover'
                             )}
                         >
-                            {s || 'ALL'}
+                            {s}
                         </button>
                     ))}
                 </div>

@@ -8,11 +8,14 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from fastapi.responses import StreamingResponse
 from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
+from app.reports.flag_classifier import classify_flag
+from app.reports.defaulters import detect_defaulters
 from app.reports.schemas import (
     TimesheetComparison,
     ComparisonReport,
     ComplianceEntry,
     ComplianceReport,
+    DefaulterReport,
 )
 
 logger = logging.getLogger(__name__)
@@ -127,17 +130,18 @@ async def get_timesheet_comparison(
         if aws_logs:
             employees_with_aws += 1
 
+        any_week_low = any(e.get("is_below_threshold") for e in aws_logs) if aws_logs else False
+
         if aws_total is not None and billable_hours > 0:
             difference = round(billable_hours - aws_total, 2)
             difference_pct = round((difference / billable_hours) * 100, 1) if billable_hours else 0
-            # Red if >25% difference OR any AWS week below 30hrs
-            any_week_low = any(e.get("is_below_threshold") for e in aws_logs)
-            if abs(difference_pct) > 25 or any_week_low:
-                flag = "red"
-            else:
-                flag = "green"
-        elif aws_total is not None:
-            flag = "green" if aws_total >= 30 else "red"
+
+        flag = classify_flag(
+            difference_pct=difference_pct,
+            any_week_low=any_week_low,
+            has_aws_data=aws_total is not None,
+            billable_hours=billable_hours,
+        )
 
         comparisons.append(TimesheetComparison(
             employee_id=emp_id,
@@ -264,4 +268,45 @@ async def export_comparison(
         iter([output.getvalue()]),
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="timesheet_comparison_{month}.csv"'},
+    )
+
+
+@router.get("/defaulters", response_model=DefaulterReport)
+async def get_defaulters(
+    month: str = Query(..., description="YYYY-MM format", pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    current_user: dict = Depends(require_admin),
+):
+    """
+    Defaulter detection — employees with insufficient Jira hours mid-month.
+    Returns employees below the minimum hours threshold with severity levels.
+    """
+    client = await get_supabase_admin_async()
+
+    # Fetch active employees
+    employees_raw = await client.table("employees").select("*").eq("status", "ACTIVE").execute()
+    employees = employees_raw.data or []
+
+    # Fetch timesheet logs for the month
+    logs_raw = await client.table("timesheet_logs").select("*").eq("import_month", month).execute()
+    logs = logs_raw.data or []
+
+    today = date.today()
+    entries = detect_defaulters(
+        employees=employees,
+        timesheet_logs=logs,
+        month=month,
+        check_date=today,
+    )
+
+    critical_count = sum(1 for e in entries if e.severity == "critical")
+    warning_count = sum(1 for e in entries if e.severity == "warning")
+
+    return DefaulterReport(
+        month=month,
+        check_date=today.isoformat(),
+        total_active=len(employees),
+        defaulter_count=len(entries),
+        critical_count=critical_count,
+        warning_count=warning_count,
+        entries=entries,
     )
