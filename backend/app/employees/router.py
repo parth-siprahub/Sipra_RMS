@@ -57,7 +57,7 @@ async def create_employee(
         raise
     except Exception as e:
         logger.error("Employee creation error: %s", str(e))
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Database error: {str(e)}")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Operation failed. Please check input and try again.")
 
 
 @router.post("/from-candidate/{candidate_id}", response_model=EmployeeResponse, status_code=status.HTTP_201_CREATED)
@@ -102,7 +102,7 @@ async def create_employee_from_candidate(
         raise
     except Exception as e:
         logger.error("Employee transition error: %s", str(e))
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Database error: {str(e)}")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Operation failed. Please check input and try again.")
 
 
 @router.get("/{employee_id}", response_model=EmployeeResponse)

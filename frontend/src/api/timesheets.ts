@@ -18,6 +18,14 @@ export interface ImportResult {
     entries_upserted: number;
 }
 
+export interface AWSImportResult {
+    month: string;
+    total_rows: number;
+    matched: number;
+    unmatched_emails: string[];
+    records_upserted: number;
+}
+
 export const timesheetsApi = {
     list: (filters?: { employee_id?: number; import_month?: string }) =>
         api.get<TimesheetEntry[]>('/timesheets/', filters),
@@ -27,5 +35,12 @@ export const timesheetsApi = {
         formData.append('file', file);
         formData.append('import_month', importMonth);
         return api.upload<ImportResult>('/timesheets/import', formData);
+    },
+
+    importAws: async (file: File, importMonth: string): Promise<AWSImportResult> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('import_month', importMonth);
+        return api.upload<AWSImportResult>('/timesheets/import-aws', formData);
     },
 };

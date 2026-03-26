@@ -27,3 +27,11 @@ class ImportResult(BaseModel):
     employees_matched: int
     employees_unmatched: list[str]
     entries_upserted: int
+
+
+class AWSImportResult(BaseModel):
+    month: str
+    total_rows: int
+    matched: int
+    unmatched_emails: list[str]
+    records_upserted: int

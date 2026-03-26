@@ -11,6 +11,7 @@ from app.candidates.schemas import (
     ExitRequest,
 )
 from app.utils.cache import api_cache
+from app.audit.service import log_audit
 import logging
 
 logger = logging.getLogger(__name__)
@@ -184,10 +185,9 @@ async def update_candidate(
         if "22P02" in error_str or "invalid input value for enum" in error_str:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                "A status value is not registered in the database enum. "
-                "Run migration 002_add_missing_candidate_statuses.sql in Supabase SQL Editor.",
+                "Invalid status value. Please contact an administrator.",
             )
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Database update failed: {error_str}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to update candidate. Please try again.")
 
     # Re-fetch the full row to guarantee complete response
     refreshed = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
@@ -244,16 +244,23 @@ async def admin_review_candidate(
         if "22P02" in error_str or "invalid input value for enum" in error_str:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                f"Status '{payload.status.value}' is not yet registered in the database enum. "
-                "Please run the migration SQL (backend/migrations/002_add_missing_candidate_statuses.sql) "
-                "in Supabase SQL Editor.",
+                "Invalid status value. Please contact an administrator.",
             )
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Database update failed: {error_str}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to update candidate status. Please try again.")
 
     # Re-fetch the full row to guarantee we return complete data
     refreshed = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
     if not refreshed.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found after update")
+
+    await log_audit(
+        user=current_user,
+        action="STATUS_CHANGE",
+        entity_type="candidate",
+        entity_id=str(candidate_id),
+        old_values={"status": current_status_str},
+        new_values={"status": payload.status.value, "remarks": payload.remarks},
+    )
 
     # Transition trigger: auto-create Employee record when status reaches ONBOARDED
     if payload.status == CandidateStatus.ONBOARDED:

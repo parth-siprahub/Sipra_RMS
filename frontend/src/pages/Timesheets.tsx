@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { timesheetsApi, type TimesheetEntry, type ImportResult } from '../api/timesheets';
+import { timesheetsApi, type TimesheetEntry, type ImportResult, type AWSImportResult } from '../api/timesheets';
 import { employeesApi, type Employee } from '../api/employees';
-import { billingApi, type BillingCalculationResult } from '../api/billing';
+import { billingApi } from '../api/billing';
+import { exportTimesheets } from '../api/exports';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useAuth, isAdminRole } from '../context/AuthContext';
 import {
     Upload,
-    Calendar,
+    Download,
     Clock,
     AlertTriangle,
     CheckCircle,
@@ -27,7 +28,9 @@ export function Timesheets() {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     });
     const [isImportOpen, setIsImportOpen] = useState(false);
+    const [isAwsImportOpen, setIsAwsImportOpen] = useState(false);
     const [importResult, setImportResult] = useState<ImportResult | null>(null);
+    const [awsImportResult, setAwsImportResult] = useState<AWSImportResult | null>(null);
     const [calculating, setCalculating] = useState(false);
 
     const fetchData = async () => {
@@ -77,9 +80,17 @@ export function Timesheets() {
                 <div className="flex gap-3">
                     {isAdmin && (
                         <>
+                            <button onClick={() => exportTimesheets(selectedMonth)} className="btn btn-secondary flex items-center gap-2">
+                                <Download size={18} />
+                                Export CSV
+                            </button>
                             <button onClick={handleCalculate} className="btn btn-secondary flex items-center gap-2" disabled={calculating}>
                                 <Calculator size={18} />
                                 {calculating ? 'Calculating...' : 'Calculate Billing'}
+                            </button>
+                            <button onClick={() => setIsAwsImportOpen(true)} className="btn btn-secondary flex items-center gap-2">
+                                <Upload size={18} />
+                                Import AWS
                             </button>
                             <button onClick={() => setIsImportOpen(true)} className="btn btn-primary flex items-center gap-2">
                                 <Upload size={18} />
@@ -194,6 +205,27 @@ export function Timesheets() {
                 )}
             </div>
 
+            {awsImportResult && (
+                <div className="card bg-info/5 border-info/20">
+                    <h3 className="font-bold text-text mb-2">AWS ActiveTrack Import Result</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div><span className="text-text-muted">Month:</span> <span className="font-medium">{awsImportResult.month}</span></div>
+                        <div><span className="text-text-muted">Total Rows:</span> <span className="font-medium">{awsImportResult.total_rows}</span></div>
+                        <div><span className="text-text-muted">Matched:</span> <span className="font-medium text-success">{awsImportResult.matched}</span></div>
+                        <div><span className="text-text-muted">Upserted:</span> <span className="font-medium">{awsImportResult.records_upserted}</span></div>
+                    </div>
+                    {awsImportResult.unmatched_emails.length > 0 && (
+                        <div className="mt-2 flex items-start gap-2">
+                            <AlertTriangle size={14} className="text-warning mt-0.5 shrink-0" />
+                            <span className="text-xs text-warning">
+                                Unmatched: {awsImportResult.unmatched_emails.slice(0, 10).join(', ')}
+                                {awsImportResult.unmatched_emails.length > 10 && ` (+${awsImportResult.unmatched_emails.length - 10} more)`}
+                            </span>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {isImportOpen && (
                 <ImportModal
                     isOpen={isImportOpen}
@@ -202,6 +234,18 @@ export function Timesheets() {
                         setImportResult(result);
                         setSelectedMonth(result.month);
                         fetchData();
+                    }}
+                    defaultMonth={selectedMonth}
+                />
+            )}
+
+            {isAwsImportOpen && (
+                <AWSImportModal
+                    isOpen={isAwsImportOpen}
+                    onClose={() => setIsAwsImportOpen(false)}
+                    onSuccess={(result) => {
+                        setAwsImportResult(result);
+                        setSelectedMonth(result.month);
                     }}
                     defaultMonth={selectedMonth}
                 />
@@ -261,6 +305,69 @@ function ImportModal({
                     <p><CheckCircle size={12} className="inline text-success mr-1" />Daily hours (standard = 8.0)</p>
                     <p><AlertTriangle size={12} className="inline text-warning mr-1" />Value "01" / 1.0 = Out of Office (OOO)</p>
                     <p><CheckCircle size={12} className="inline text-info mr-1" />Re-uploading same month overwrites previous data</p>
+                </div>
+                <div className="flex gap-3 pt-2">
+                    <button type="button" onClick={onClose} className="btn btn-secondary flex-1" disabled={uploading}>Cancel</button>
+                    <button type="submit" className="btn btn-cta flex-1" disabled={uploading || !file}>
+                        {uploading ? <span className="spinner w-4 h-4" /> : 'Upload & Import'}
+                    </button>
+                </div>
+            </form>
+        </Modal>
+    );
+}
+
+function AWSImportModal({
+    isOpen,
+    onClose,
+    onSuccess,
+    defaultMonth,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: (result: AWSImportResult) => void;
+    defaultMonth: string;
+}) {
+    const [file, setFile] = useState<File | null>(null);
+    const [month, setMonth] = useState(defaultMonth);
+    const [uploading, setUploading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!file) { toast.error('Select a CSV file'); return; }
+        setUploading(true);
+        try {
+            const result = await timesheetsApi.importAws(file, month);
+            toast.success(`AWS import: ${result.records_upserted} records upserted`);
+            onSuccess(result);
+            onClose();
+        } catch {
+            // handled
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Import AWS ActiveTrack Report">
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label className="input-label">AWS ActiveTrack CSV</label>
+                    <input
+                        type="file"
+                        accept=".csv"
+                        className="input-field"
+                        onChange={e => setFile(e.target.files?.[0] || null)}
+                    />
+                </div>
+                <div>
+                    <label className="input-label">Import Month</label>
+                    <input type="month" className="input-field" value={month} onChange={e => setMonth(e.target.value)} />
+                </div>
+                <div className="text-xs text-text-muted space-y-1">
+                    <p><CheckCircle size={12} className="inline text-success mr-1" />Matches CSV "User" email to employee AWS email</p>
+                    <p><CheckCircle size={12} className="inline text-info mr-1" />Updates aws_active_hours in billing records</p>
+                    <p><AlertTriangle size={12} className="inline text-warning mr-1" />Unmatched emails shown after import</p>
                 </div>
                 <div className="flex gap-3 pt-2">
                     <button type="button" onClick={onClose} className="btn btn-secondary flex-1" disabled={uploading}>Cancel</button>

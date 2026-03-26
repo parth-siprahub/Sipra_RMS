@@ -44,7 +44,7 @@ class CandidateCreate(BaseModel):
     request_id: int | None = None
     first_name: str
     last_name: str
-    email: str
+    email: EmailStr
     phone: str | None = None
     source: str | None = None
 
@@ -70,7 +70,7 @@ class CandidateCreate(BaseModel):
 class CandidateUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
-    email: str | None = None
+    email: EmailStr | None = None
     phone: str | None = None
     request_id: int | None = None
 

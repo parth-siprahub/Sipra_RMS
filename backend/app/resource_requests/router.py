@@ -1,6 +1,6 @@
 """Resource Requests CRUD — aligned with public.resource_requests table."""
 from fastapi import APIRouter, HTTPException, status, Depends, Query
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
 from app.resource_requests.schemas import (
     ResourceRequestCreate,
@@ -50,7 +50,7 @@ async def list_requests(
 @router.post("/", response_model=ResourceRequestResponse, status_code=status.HTTP_201_CREATED)
 async def create_request(
     payload: ResourceRequestCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ):
     client = await get_supabase_admin_async()
     # Generate next display ID (REQ-YYYYMMDD-XXX)
@@ -82,7 +82,7 @@ async def get_request(request_id: int, current_user: dict = Depends(get_current_
 async def update_request(
     request_id: int,
     payload: ResourceRequestUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ):
     client = await get_supabase_admin_async()
     data = payload.model_dump(exclude_none=True)
@@ -100,7 +100,7 @@ async def update_request(
 async def transition_status(
     request_id: int,
     payload: StatusTransition,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ):
     client = await get_supabase_admin_async()
 
