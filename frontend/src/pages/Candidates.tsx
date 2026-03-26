@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Plus, RefreshCw, LayoutGrid, List } from 'lucide-react';
+import { Plus, RefreshCw, LayoutGrid, List, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { candidatesApi } from '../api/candidates';
 import { resourceRequestsApi } from '../api/resourceRequests';
@@ -19,6 +19,7 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton, KanbanColumnSkeleton, TableRowSkeleton } from '../components/ui/Skeleton';
 import { communicationLogApi, type CommunicationLog } from '../api/communicationLogs';
+import { exportCandidates } from '../api/exports';
 import { cn } from '../lib/utils';
 import {
     User,
@@ -530,7 +531,10 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                         />
                                     </div>
                                     <div className="bg-surface p-3 rounded-xl border border-border hover:border-cta/30 transition-all">
-                                        <label className="text-[11px] font-semibold text-text-muted block mb-2" htmlFor="l1-file">
+                                        <label
+                                            className="text-[11px] font-semibold text-text-muted block mb-2"
+                                            htmlFor="l1-feedback-file"
+                                        >
                                             L1 Feedback File (PDF/DOCX)
                                         </label>
                                         {candidate.l1_feedback_file_url && (
@@ -539,11 +543,11 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                             </p>
                                         )}
                                         <input
-                                            id="l1-file"
+                                            id="l1-feedback-file"
                                             type="file"
                                             accept=".pdf,.doc,.docx"
-                                            className="text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-surface-hover file:text-cta hover:file:bg-cta/10 file:cursor-pointer transition-all w-full"
                                             title="Upload L1 Feedback File"
+                                            className="text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-surface-hover file:text-cta hover:file:bg-cta/10 file:cursor-pointer transition-all w-full"
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (file) {
@@ -576,7 +580,10 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                         />
                                     </div>
                                     <div className="bg-surface p-3 rounded-xl border border-border hover:border-cta/30 transition-all">
-                                        <label className="text-[11px] font-semibold text-text-muted block mb-2" htmlFor="l2-file">
+                                        <label
+                                            className="text-[11px] font-semibold text-text-muted block mb-2"
+                                            htmlFor="l2-feedback-file"
+                                        >
                                             L2 Feedback File (PDF/DOCX)
                                         </label>
                                         {candidate.l2_feedback_file_url && (
@@ -585,11 +592,11 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                             </p>
                                         )}
                                         <input
-                                            id="l2-file"
+                                            id="l2-feedback-file"
                                             type="file"
                                             accept=".pdf,.doc,.docx"
-                                            className="text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-surface-hover file:text-cta hover:file:bg-cta/10 file:cursor-pointer transition-all w-full"
                                             title="Upload L2 Feedback File"
+                                            className="text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-surface-hover file:text-cta hover:file:bg-cta/10 file:cursor-pointer transition-all w-full"
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (file) {
@@ -1182,6 +1189,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, onViewDuplicate, req
                             id="c-resume"
                             type="file"
                             accept=".pdf,.doc,.docx"
+                            title="Resume Attachment"
                             className="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-surface-hover file:text-cta hover:file:bg-cta/10 file:cursor-pointer transition-all"
                             title="Upload Resume File"
                             onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
@@ -1290,13 +1298,18 @@ export function Candidates() {
                         Manage your candidate journey from submission to onboarding
                     </p>
                 </div>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="btn btn-cta shrink-0"
-                    id="add-candidate-btn"
-                >
-                    <Plus size={18} /> Add Candidate
-                </button>
+                <div className="flex gap-2 shrink-0">
+                    <button onClick={() => exportCandidates()} className="btn btn-secondary flex items-center gap-2">
+                        <Download size={18} /> Export CSV
+                    </button>
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="btn btn-cta"
+                        id="add-candidate-btn"
+                    >
+                        <Plus size={18} /> Add Candidate
+                    </button>
+                </div>
             </div>
 
             {/* Controls Bar */}

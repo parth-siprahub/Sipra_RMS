@@ -9,8 +9,10 @@ from app.candidates.schemas import (
     CandidateStatus,
     AdminReview,
     ExitRequest,
+    RehireWarning,
 )
 from app.utils.cache import api_cache
+from app.audit.service import log_audit
 import logging
 
 logger = logging.getLogger(__name__)
@@ -83,9 +85,11 @@ ADMIN_REVIEW_TRANSITIONS = {
 async def list_candidates(
     request_id: int | None = None,
     candidate_status: str | None = Query(None, alias="status"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
     current_user: dict = Depends(get_current_user),
 ):
-    cache_key = f"candidates_list_{request_id}_{candidate_status}"
+    cache_key = f"candidates_list_{request_id}_{candidate_status}_{page}_{page_size}"
     cached = api_cache.get(cache_key)
     if cached:
         return cached
@@ -102,7 +106,8 @@ async def list_candidates(
         query = query.eq("request_id", request_id)
     if candidate_status:
         query = query.eq("status", candidate_status)
-    result = await query.order("created_at", desc=True).execute()
+    offset = (page - 1) * page_size
+    result = await query.order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
     api_cache.set(cache_key, result.data)
     return result.data
 
@@ -148,13 +153,42 @@ async def create_candidate(
                         f"Duplicate candidate found: {d['first_name']} {d['last_name']} ({d['email']}). ID: {d['id']}",
                     )
 
+    # Rehire check: look for exited/terminated employees whose linked
+    # candidate record has a matching email (case-insensitive).
+    # Uses Supabase's embedded resource filtering via the candidates FK.
+    rehire_warning = None
+    try:
+        emp_check = await (
+            client.table("employees")
+            .select("id, rms_name, exit_date, status, candidates!inner(email)")
+            .in_("status", ["EXITED", "TERMINATED"])
+            .ilike("candidates.email", payload.email.strip())
+            .limit(1)
+            .execute()
+        )
+        if emp_check.data:
+            emp = emp_check.data[0]
+            rehire_warning = {
+                "previous_employee_id": emp["id"],
+                "previous_employee_name": emp.get("rms_name", "Unknown"),
+                "exit_date": emp.get("exit_date"),
+                "status": emp["status"],
+                "message": "This candidate was previously employed. Review before proceeding.",
+            }
+    except Exception as e:
+        logger.warning("Rehire check failed (non-blocking): %s", e)
+
     data = payload.model_dump(exclude_none=True, mode="json")
     data["owner_id"] = current_user["id"]
     data["status"] = CandidateStatus.NEW.value
     result = await client.table("candidates").insert(data).execute()
     api_cache.clear_prefix("candidates_")
     api_cache.clear_prefix("dashboard_")
-    return result.data[0]
+
+    response_data = result.data[0]
+    if rehire_warning:
+        response_data["rehire_warning"] = rehire_warning
+    return response_data
 
 
 @router.get("/{candidate_id}", response_model=CandidateResponse)
@@ -184,10 +218,9 @@ async def update_candidate(
         if "22P02" in error_str or "invalid input value for enum" in error_str:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                "A status value is not registered in the database enum. "
-                "Run migration 002_add_missing_candidate_statuses.sql in Supabase SQL Editor.",
+                "Invalid status value. Please contact an administrator.",
             )
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Database update failed: {error_str}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to update candidate. Please try again.")
 
     # Re-fetch the full row to guarantee complete response
     refreshed = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
@@ -244,16 +277,24 @@ async def admin_review_candidate(
         if "22P02" in error_str or "invalid input value for enum" in error_str:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                f"Status '{payload.status.value}' is not yet registered in the database enum. "
-                "Please run the migration SQL (backend/migrations/002_add_missing_candidate_statuses.sql) "
-                "in Supabase SQL Editor.",
+                "Invalid status value. Please contact an administrator.",
             )
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Database update failed: {error_str}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to update candidate status. Please try again.")
 
     # Re-fetch the full row to guarantee we return complete data
     refreshed = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
     if not refreshed.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found after update")
+
+    await log_audit(
+        user=current_user,
+        action="STATUS_CHANGE",
+        entity_type="candidate",
+        entity_id=str(candidate_id),
+        old_values={"status": current_status_str},
+        new_values={"status": payload.status.value, "remarks": payload.remarks},
+    )
+
 
     # Transition trigger: auto-create Employee record when status reaches ONBOARDED
     if payload.status == CandidateStatus.ONBOARDED:
@@ -291,6 +332,7 @@ async def admin_review_candidate(
                 logger.info("Auto-closed resource request %s after candidate %s onboarded", request_id, candidate_id)
             except Exception as rr_err:
                 logger.warning("RR auto-close failed for request %s: %s", request_id, rr_err)
+
 
     api_cache.clear_prefix("candidates_")
     api_cache.clear_prefix("dashboard_")

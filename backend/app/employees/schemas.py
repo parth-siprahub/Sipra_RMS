@@ -1,5 +1,5 @@
 """Employee schemas — aligned with public.employees table."""
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import datetime, date
 from enum import Enum
 
@@ -14,7 +14,7 @@ class EmployeeCreate(BaseModel):
     candidate_id: int
     rms_name: str
     client_name: str | None = None
-    aws_email: str | None = None
+    aws_email: EmailStr | None = None
     github_id: str | None = None
     jira_username: str | None = None
     start_date: date | None = None
@@ -23,7 +23,7 @@ class EmployeeCreate(BaseModel):
 class EmployeeUpdate(BaseModel):
     rms_name: str | None = None
     client_name: str | None = None
-    aws_email: str | None = None
+    aws_email: EmailStr | None = None
     github_id: str | None = None
     jira_username: str | None = None
     start_date: date | None = None
