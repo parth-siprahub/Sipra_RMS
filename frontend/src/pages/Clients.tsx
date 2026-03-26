@@ -203,6 +203,7 @@ export function Clients() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <div className="flex items-center gap-2">
+                        <p className="text-text-muted">Manage client organizations and contact information</p>
                         {isSuperAdmin && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20">
                                 <Shield size={10} />
@@ -210,7 +211,6 @@ export function Clients() {
                             </span>
                         )}
                     </div>
-                    <p className="text-text-muted">Manage client organizations and contact information</p>
                 </div>
                 {canManage && (
                     <button

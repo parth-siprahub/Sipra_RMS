@@ -34,6 +34,7 @@ from app.billing.router import router as billing_router
 from app.clients.router import router as clients_router
 from app.exports.router import router as exports_router
 from app.audit.router import router as audit_router
+from app.reports.router import router as reports_router
 
 # Set up structured JSON logging (replaces basicConfig)
 setup_logging()
@@ -183,9 +184,28 @@ app.include_router(billing_router)
 app.include_router(clients_router)
 app.include_router(exports_router)
 app.include_router(audit_router)
+app.include_router(reports_router)
 
 
 # ─── Health ───────────────────────────────────────────────────────────────────
 @app.get("/health", tags=["System"])
 async def health():
     return {"status": "ok", "environment": settings.ENVIRONMENT}
+
+
+@app.get("/ready", tags=["System"])
+async def readiness_check():
+    """Check database connectivity. Returns 503 if Supabase is unreachable."""
+    from app.database import get_supabase_admin_async
+    from fastapi.responses import JSONResponse
+    try:
+        client = await get_supabase_admin_async()
+        # Simple query to verify DB connectivity
+        await client.table("employees").select("id").limit(1).execute()
+        return {"status": "ready", "database": "connected"}
+    except Exception as exc:
+        logger.error("Readiness check failed: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "database": "disconnected", "error": str(exc)},
+        )

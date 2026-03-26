@@ -1,6 +1,6 @@
 """Employees CRUD + Onboarding Transition — aligned with public.employees table."""
 import logging
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Query
 from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
 from app.employees.schemas import EmployeeCreate, EmployeeUpdate, EmployeeResponse, EmployeeStatus
@@ -14,9 +14,11 @@ router = APIRouter(prefix="/employees", tags=["Employees"])
 @router.get("/", response_model=list[EmployeeResponse])
 async def list_employees(
     employee_status: str | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=500),
     current_user: dict = Depends(get_current_user),
 ):
-    cache_key = f"employees_list_{employee_status}"
+    cache_key = f"employees_list_{employee_status}_{page}_{page_size}"
     cached = api_cache.get(cache_key)
     if cached:
         return cached
@@ -25,7 +27,8 @@ async def list_employees(
     query = client.table("employees").select("*")
     if employee_status:
         query = query.eq("status", employee_status)
-    result = await query.order("created_at", desc=True).execute()
+    offset = (page - 1) * page_size
+    result = await query.order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
     api_cache.set(cache_key, result.data)
     return result.data
 

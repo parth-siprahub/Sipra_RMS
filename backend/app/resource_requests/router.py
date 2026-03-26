@@ -29,9 +29,11 @@ REQUEST_STATUS_TRANSITIONS = {
 async def list_requests(
     request_status: str | None = Query(None, alias="status"),
     priority: str | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
     current_user: dict = Depends(get_current_user),
 ):
-    cache_key = f"requests_list_{request_status}_{priority}"
+    cache_key = f"requests_list_{request_status}_{priority}_{page}_{page_size}"
     cached = api_cache.get(cache_key)
     if cached:
         return cached
@@ -42,7 +44,8 @@ async def list_requests(
         query = query.eq("status", request_status)
     if priority:
         query = query.eq("priority", priority)
-    result = await query.order("created_at", desc=True).execute()
+    offset = (page - 1) * page_size
+    result = await query.order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
     api_cache.set(cache_key, result.data)
     return result.data
 

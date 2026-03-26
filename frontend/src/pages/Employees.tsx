@@ -154,7 +154,7 @@ export function Employees() {
                     />
                 </div>
                 <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
-                    {['ACTIVE', 'EXITED'].map(s => (
+                    {['ACTIVE', 'EXITED', ''].map(s => (
                         <button
                             key={s}
                             onClick={() => setStatusFilter(s)}
@@ -165,7 +165,7 @@ export function Employees() {
                                     : 'bg-surface text-text-muted hover:bg-surface-hover'
                             )}
                         >
-                            {s === 'ACTIVE' ? 'Active' : 'Exited'}
+                            {s || 'ALL'}
                         </button>
                     ))}
                 </div>

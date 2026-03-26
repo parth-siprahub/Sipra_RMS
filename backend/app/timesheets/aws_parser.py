@@ -1,64 +1,69 @@
-"""Parse AWS ActiveTrack CSV exports into structured records."""
-import csv
-import io
+"""
+AWS ActiveTrack CSV Parser (Track E-2)
+Parses weekly CSV exports from AWS ActiveTrack.
+Format: CSV with 29 columns, @dcli.com emails, seconds-based metrics.
+"""
 import logging
-from dataclasses import dataclass
+from datetime import date
+from io import StringIO
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-
-@dataclass
-class AWSActiveTrackRecord:
-    user_email: str
-    active_hours: float
-    work_time_hours: float
-    productive_hours: float
+THRESHOLD_SECS = 108000  # 30 hours in seconds
 
 
-def _secs_to_hours(value: str) -> float:
-    """Convert seconds string to hours, rounded to 2 decimal places."""
-    try:
-        return round(int(value.strip().strip('"')) / 3600, 2)
-    except (ValueError, TypeError):
-        return 0.0
-
-
-def parse_aws_csv(file_bytes: bytes) -> list[AWSActiveTrackRecord]:
+def parse_aws_csv(file_bytes: bytes, week_start: date, week_end: date) -> list[dict]:
     """
-    Parse AWS ActiveTrack CSV content.
+    Parse an AWS ActiveTrack CSV export.
 
-    Expected columns:
-      - User: email address
-      - Active (secs): active time in seconds
-      - Work Time (secs): total work time in seconds
-      - Productive (secs): productive time in seconds
-
-    Returns a list of AWSActiveTrackRecord with hours values.
+    Returns a list of dicts with employee metrics for the given week.
     """
-    try:
-        text = file_bytes.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        text = file_bytes.decode("latin-1")
+    content = file_bytes.decode("utf-8-sig")
+    df = pd.read_csv(StringIO(content))
 
-    reader = csv.DictReader(io.StringIO(text))
+    if df.empty:
+        return []
 
-    records: list[AWSActiveTrackRecord] = []
-    for row_num, row in enumerate(reader, start=2):
-        user_email = row.get("User", "").strip().strip('"')
-        if not user_email:
-            logger.warning("Row %d: missing User email, skipping", row_num)
+    results = []
+    for _, row in df.iterrows():
+        user_raw = str(row.get("User", "")).strip().strip('"').strip()
+        if not user_raw or user_raw.lower() == "nan":
             continue
 
-        active_secs = row.get("Active (secs)", "0")
-        work_time_secs = row.get("Work Time (secs)", "0")
-        productive_secs = row.get("Productive (secs)", "0")
+        email = user_raw.lower()
 
-        records.append(AWSActiveTrackRecord(
-            user_email=user_email,
-            active_hours=_secs_to_hours(active_secs),
-            work_time_hours=_secs_to_hours(work_time_secs),
-            productive_hours=_secs_to_hours(productive_secs),
-        ))
+        try:
+            work_time_secs = int(row.get("Work Time (secs)", 0) or 0)
+            productive_secs = int(row.get("Productive (secs)", 0) or 0)
+            unproductive_secs = int(row.get("Unproductive (sec)", 0) or 0)
+            active_secs = int(row.get("Active (secs)", 0) or 0)
+            passive_secs = int(row.get("Passive (secs)", 0) or 0)
+            screen_time_secs = int(row.get("Screen Time (secs)", 0) or 0)
+        except (ValueError, TypeError) as e:
+            logger.warning("Skipping row for %s due to parse error: %s", email, e)
+            continue
 
-    logger.info("Parsed %d AWS ActiveTrack records from CSV", len(records))
-    return records
+        results.append({
+            "aws_email": email,
+            "week_start": str(week_start),
+            "week_end": str(week_end),
+            "work_time_secs": work_time_secs,
+            "productive_secs": productive_secs,
+            "unproductive_secs": unproductive_secs,
+            "active_secs": active_secs,
+            "passive_secs": passive_secs,
+            "screen_time_secs": screen_time_secs,
+            "work_time_hours": round(work_time_secs / 3600, 2),
+            "is_below_threshold": work_time_secs < THRESHOLD_SECS,
+        })
+
+    logger.info(
+        "Parsed %d AWS entries for week %s to %s (%d below threshold)",
+        len(results),
+        week_start,
+        week_end,
+        sum(1 for r in results if r["is_below_threshold"]),
+    )
+    return results
