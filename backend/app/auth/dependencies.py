@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-# Cache user profiles for 5 minutes to avoid redundant DB calls on every request
-user_cache = SimpleCache(ttl_seconds=300)
+# Cache user profiles for 2 minutes by user_id (not token) to avoid stale role data
+user_cache = SimpleCache(ttl_seconds=120)
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
@@ -21,25 +21,26 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # Check memory cache first
-    cached_user = user_cache.get(token)
-    if cached_user:
-        return cached_user
-
+    # Verify token with Supabase Auth first
     client = await get_supabase_admin_async()
     try:
         auth_response = await client.auth.get_user(token)
         if not auth_response or not auth_response.user:
             raise credentials_exception
-        user_id = auth_response.user.id
+        user_id = str(auth_response.user.id)
     except Exception:
         raise credentials_exception
+
+    # Check memory cache by user_id (not token) to avoid stale role data
+    cached_user = user_cache.get(user_id)
+    if cached_user:
+        return cached_user
 
     # Fetch full profile from DB
     try:
         result = (
             await client.table("profiles")
-            .select("*")
+            .select("id, email, role, full_name, vendor_id")
             .eq("id", user_id)
             .single()
             .execute()
@@ -48,8 +49,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
             raise credentials_exception
 
         user_data = result.data
-        # Update cache for subsequent requests in this session
-        user_cache.set(token, user_data)
+        # Cache by user_id so role changes take effect after TTL
+        user_cache.set(user_id, user_data)
         return user_data
     except Exception as e:
         logger.error("Auth Profile Fetch Error: %s", str(e))

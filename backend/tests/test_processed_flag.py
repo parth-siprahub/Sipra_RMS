@@ -338,7 +338,7 @@ class TestTimesheetImportFrozenGuard:
             resp = await authed_client.post(
                 "/timesheets/import",
                 data={"import_month": "2025-03"},
-                files={"file": ("test.xls", b"fake", "application/vnd.ms-excel")},
+                files={"file": ("test.xls", b"\xD0\xCF\x11\xE0fake_excel_data", "application/vnd.ms-excel")},
             )
 
         assert resp.status_code == 409

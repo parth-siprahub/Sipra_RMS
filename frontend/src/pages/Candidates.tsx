@@ -216,7 +216,7 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick }: 
 
                 {/* Cards */}
                 <div className={cn(
-                    'flex-1 p-2 space-y-2 min-h-[120px] transition-colors duration-200',
+                    'flex-1 p-2 space-y-2 min-h-[120px] max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar transition-colors duration-200',
                     isDragOver && !isDraggingFromThis && 'bg-cta/5'
                 )}>
                     {items.length === 0 && (

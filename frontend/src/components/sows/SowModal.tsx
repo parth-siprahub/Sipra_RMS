@@ -6,6 +6,7 @@ import { jobProfileApi, type JobProfile } from '../../api/jobProfiles';
 import { clientsApi, type Client } from '../../api/clients';
 import toast from 'react-hot-toast';
 import { Calendar, Users, Hash, Building2, Briefcase } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 interface SowModalProps {
     isOpen: boolean;
@@ -18,6 +19,7 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
     const [loading, setLoading] = useState(false);
     const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [formData, setFormData] = useState({
         sow_number: '',
         client_name: '',
@@ -67,8 +69,24 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
         }
     }, [sow, isOpen]);
 
+    const validateDates = (): boolean => {
+        const newErrors: Record<string, string> = {};
+        const { start_date, target_date, submitted_date } = formData;
+
+        if (start_date && target_date && start_date > target_date) {
+            newErrors.target_date = 'Target date must be on or after start date';
+        }
+        if (submitted_date && start_date && submitted_date < start_date) {
+            newErrors.submitted_date = 'Submitted date must be on or after start date';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!validateDates()) return;
         setLoading(true);
 
         try {
@@ -172,43 +190,58 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
                     <div>
                         <label className="input-label" htmlFor="start_date">Start Date</label>
                         <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+                            <Calendar
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted cursor-pointer z-10"
+                                size={18}
+                                onClick={() => (document.getElementById('start_date') as HTMLInputElement)?.showPicker?.()}
+                            />
                             <input
                                 id="start_date"
                                 type="date"
-                                className="input-field pl-10"
+                                className={cn('input-field pl-10', errors.start_date && 'input-error')}
                                 value={formData.start_date}
-                                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                                onChange={(e) => { setFormData({ ...formData, start_date: e.target.value }); setErrors(prev => { const { start_date: _, ...rest } = prev; return rest; }); }}
                             />
                         </div>
+                        {errors.start_date && <span className="error-text">{errors.start_date}</span>}
                     </div>
 
                     <div>
                         <label className="input-label" htmlFor="target_date">Target Date</label>
                         <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+                            <Calendar
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted cursor-pointer z-10"
+                                size={18}
+                                onClick={() => (document.getElementById('target_date') as HTMLInputElement)?.showPicker?.()}
+                            />
                             <input
                                 id="target_date"
                                 type="date"
-                                className="input-field pl-10"
+                                className={cn('input-field pl-10', errors.target_date && 'input-error')}
                                 value={formData.target_date}
-                                onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
+                                onChange={(e) => { setFormData({ ...formData, target_date: e.target.value }); setErrors(prev => { const { target_date: _, ...rest } = prev; return rest; }); }}
                             />
                         </div>
+                        {errors.target_date && <span className="error-text">{errors.target_date}</span>}
                     </div>
 
                     <div>
                         <label className="input-label" htmlFor="submitted_date">Submitted Date</label>
                         <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+                            <Calendar
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted cursor-pointer z-10"
+                                size={18}
+                                onClick={() => (document.getElementById('submitted_date') as HTMLInputElement)?.showPicker?.()}
+                            />
                             <input
                                 id="submitted_date"
                                 type="date"
-                                className="input-field pl-10"
+                                className={cn('input-field pl-10', errors.submitted_date && 'input-error')}
                                 value={formData.submitted_date}
-                                onChange={(e) => setFormData({ ...formData, submitted_date: e.target.value })}
+                                onChange={(e) => { setFormData({ ...formData, submitted_date: e.target.value }); setErrors(prev => { const { submitted_date: _, ...rest } = prev; return rest; }); }}
                             />
                         </div>
+                        {errors.submitted_date && <span className="error-text">{errors.submitted_date}</span>}
                     </div>
 
                     <div className="md:col-span-2 space-y-4">

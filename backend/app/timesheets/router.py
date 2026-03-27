@@ -19,6 +19,45 @@ from app.audit.service import log_audit
 
 logger = logging.getLogger(__name__)
 
+MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
+
+# Magic numbers for Excel file validation
+_XLS_MAGIC = b'\xD0\xCF\x11\xE0'   # OLE2 Compound Document (XLS)
+_XLSX_MAGIC = b'PK\x03\x04'         # ZIP archive (XLSX)
+_CSV_BOM = b'\xef\xbb\xbf'          # UTF-8 BOM (optional in CSV)
+
+
+def _validate_file_size(file_bytes: bytes, filename: str) -> None:
+    """Reject files exceeding MAX_UPLOAD_SIZE_BYTES."""
+    if len(file_bytes) > MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"File '{filename}' exceeds {MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB limit",
+        )
+
+
+def _validate_excel_magic(file_bytes: bytes) -> None:
+    """Verify file is actually XLS/XLSX by checking magic number."""
+    if not (file_bytes[:4] == _XLS_MAGIC or file_bytes[:4] == _XLSX_MAGIC):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "File content does not match Excel format. Ensure it is a valid .xls or .xlsx file.",
+        )
+
+
+def _validate_import_month_strict(month: str) -> None:
+    """Validate YYYY-MM format with valid month (01-12) and reasonable year."""
+    if len(month) != 7 or month[4] != "-":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "import_month must be YYYY-MM format")
+    try:
+        year, mon = int(month[:4]), int(month[5:7])
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "import_month must be YYYY-MM format")
+    if year < 2020 or year > 2035:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "import_month year must be between 2020 and 2035")
+    if mon < 1 or mon > 12:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "import_month month must be between 01 and 12")
+
 router = APIRouter(prefix="/timesheets", tags=["Timesheets"])
 
 
@@ -95,11 +134,11 @@ async def import_timesheet(
     if not file.filename or not (file.filename.endswith(".xls") or file.filename.endswith(".xlsx")):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "File must be .xls or .xlsx")
 
-    # Validate month format
-    if len(import_month) != 7 or import_month[4] != "-":
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "import_month must be YYYY-MM format")
+    _validate_import_month_strict(import_month)
 
     file_bytes = await file.read()
+    _validate_file_size(file_bytes, file.filename)
+    _validate_excel_magic(file_bytes)
     try:
         entries = parse_tempo_xls(file_bytes, import_month)
     except ValueError as e:
@@ -269,6 +308,7 @@ async def import_aws_timesheet(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "week_end must be after week_start")
 
     file_bytes = await file.read()
+    _validate_file_size(file_bytes, file.filename)
     entries = parse_aws_csv(file_bytes, ws, we)
 
     if not entries:

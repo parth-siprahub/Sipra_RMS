@@ -96,7 +96,10 @@ def detect_defaulters(
                 if emp_start_dt > month_start:
                     emp_start = emp_start_dt
             except (ValueError, TypeError):
-                pass
+                logger.warning(
+                    "Invalid start_date '%s' for employee %s — treating as month start",
+                    start_date_str, emp.get("id"),
+                )
 
         # If employee hasn't started yet, skip
         if emp_start > check_date:

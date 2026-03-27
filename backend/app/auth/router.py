@@ -13,7 +13,8 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest):
+@limiter.limit("5/minute")
+async def login(request: Request, body: LoginRequest):
     """Authenticate user via Supabase Auth and return JWT."""
     client = get_supabase_admin()
     loop = asyncio.get_event_loop()
