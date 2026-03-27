@@ -513,8 +513,10 @@ function JiraImportModal({
             toast.success(`Imported ${result.entries_upserted} entries`);
             onSuccess(result);
             onClose();
-        } catch {
-            // handled
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Import failed';
+            toast.error(msg);
+            console.error('Jira import failed:', error);
         } finally {
             setUploading(false);
         }

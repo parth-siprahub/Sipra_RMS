@@ -99,9 +99,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     import traceback
     error_trace = traceback.format_exc()
     logger.error("Unhandled exception: %s\n%s", exc, error_trace)
-    # Write to a specific file just to be double sure
-    with open("critical_error.txt", "a") as f:
-        f.write(f"\n\n--- ERROR {time.ctime()} ---\n{error_trace}")
+    # Structured logging captures errors — no file writing needed in production
     headers = get_cors_headers(request)
     return JSONResponse(
         status_code=500,

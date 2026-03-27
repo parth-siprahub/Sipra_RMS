@@ -28,8 +28,14 @@ class SowCreate(BaseModel):
 
     @model_validator(mode="after")
     def start_before_target(self) -> "SowCreate":
-        if self.start_date and self.target_date and self.start_date >= self.target_date:
-            raise ValueError("Start date must be before target date")
+        if self.start_date and self.target_date and self.start_date > self.target_date:
+            raise ValueError("Start date must be on or before target date")
+        return self
+
+    @model_validator(mode="after")
+    def submitted_after_start(self) -> "SowCreate":
+        if self.submitted_date and self.start_date and self.submitted_date < self.start_date:
+            raise ValueError("Submitted date must be on or after start date")
         return self
 
 
@@ -49,6 +55,18 @@ class SowUpdate(BaseModel):
         if v is not None and v > 100:
             raise ValueError("Max resources cannot exceed 100")
         return v
+
+    @model_validator(mode="after")
+    def start_before_target(self) -> "SowUpdate":
+        if self.start_date and self.target_date and self.start_date > self.target_date:
+            raise ValueError("Start date must be on or before target date")
+        return self
+
+    @model_validator(mode="after")
+    def submitted_after_start(self) -> "SowUpdate":
+        if self.submitted_date and self.start_date and self.submitted_date < self.start_date:
+            raise ValueError("Submitted date must be on or after start date")
+        return self
 
 
 class SowResponse(BaseModel):

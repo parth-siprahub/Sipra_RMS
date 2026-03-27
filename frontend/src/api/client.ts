@@ -1,6 +1,12 @@
 import toast from 'react-hot-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = (() => {
+    const url = import.meta.env.VITE_API_URL;
+    if (!url && import.meta.env.PROD) {
+        throw new Error('VITE_API_URL environment variable is required in production');
+    }
+    return url || 'http://localhost:8000';
+})();
 
 interface RequestOptions extends RequestInit {
     params?: Record<string, string | number | undefined>;
@@ -72,7 +78,13 @@ class ApiClient {
                 let errorMessage = 'An error occurred';
                 try {
                     const errorData = await response.json();
-                    errorMessage = errorData.detail || errorData.message || errorMessage;
+                    if (Array.isArray(errorData.detail)) {
+                        errorMessage = errorData.detail
+                            .map((d: { msg?: string }) => d.msg || 'Validation error')
+                            .join('; ');
+                    } else {
+                        errorMessage = errorData.detail || errorData.message || errorMessage;
+                    }
                 } catch (e) {
                     // Ignore JSON parse error on non-JSON error responses
                 }

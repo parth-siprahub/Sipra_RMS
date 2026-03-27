@@ -6,6 +6,7 @@ import { jobProfileApi, type JobProfile } from '../../api/jobProfiles';
 import { clientsApi, type Client } from '../../api/clients';
 import toast from 'react-hot-toast';
 import { Calendar, Users, Hash, Building2, Briefcase } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 interface SowModalProps {
     isOpen: boolean;
@@ -18,6 +19,7 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
     const [loading, setLoading] = useState(false);
     const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [formData, setFormData] = useState({
         sow_number: '',
         client_name: '',
@@ -172,29 +174,39 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
                     <div>
                         <label className="input-label" htmlFor="start_date">Start Date</label>
                         <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+                            <Calendar
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted cursor-pointer z-10"
+                                size={18}
+                                onClick={() => (document.getElementById('start_date') as HTMLInputElement)?.showPicker?.()}
+                            />
                             <input
                                 id="start_date"
                                 type="date"
-                                className="input-field pl-10"
+                                className={cn('input-field pl-10', errors.start_date && 'input-error')}
                                 value={formData.start_date}
                                 onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
                             />
                         </div>
+                        {errors.start_date && <span className="error-text">{errors.start_date}</span>}
                     </div>
 
                     <div>
                         <label className="input-label" htmlFor="target_date">Target Date</label>
                         <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+                            <Calendar
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted cursor-pointer z-10"
+                                size={18}
+                                onClick={() => (document.getElementById('target_date') as HTMLInputElement)?.showPicker?.()}
+                            />
                             <input
                                 id="target_date"
                                 type="date"
-                                className="input-field pl-10"
+                                className={cn('input-field pl-10', errors.target_date && 'input-error')}
                                 value={formData.target_date}
                                 onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
                             />
                         </div>
+                        {errors.target_date && <span className="error-text">{errors.target_date}</span>}
                     </div>
 
                     <div>
