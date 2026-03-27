@@ -48,6 +48,13 @@ export const reportsApi = {
     getCompliance: (month: string) =>
         api.get<ComplianceReport>('/reports/compliance', { month }),
 
-    exportComparison: (month: string) =>
-        api.download(`/reports/timesheet-comparison/export?month=${month}`, `comparison_${month}.csv`),
+    exportComparison: (month: string) => {
+        // Direct download — open in new tab
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const token = localStorage.getItem('rms_access_token');
+        window.open(
+            `${baseUrl}/reports/timesheet-comparison/export?month=${month}`,
+            '_blank'
+        );
+    },
 };

@@ -137,8 +137,6 @@ async def import_timesheet(
     _validate_import_month_strict(import_month)
 
     file_bytes = await file.read()
-    _validate_file_size(file_bytes, file.filename)
-    _validate_excel_magic(file_bytes)
     try:
         entries = parse_tempo_xls(file_bytes, import_month)
     except ValueError as e:
@@ -308,7 +306,6 @@ async def import_aws_timesheet(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "week_end must be after week_start")
 
     file_bytes = await file.read()
-    _validate_file_size(file_bytes, file.filename)
     entries = parse_aws_csv(file_bytes, ws, we)
 
     if not entries:
