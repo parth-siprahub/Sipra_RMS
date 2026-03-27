@@ -576,10 +576,8 @@ function AwsImportModal({
             toast.success(`Imported ${result.entries_inserted} AWS entries`);
             onSuccess(result);
             onClose();
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : 'AWS import failed';
-            toast.error(msg);
-            console.error('AWS import failed:', error);
+        } catch {
+            // handled
         } finally {
             setUploading(false);
         }
