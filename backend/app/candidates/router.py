@@ -19,6 +19,19 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
 
+
+def _enforce_vendor_isolation(record: dict, current_user: dict) -> None:
+    """Raise 403 if a VENDOR user tries to access another vendor's candidate."""
+    user_role = (current_user.get("role") or "").upper()
+    if user_role == "VENDOR":
+        user_vendor_id = current_user.get("vendor_id")
+        record_vendor_id = record.get("vendor_id")
+        if user_vendor_id and record_vendor_id and str(user_vendor_id) != str(record_vendor_id):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "You do not have permission to access this candidate",
+            )
+
 # Valid status transitions — sequential pipeline enforcement
 # Correct sequence: NEW → SCREENING → L1_SCHEDULED → L1_COMPLETED → L1_SHORTLIST
 # → INTERVIEW_SCHEDULED → SELECTED → WITH_ADMIN → WITH_CLIENT → SUBMITTED_TO_ADMIN → ONBOARDED
@@ -197,6 +210,7 @@ async def get_candidate(candidate_id: int, current_user: dict = Depends(get_curr
     result = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
     if not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found")
+    _enforce_vendor_isolation(result.data, current_user)
     return result.data
 
 
@@ -207,6 +221,12 @@ async def update_candidate(
     current_user: dict = Depends(get_current_user),
 ):
     client = await get_supabase_admin_async()
+    # Vendor isolation: check before allowing update
+    existing = await client.table("candidates").select("id, vendor_id").eq("id", candidate_id).single().execute()
+    if not existing.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found")
+    _enforce_vendor_isolation(existing.data, current_user)
+
     data = payload.model_dump(exclude_none=True, mode="json")
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")

@@ -56,6 +56,35 @@ async def create_sow(
         )
 
 
+@router.get("/capacity", response_model=list[dict])
+async def sow_capacity(current_user: dict = Depends(get_current_user)):
+    """Return onboarded_count per SOW (avoids 3 client-side API calls)."""
+    client = await get_supabase_admin_async()
+    # Get all resource requests with their sow_id
+    rr_result = await client.table("resource_requests").select("id, sow_id").execute()
+    rr_map: dict[int, int] = {}  # rr_id -> sow_id
+    for rr in (rr_result.data or []):
+        if rr.get("sow_id"):
+            rr_map[rr["id"]] = rr["sow_id"]
+
+    # Get all onboarded candidates
+    cand_result = await (
+        client.table("candidates")
+        .select("id, request_id")
+        .eq("status", "ONBOARDED")
+        .execute()
+    )
+
+    # Count onboarded per SOW
+    sow_counts: dict[int, int] = {}
+    for cand in (cand_result.data or []):
+        sow_id = rr_map.get(cand.get("request_id", 0))
+        if sow_id:
+            sow_counts[sow_id] = sow_counts.get(sow_id, 0) + 1
+
+    return [{"sow_id": k, "onboarded_count": v} for k, v in sow_counts.items()]
+
+
 @router.get("/{sow_id}", response_model=SowResponse)
 async def get_sow(sow_id: int, current_user: dict = Depends(get_current_user)):
     client = await get_supabase_admin_async()

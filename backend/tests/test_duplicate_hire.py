@@ -125,7 +125,6 @@ def override_auth():
 
 # ── Tests ──────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_rehire_warning_for_terminated_employee(override_auth):
     """Creating a candidate whose email matches a TERMINATED employee returns rehire_warning."""
     created = make_candidate(id=10, email="jane@example.com")
@@ -160,7 +159,6 @@ async def test_rehire_warning_for_terminated_employee(override_auth):
     assert "previously employed" in body["rehire_warning"]["message"].lower()
 
 
-@pytest.mark.asyncio
 async def test_no_warning_for_active_employee(override_auth):
     """Creating a candidate whose email matches an ACTIVE employee should NOT produce a warning."""
     created = make_candidate(id=11, email="active@example.com")
@@ -187,7 +185,6 @@ async def test_no_warning_for_active_employee(override_auth):
     assert body.get("rehire_warning") is None
 
 
-@pytest.mark.asyncio
 async def test_no_warning_when_no_matching_employee(override_auth):
     """Creating a candidate with no matching employee proceeds normally without warning."""
     created = make_candidate(id=12, email="brand.new@example.com")
@@ -214,7 +211,6 @@ async def test_no_warning_when_no_matching_employee(override_auth):
     assert body.get("rehire_warning") is None
 
 
-@pytest.mark.asyncio
 async def test_rehire_warning_for_exited_employee(override_auth):
     """Creating a candidate whose email matches an EXITED employee returns rehire_warning with details."""
     created = make_candidate(id=13, email="exited@example.com")
@@ -249,7 +245,6 @@ async def test_rehire_warning_for_exited_employee(override_auth):
     assert body["rehire_warning"]["status"] == "EXITED"
 
 
-@pytest.mark.asyncio
 async def test_existing_candidate_dedup_still_returns_409(override_auth):
     """The existing email dedup against candidates table should still return 409."""
     existing = make_candidate(
@@ -274,7 +269,6 @@ async def test_existing_candidate_dedup_still_returns_409(override_auth):
     assert "Duplicate candidate" in resp.json()["detail"]
 
 
-@pytest.mark.asyncio
 async def test_rehire_check_is_case_insensitive(override_auth):
     """Email comparison for rehire check should be case-insensitive (uses ilike)."""
     created = make_candidate(id=14, email="JANE@EXAMPLE.COM")
