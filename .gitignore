@@ -22,6 +22,12 @@ dist/
 .env.local
 .env.*.local
 
+# ─── Local tool secrets (never commit) ───────────────────
+.claude/settings.local.json
+.letta/settings.local.json
+backend/.letta/settings.local.json
+frontend/.letta/settings.local.json
+
 # ─── IDE / Editor ───────────────────────────────────────
 .vscode/
 .idea/
