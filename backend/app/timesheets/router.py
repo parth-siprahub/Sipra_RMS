@@ -324,8 +324,6 @@ async def import_timesheet(
     _validate_import_month_strict(import_month)
 
     file_bytes = await file.read()
-    _validate_file_size(file_bytes, file.filename)
-    _validate_excel_magic(file_bytes)
     try:
         entries = parse_tempo_xls(file_bytes, import_month)
     except ValueError as e:

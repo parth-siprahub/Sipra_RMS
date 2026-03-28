@@ -170,13 +170,7 @@ class ApiClient {
                 let errorMessage = 'Download failed';
                 try {
                     const errorData = await response.json();
-                    if (Array.isArray(errorData.detail)) {
-                        errorMessage = errorData.detail
-                            .map((d: { msg?: string }) => d.msg || 'Validation error')
-                            .join('; ');
-                    } else {
-                        errorMessage = errorData.detail || errorData.message || errorMessage;
-                    }
+                    errorMessage = errorData.detail || errorData.message || errorMessage;
                 } catch {
                     // non-JSON error response
                 }
