@@ -63,3 +63,37 @@ class DefaulterReport(BaseModel):
     critical_count: int
     warning_count: int
     entries: list[DefaulterEntry]
+
+
+# ──────────────────────────────────────────────
+# Computed reports (persisted Jira vs AWS results)
+# ──────────────────────────────────────────────
+
+class ComputedReportRow(BaseModel):
+    id: int | None = None
+    employee_id: int
+    billing_month: str
+    jira_hours: float = 0
+    ooo_days: int = 0
+    aws_hours: float | None = None
+    billable_hours: float | None = None
+    difference: float | None = None
+    difference_pct: float | None = None
+    flag: str = "no_aws"
+    computed_at: str | None = None
+    # Joined
+    rms_name: str | None = None
+    jira_username: str | None = None
+    aws_email: str | None = None
+
+
+class CalculateResult(BaseModel):
+    month: str
+    total_computed: int
+    reports: list[ComputedReportRow]
+
+
+class EmployeeDetail(BaseModel):
+    summary: ComputedReportRow | None = None
+    aws_data: dict | None = None
+    jira_entries: list[dict] = []

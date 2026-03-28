@@ -1,0 +1,307 @@
+
+# 2026-03-16 13:08:17.763155
++y
+
+# 2026-03-16 13:22:34.726802
++n
+
+# 2026-03-16 16:27:24.269028
++d
+
+# 2026-03-16 16:40:51.327177
++# ROLE
++Act as a Principal System Architect with a "Spec-Driven Development" (SDD) obsession. You are reverse-engineering a complex Resource Management System (RMS) to create an immutable Source of Truth.
++
++# CONTEXT
++- Workstation: 16GB RAM (Optimization is critical).
++- Goal: Create a SPEC.md that acts as the "Grand Map" for future surgical AI edits.
++
++# INSTRUCTIONS
++Analyze the codebase and generate `SPEC.md`. You must follow these 5 "Elite" requirements:
++
++1. **Topological Mapping**: Use Mermaid.js `flowchart TD` to map the high-level data flow from the Frontend to the Database.
++2. **Entity-Relationship (ER) Spec**: Generate a Mermaid.js `erDiagram` showing all DB models and their relationships (e.g., User ||--o{ Resource : "allocates").
++3. **Logic Decision Trees**: For the "Resource Allocation" and "Conflict Detection" logic, create a pseudocode "Decision Logic" section that explains the exact `if/else` priority currently in the code.
++4. **Context Anchors**: For every major feature, list the "Critical Path Files" (e.g., "Authentication: `src/auth.ts`, `src/middleware/jwt.js`").
++5. **The "Anomaly Log"**: Create a section titled "## ⚠️ Current Implementation Drift" where you list every place the code deviates from the existing `.agent` best practices.
++
++# FORMATTING
++- Output strictly in Markdown.
++- No conversational filler. 
++- Use `?? [AMBIGUITY]` for any logic you cannot trace with 100% certainty.
++
++# COMMAND
++Extract this into `SPEC.md` now.
+
+# 2026-03-16 16:41:49.013395
++listmodels
+
+# 2026-03-16 16:42:59.458738
++aider --model gemini/gemini-3-flash-preview
+
+# 2026-03-16 16:43:36.513401
++# ROLE
++Act as a Principal System Architect with a "Spec-Driven Development" (SDD) obsession. You are reverse-engineering a complex Resource Management System (RMS) to create an immutable Source of Truth.
++
++# CONTEXT
++- Workstation: 16GB RAM (Optimization is critical).
++- Goal: Create a SPEC.md that acts as the "Grand Map" for future surgical AI edits.
++
++# INSTRUCTIONS
++Analyze the codebase and generate `SPEC.md`. You must follow these 5 "Elite" requirements:
++
++1. **Topological Mapping**: Use Mermaid.js `flowchart TD` to map the high-level data flow from the Frontend to the Database.
++2. **Entity-Relationship (ER) Spec**: Generate a Mermaid.js `erDiagram` showing all DB models and their relationships (e.g., User ||--o{ Resource : "allocates").
++3. **Logic Decision Trees**: For the "Resource Allocation" and "Conflict Detection" logic, create a pseudocode "Decision Logic" section that explains the exact `if/else` priority currently in the code.
++4. **Context Anchors**: For every major feature, list the "Critical Path Files" (e.g., "Authentication: `src/auth.ts`, `src/middleware/jwt.js`").
++5. **The "Anomaly Log"**: Create a section titled "## ⚠️ Current Implementation Drift" where you list every place the code deviates from the existing `.agent` best practices.
++
++# FORMATTING
++- Output strictly in Markdown.
++- No conversational filler. 
++- Use `?? [AMBIGUITY]` for any logic you cannot trace with 100% certainty.
++
++# COMMAND
++Extract this into `SPEC.md` now.
+
+# 2026-03-16 16:45:34.236514
++y
+
+# 2026-03-16 16:45:47.672616
++s
+
+# 2026-03-16 16:46:13.883101
++a
+
+# 2026-03-16 16:46:50.619525
++y
+
+# 2026-03-16 16:52:24.476410
++verify whether all necessary files from D:/RMS_Siprahub have been accounted for while creating SPEC.md . WHatever has been missed out MUST be accounted for. I think I didn't accept some things when asked for permission when aider was generating the previous output. 
+
+# 2026-03-16 16:54:30.369202
++a
+
+# 2026-03-16 20:00:21.563123
++# ROLE
++Act as a Senior AI Integration Architect. Your mission is to synchronize the Project's "Source of Truth" with newly received Managerial Requirements and Functional Bug Reports.
++
++# CONTEXT
++- We have an existing `SPEC.md` that defines the current state.
++- We have a Meeting Transcript that defines the "Future State" and "Managerial Constraints."
++- We have a Manual Issue List that defines the "Broken State."
++
++# INPUT FILES
++- TRANSCRIPT_PATH: "D:\RMS_Siprahub\Rms specifications.md"
++- ISSUE_LIST: 
++---
++When I try to make a sow I'm getting internal server error. The fields start and target date must be allowed to take date as input when creating SOW but not submitted date. Submitted date should take input only while editing SOW not creating.
++Resume upload not working. I think there's no column for it in supabase
++exactly 10 digit requirement for mobile number
++Redundant headings on pages Job profiles Job profiles, Statements of work statements of work. UI inconsistencies redundant components must be removed. 
++Notification button does nothing so remove.
++New SOW option should not be visible when checking inactive SOWs. Same with Job profile. If user is viewing inactive items there is no need for new option to be visible. New option MUST be present when user viewing active sows and Job profiles. 
++Dashboard metrics validation. Is it showing the data in the right manner and such. Sort by time option in metrics. All basic functionalities that MUST be present in the existing graphs need to be added. 
++in kanaban view the line keeps getting longer and the page becomes longer when there are more resources on the same kanaban table. maybe a fixed length with scroll bar would be better.
++JD file attachment not working. 
++Can't delete Job profile.
++
++---
++
++# TASK
++1. **RE-INDEX**: Read the provided transcript and the issue list. 
++2. **GAP ANALYSIS**: Identify where the current `SPEC.md` is missing features discussed in the transcript (e.g., Employee Billing, Jira Integration).
++3. **UPDATE SPEC.md**: Update the `SPEC.md` to include these new requirements as "Upcoming Features" so they are part of the project's long-term memory.
++4. **CREATE IMPLEMENTATION_PLAN.md**: Create a surgical plan to resolve the "Manual Issue List."
++   - Group issues by "Critical Path Files."
++   - Order them from "Foundation Fixes" to "UI Refinements."
++   - For each fix, cross-reference the `SPEC.md` to ensure no regressions.
++
++# OUTPUT
++- Modified `SPEC.md`
++- New `IMPLEMENTATION_PLAN.md`
++- Other required files based on meeting transcript.
++
++
++# CONSTRAINTS
++- Maintain high-density, simple English.
++- Use Mermaid diagrams if the data flow for the new "Employee Table" needs visualization.
++- Be surgically specific about file paths.
+
+# 2026-03-16 20:00:59.231831
++a
+
+# 2026-03-16 20:02:26.435196
++y
+
+# 2026-03-16 20:29:51.287548
++create a list of key items based on "D:\RMS_Siprahub\Rms specifications.md" and also create new list of jira items based on existing C:\Users\parth\.gemini\antigravity\brain\3d673239-79ca-4be3-b6bc-2074265ad5b0\jira_items_extract.md
+
+# 2026-03-16 20:31:12.008722
++access granted 
+
+# 2026-03-16 20:34:48.474750
++"D:\RMS_Siprahub\jira_items_extract.md" and "D:\RMS_Siprahub\Rms specifications.md" please read the files. If I paste the contents then the chat will get too long. 
+
+# 2026-03-16 20:36:03.533935
++D:\RMS_Siprahub\jira_items_extract.md "D:\RMS_Siprahub\Rms specifications.md"
+
+# 2026-03-16 20:38:41.610039
++/add "D:\RMS_Siprahub\jira_items_extract.md"
+
+# 2026-03-16 20:38:52.187905
++/add "D:\RMS_Siprahub\Rms specifications.md"
+
+# 2026-03-16 20:40:09.908613
++now  create:
++
++  KEY_REQUIREMENTS.md based on Rms specifications.md.
++  JIRA_BACKLOG.md based on jira_items_extract.md.
+
+# 2026-03-16 20:40:58.180748
++y
+
+# 2026-03-16 20:47:16.233055
++n
+
+# 2026-03-16 20:48:55.389834
++you got stuck here just a min ago-- > now  create:
++>
++>   KEY_REQUIREMENTS.md based on Rms specifications.md.
++>   JIRA_BACKLOG.md based on jira_items_extract.md.
++
++
++KEY_REQUIREMENTS.md
++<<<<<<< SEARCH
++=======
++# KEY REQUIREMENTS (Extracted from RMS Specifications Transcript)
++
++## 1. Job Profiles & SOW
++- **JD Handling**: Support for large text fields (20+ lines/Word docs). JD file attachment must not break.
++- **SOW Masters**: Client Name must be a dropdown sourced from a Master table (e.g., DCLI, Internal).
++- **SOW-Profile Linking**: SOW is 1:1 with a Job Profile. Resource Requests against an SOW should auto-populate the Job
++Profile.
++
++## 2. Resource Requests & Candidates
++- **Unique Identification**: Use email/phone to detect existing candidates and fetch historical details/remarks to
++prevent redundant/rejected profile submissions.
++- **Request Granularity**: SOW to Resource Request is 1:Many. Each position in an SOW should have its own Resource
++Request ID for individual tracking/priority.
++- **Backfill Workflow**: Dedicated checkbox for backfill requests to track replacements against existing SOWs.
++
++## 3. Employee & Billing (Phase 2 Focus)
++- **Employee Table**: Create a separate `employees` table to transition candidates from "Onboarded" status.
++- **Billing Categories**: Distinguish between billable and non-billable resources.
++- **Jira Integration (Tempo)**:
++    - Import monthly timesheet data (Excel dump).
++    - Cap billing at 8 hours/day or 40 hours/week, even if more is logged.
++    - Identify "Out of Office" (OOO) and unlogged time; these are non-billable.
++    - Match Jira records using a mapper (Names/Emails) between client systems and the RMS.
++- **Cross-Verification**: Compare Jira hours with AWS Workspace hours and GitHub check-in frequency to validate
++performance and billing compliance.
++
++## 4. UI/UX Improvements
++- **Kanban Pipeline**: Swapping "With Client" and "Submitted" to match reality. Ensure "Onboarded" is the terminal stage
++that triggers employee creation.
++- **Dashboards**:
++    - Metrics for resources by role/client.
++    - Tracking of people who haven't filled timesheets.
++    - Analysis of Jira vs. AWS hours.
++>>>>>>> REPLACE
++
++
++
++JIRA_BACKLOG.md
++<<<<<<< SEARCH
++=======
++# JIRA BACKLOG (Extracted from Project History)
++
++## Epic 1: Authentication & RBAC
++- **AUTH-001**: User Login (Supabase Auth) ✅
++- **AUTH-002**: Role-Based Access Control (ADMIN, RECRUITER, MANAGEMENT) ✅
++- **AUTH-003**: Permission-Based Feature Gating ✅
++
++## Epic 2: Dashboard & Metrics
++- **DASH-001**: Total Requests Metric ✅
++- **DASH-008**: Attrition Rate Trend (Exits over time) ✅
++- **DASH-009**: Avg Time to Onboard ✅
++- **F-078**: Dashboard Overhaul (Hiring Funnel, Vendor Charts) ✅
++
++## Epic 3: Job Profile Management
++- **JOBPROF-001**: CRUD operations for profiles ✅
++- **F-077**: Rich text JD and file upload support ✅
++
++## Epic 4: Resource Request Workflow
++- **REQUEST-001**: Create Request with auto-generated ID ✅
++- **REQUEST-007**: Multi-criteria filtering ✅
++
++## Epic 5: Recruiter Pipeline
++- **PIPELINE-001**: Add Candidate (21-field form) ✅
++- **PIPELINE-010**: Resume Upload to Supabase ✅
++- **F-074**: Kanban View with Drag-and-Drop ✅
++- **F-079**: Source field and back-out statuses ✅
++
++## Epic 7: Lifecycle Management
++- **ONBOARD-001**: Mark Onboarded with billing start date ✅
++- **ONBOARD-007**: Auto-Create Backfill on client rejection ✅
++- **EXIT-001**: Capture exit reason and last working day ✅
++- **SOW-001**: Manual SOW entry (Admin) ✅
++- **F-076**: Target/Submitted dates and JobProfile linking ✅
++
++## Phase 2: Planned Items (Backlog)
+
+# 2026-03-16 20:49:02.026744
++a
+
+# 2026-03-16 20:49:28.044938
++y
+
+# 2026-03-16 20:56:27.930226
++is the KEY_REQUIREMENTS.md and JIRA_BACKLOG.md perfectly updated based on Rms specification.md?? I need to send it to my managers for approval. Make it perfect please. 
+
+# 2026-03-16 20:58:07.304419
++aider --model gemini/gemini-3.1-pro-preview --architect
+
+# 2026-03-16 20:59:15.801633
++/model gemini/gemini-3.1-pro-preview
+
+# 2026-03-16 20:59:42.445126
++# MISSION
++I need to send `KEY_REQUIREMENTS.md` and `JIRA_BACKLOG.md` to my managers for immediate approval. They must be perfect.
++
++# INSTRUCTIONS
++1. **SYNC**: Read the latest `Rms specification.md` and `jira_items_extract.md`.
++2. **POLISH**: Ensure `KEY_REQUIREMENTS.md` follows a professional "High-Level Feature -> Functional Requirement" hierarchy. 
++3. **VALIDATE**: Cross-reference the `JIRA_BACKLOG.md` with the transcript requirements. If anything discussed in the meeting is missing from the backlog, add it now with a [NEW] tag.
++4. **FORMAT**: Use professional Markdown tables for the backlog, including "Priority" and "Category" columns.
++
++# OUTPUT
++Update both files to their final, "Elite" versions.
+
+# 2026-03-16 21:01:44.168367
++ /model gemini/gemini-3-flash
+
+# 2026-03-16 21:02:43.240152
++/model gemini/gemini-3-flash-preview
+
+# 2026-03-16 21:03:02.720852
++# MISSION
++I need to send `KEY_REQUIREMENTS.md` and `JIRA_BACKLOG.md` to my managers for immediate approval. They must be perfect.
++
++# INSTRUCTIONS
++1. **SYNC**: Read the latest `Rms specification.md` and `jira_items_extract.md`.
++2. **POLISH**: Ensure `KEY_REQUIREMENTS.md` follows a professional "High-Level Feature -> Functional Requirement" hierarchy. 
++3. **VALIDATE**: Cross-reference the `JIRA_BACKLOG.md` with the transcript requirements. If anything discussed in the meeting is missing from the backlog, add it now with a [NEW] tag.
++4. **FORMAT**: Use professional Markdown tables for the backlog, including "Priority" and "Category" columns.
++
++# OUTPUT
++Update both files to their final, "Elite" versions.
+
+# 2026-03-16 21:09:27.532178
++continue
+
+# 2026-03-17 14:32:08.252318
++update IMPLEMENTATION_PLAN.md based on D:\RMS_Siprahub\KEY_REQUIREMENTS_v2.md  and D:\RMS_Siprahub\Rms specifications.md
+
+# 2026-03-17 14:32:33.766261
++y

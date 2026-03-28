@@ -1,7 +1,8 @@
 """Authentication dependencies — async-first, with user profile caching."""
+import asyncio
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from app.database import get_supabase_admin_async
+from app.database import get_supabase_admin, get_supabase_admin_async
 from app.utils.cache import SimpleCache
 import logging
 
@@ -21,14 +22,21 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # Verify token with Supabase Auth first
-    client = await get_supabase_admin_async()
+    # Verify token with Supabase Auth using sync client (reliable in long-running app)
+    sync_client = get_supabase_admin()
+    loop = asyncio.get_event_loop()
     try:
-        auth_response = await client.auth.get_user(token)
+        auth_response = await loop.run_in_executor(
+            None, lambda: sync_client.auth.get_user(token)
+        )
         if not auth_response or not auth_response.user:
+            logger.error("Auth: get_user returned no user")
             raise credentials_exception
         user_id = str(auth_response.user.id)
-    except Exception:
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Auth: get_user failed: %s: %s", type(e).__name__, str(e)[:200])
         raise credentials_exception
 
     # Check memory cache by user_id (not token) to avoid stale role data
@@ -36,11 +44,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     if cached_user:
         return cached_user
 
-    # Fetch full profile from DB
+    # Fetch full profile from DB (async client is fine for DB queries)
+    async_client = await get_supabase_admin_async()
     try:
         result = (
-            await client.table("profiles")
-            .select("id, email, role, full_name, vendor_id")
+            await async_client.table("profiles")
+            .select("id, email, role, full_name")
             .eq("id", user_id)
             .single()
             .execute()

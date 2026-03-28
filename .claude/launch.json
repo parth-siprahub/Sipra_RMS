@@ -4,7 +4,7 @@
     {
       "name": "Backend (FastAPI)",
       "runtimeExecutable": "D:\\RMS_Siprahub\\backend\\venv\\Scripts\\python.exe",
-      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--reload", "--port", "8000"],
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
       "port": 8000,
       "cwd": "D:\\RMS_Siprahub\\backend"
     },

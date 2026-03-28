@@ -35,6 +35,7 @@ from app.clients.router import router as clients_router
 from app.exports.router import router as exports_router
 from app.audit.router import router as audit_router
 from app.reports.router import router as reports_router
+from app.billing_config.router import router as billing_config_router
 
 # Set up structured JSON logging (replaces basicConfig)
 setup_logging()
@@ -183,6 +184,7 @@ app.include_router(clients_router)
 app.include_router(exports_router)
 app.include_router(audit_router)
 app.include_router(reports_router)
+app.include_router(billing_config_router)
 
 
 # ─── Health ───────────────────────────────────────────────────────────────────

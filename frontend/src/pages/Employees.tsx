@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { employeesApi, type Employee, type EmployeeUpdate } from '../api/employees';
+import { clientsApi, type Client } from '../api/clients';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { StatusBadge } from '../components/ui/StatusBadge';
@@ -38,6 +39,10 @@ function EditEmployeeModal({
         jira_username: employee.jira_username || '',
     });
     const [submitting, setSubmitting] = useState(false);
+    const [clients, setClients] = useState<Client[]>([]);
+    useEffect(() => {
+        clientsApi.list().then(setClients).catch(() => {});
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -70,7 +75,16 @@ function EditEmployeeModal({
                 </div>
                 <div>
                     <label className="input-label">Client Name</label>
-                    <input className="input-field" value={form.client_name || ''} onChange={e => setForm(p => ({ ...p, client_name: e.target.value }))} placeholder="e.g. Aamir Bashir" />
+                    <select
+                        className="input-field"
+                        value={form.client_name || ''}
+                        onChange={e => setForm(p => ({ ...p, client_name: e.target.value }))}
+                    >
+                        <option value="">Select client...</option>
+                        {clients.map(c => (
+                            <option key={c.id} value={c.client_name}>{c.client_name}</option>
+                        ))}
+                    </select>
                 </div>
                 <div>
                     <label className="input-label">AWS Email</label>
@@ -207,7 +221,9 @@ export function Employees() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-sm text-text">{emp.client_name || '—'}</td>
+                                        <td className="px-6 py-4 text-sm text-text">
+                                            {emp.client_name ? emp.client_name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') : '—'}
+                                        </td>
                                         <td className="px-6 py-4">
                                             <div className="space-y-1 text-xs">
                                                 <div className="flex items-center gap-1.5">

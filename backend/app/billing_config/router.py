@@ -1,0 +1,80 @@
+"""Billing configuration CRUD — configurable billable hours per client/month."""
+import logging
+from fastapi import APIRouter, HTTPException, Query
+from app.database import get_supabase_admin_async
+from app.billing_config.schemas import BillingConfigCreate, BillingConfigResponse
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/billing-config", tags=["Billing Config"])
+
+
+@router.get("/", response_model=list[BillingConfigResponse])
+async def list_billing_configs(
+    month: str | None = Query(None, description="Filter by YYYY-MM"),
+    client_name: str | None = Query(None),
+):
+    """List billing configurations, optionally filtered by month/client."""
+    client = await get_supabase_admin_async()
+    query = client.table("billing_config").select("*").order("billing_month", desc=True)
+    if month:
+        query = query.eq("billing_month", month)
+    if client_name:
+        query = query.eq("client_name", client_name)
+    result = await query.execute()
+    return result.data
+
+
+@router.get("/{config_id}", response_model=BillingConfigResponse)
+async def get_billing_config(config_id: int):
+    """Get a single billing config by ID."""
+    client = await get_supabase_admin_async()
+    result = await client.table("billing_config").select("*").eq("id", config_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Billing config not found")
+    return result.data[0]
+
+
+@router.post("/", response_model=BillingConfigResponse, status_code=201)
+async def upsert_billing_config(payload: BillingConfigCreate):
+    """Create or update billing config (upsert on client_name + billing_month)."""
+    client = await get_supabase_admin_async()
+
+    # Check if exists
+    existing = await (
+        client.table("billing_config")
+        .select("id")
+        .eq("client_name", payload.client_name)
+        .eq("billing_month", payload.billing_month)
+        .execute()
+    )
+
+    data = payload.model_dump()
+
+    if existing.data:
+        # Update
+        config_id = existing.data[0]["id"]
+        data["updated_at"] = "now()"
+        result = await (
+            client.table("billing_config")
+            .update(data)
+            .eq("id", config_id)
+            .execute()
+        )
+        logger.info("Updated billing config %d for %s/%s", config_id, payload.client_name, payload.billing_month)
+    else:
+        # Insert
+        result = await client.table("billing_config").insert(data).execute()
+        logger.info("Created billing config for %s/%s", payload.client_name, payload.billing_month)
+
+    return result.data[0]
+
+
+@router.delete("/{config_id}", status_code=204)
+async def delete_billing_config(config_id: int):
+    """Delete a billing config."""
+    client = await get_supabase_admin_async()
+    existing = await client.table("billing_config").select("id").eq("id", config_id).execute()
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Billing config not found")
+    await client.table("billing_config").delete().eq("id", config_id).execute()
+    logger.info("Deleted billing config %d", config_id)

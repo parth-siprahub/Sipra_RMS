@@ -16,6 +16,9 @@ from app.reports.schemas import (
     ComplianceEntry,
     ComplianceReport,
     DefaulterReport,
+    ComputedReportRow,
+    CalculateResult,
+    EmployeeDetail,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,29 +53,36 @@ async def get_timesheet_comparison(
     emp_ids = [e["id"] for e in employees]
     emp_map = {e["id"]: e for e in employees}
 
-    # Fetch Jira timesheet logs for the month
-    jira_raw = await client.table("timesheet_logs").select("*").eq("import_month", month).execute()
-    jira_entries = jira_raw.data or []
+    # Fetch Jira data from jira_timesheet_raw (new table mirroring Excel)
+    jira_all: list = []
+    chunk_off = 0
+    while True:
+        batch = await (
+            client.table("jira_timesheet_raw")
+            .select("*")
+            .eq("billing_month", month)
+            .range(chunk_off, chunk_off + 999)
+            .execute()
+        )
+        jira_all.extend(batch.data or [])
+        if len(batch.data or []) < 1000:
+            break
+        chunk_off += 1000
+    jira_entries = jira_all
 
-    # Group Jira entries by employee
+    # Group Jira entries by employee — sum logged hours from non-summary rows
     jira_by_emp: dict[int, list] = defaultdict(list)
     for entry in jira_entries:
-        if entry["employee_id"] in emp_map:
-            jira_by_emp[entry["employee_id"]].append(entry)
+        eid = entry.get("employee_id")
+        if eid and eid in emp_map:
+            jira_by_emp[eid].append(entry)
 
-    # Fetch AWS data for weeks overlapping this month
-    year, mo = int(month[:4]), int(month[5:7])
-    month_start = f"{year}-{mo:02d}-01"
-    if mo == 12:
-        month_end = f"{year + 1}-01-01"
-    else:
-        month_end = f"{year}-{mo + 1:02d}-01"
-
+    # Fetch AWS data from aws_timesheet_logs_v2 (monthly per-employee)
     aws_raw = (
-        await client.table("aws_timesheet_logs")
+        await client.table("aws_timesheet_logs_v2")
         .select("*")
-        .gte("week_start", month_start)
-        .lt("week_start", month_end)
+        .eq("billing_month", month)
+        .range(0, 999)
         .execute()
     )
     aws_entries = aws_raw.data or []
@@ -93,32 +103,39 @@ async def get_timesheet_comparison(
         jira_logs = jira_by_emp.get(emp_id, [])
         aws_logs = aws_by_emp.get(emp_id, [])
 
-        # Jira calculations
-        ooo_days = sum(1 for e in jira_logs if e.get("is_ooo"))
-        total_hours = sum(e.get("hours_logged", 0) for e in jira_logs)
+        # Jira calculations (jira_timesheet_raw schema: logged, day_01..day_31, is_ooo, is_summary_row)
+        # Get total from summary row's logged field
+        summary_rows = [e for e in jira_logs if e.get("is_summary_row")]
+        issue_rows = [e for e in jira_logs if not e.get("is_summary_row") and not e.get("is_ooo")]
+        ooo_rows = [e for e in jira_logs if e.get("is_ooo")]
 
-        # Apply daily cap (already applied in parser, but verify)
-        daily_sums: dict[str, float] = defaultdict(float)
-        for e in jira_logs:
-            if not e.get("is_ooo"):
-                daily_sums[e["log_date"]] += e.get("hours_logged", 0)
+        # Total hours from summary row, or sum of issue rows' logged
+        total_hours = 0.0
+        if summary_rows:
+            total_hours = float(summary_rows[0].get("logged") or 0)
+        else:
+            total_hours = sum(float(e.get("logged") or 0) for e in issue_rows)
 
-        capped_hours = sum(min(h, DAILY_CAP) for h in daily_sums.values())
+        # OOO days: count non-zero day columns in OOO rows
+        ooo_days = 0
+        for ooo in ooo_rows:
+            for d in range(1, 32):
+                val = ooo.get(f"day_{d:02d}")
+                if val is not None and float(val) > 0:
+                    ooo_days += 1
 
-        # Apply weekly cap: daily-cap each day first, then sum per week
-        weekly_sums: dict[int, float] = defaultdict(float)
-        for log_date_str, hours in daily_sums.items():
-            try:
-                d = date.fromisoformat(log_date_str)
-                week_num = d.isocalendar()[1]
-                weekly_sums[week_num] += min(hours, DAILY_CAP)
-            except ValueError:
-                pass
+        # Billable = total hours (already capped per Excel source)
+        billable_hours = total_hours
 
-        billable_hours = sum(min(h, WEEKLY_CAP) for h in weekly_sums.values())
-
-        # AWS calculations
-        aws_total = sum(e.get("work_time_hours", 0) for e in aws_logs) if aws_logs else None
+        # AWS calculations (aws_timesheet_logs_v2: work_time_secs or work_time_hours)
+        aws_total = None
+        if aws_logs:
+            entry = aws_logs[0]  # One row per employee per month
+            secs = entry.get("work_time_secs")
+            if secs is not None:
+                aws_total = round(float(secs) / 3600.0, 2)
+            elif entry.get("work_time_hours") is not None:
+                aws_total = round(float(entry["work_time_hours"]), 2)
 
         # Difference and flag
         difference = None
@@ -130,15 +147,13 @@ async def get_timesheet_comparison(
         if aws_logs:
             employees_with_aws += 1
 
-        any_week_low = any(e.get("is_below_threshold") for e in aws_logs) if aws_logs else False
-
         if aws_total is not None and billable_hours > 0:
             difference = round(billable_hours - aws_total, 2)
             difference_pct = round((difference / billable_hours) * 100, 1) if billable_hours else 0
 
         flag = classify_flag(
             difference_pct=difference_pct,
-            any_week_low=any_week_low,
+            any_week_low=False,  # v2 is monthly, no weekly threshold
             has_aws_data=aws_total is not None,
             billable_hours=billable_hours,
         )
@@ -149,7 +164,7 @@ async def get_timesheet_comparison(
             jira_username=emp.get("jira_username"),
             aws_email=emp.get("aws_email"),
             jira_total_hours=round(total_hours, 2),
-            jira_capped_hours=round(capped_hours, 2),
+            jira_capped_hours=round(billable_hours, 2),
             jira_ooo_days=ooo_days,
             jira_billable_hours=round(billable_hours, 2),
             aws_total_hours=round(aws_total, 2) if aws_total is not None else None,
@@ -183,29 +198,66 @@ async def get_compliance_report(
     employees_raw = await client.table("employees").select("*").eq("status", "ACTIVE").execute()
     employees = employees_raw.data or []
 
-    jira_raw = await client.table("timesheet_logs").select("*").eq("import_month", month).execute()
-    jira_entries = jira_raw.data or []
+    # Fetch from jira_timesheet_raw (new table) with pagination
+    jira_all: list = []
+    chunk_off = 0
+    while True:
+        batch = await (
+            client.table("jira_timesheet_raw")
+            .select("*")
+            .eq("billing_month", month)
+            .range(chunk_off, chunk_off + 999)
+            .execute()
+        )
+        jira_all.extend(batch.data or [])
+        if len(batch.data or []) < 1000:
+            break
+        chunk_off += 1000
+    jira_entries = jira_all
 
     # Group by employee
     jira_by_emp: dict[int, list] = defaultdict(list)
     for entry in jira_entries:
-        jira_by_emp[entry["employee_id"]].append(entry)
+        eid = entry.get("employee_id")
+        if eid:
+            jira_by_emp[eid].append(entry)
+
+    # Try to get working_days from billing_config
+    config_res = await client.table("billing_config").select("working_days").eq("billing_month", month).limit(1).execute()
+    working_days_estimate = config_res.data[0]["working_days"] if config_res.data else 22
 
     entries: list[ComplianceEntry] = []
     complete = 0
     partial = 0
     missing = 0
 
-    # Estimate working days in the month (~22 for most months)
     year, mo = int(month[:4]), int(month[5:7])
-    working_days_estimate = 22
 
     for emp in employees:
         emp_id = emp["id"]
         logs = jira_by_emp.get(emp_id, [])
-        days_logged = len([l for l in logs if not l.get("is_ooo") and l.get("hours_logged", 0) > 0])
-        total_hours = sum(l.get("hours_logged", 0) for l in logs)
-        ooo_days = sum(1 for l in logs if l.get("is_ooo"))
+
+        # Count days with logged hours from non-summary, non-OOO rows
+        issue_rows = [l for l in logs if not l.get("is_summary_row") and not l.get("is_ooo")]
+        days_with_hours: set[int] = set()
+        for row in issue_rows:
+            for d in range(1, 32):
+                val = row.get(f"day_{d:02d}")
+                if val is not None and float(val) > 0:
+                    days_with_hours.add(d)
+        days_logged = len(days_with_hours)
+
+        # Total hours from summary row
+        summary = [l for l in logs if l.get("is_summary_row")]
+        total_hours = float(summary[0].get("logged") or 0) if summary else sum(float(r.get("logged") or 0) for r in issue_rows)
+
+        # OOO days
+        ooo_days = 0
+        for ooo in [l for l in logs if l.get("is_ooo")]:
+            for d in range(1, 32):
+                val = ooo.get(f"day_{d:02d}")
+                if val is not None and float(val) > 0:
+                    ooo_days += 1
 
         if days_logged == 0 and ooo_days == 0:
             status_val = "missing"
@@ -309,4 +361,289 @@ async def get_defaulters(
         critical_count=critical_count,
         warning_count=warning_count,
         entries=entries,
+    )
+
+
+# ──────────────────────────────────────────────
+# Computed reports — Phase 5
+# ──────────────────────────────────────────────
+
+@router.post("/calculate/{billing_month}", response_model=CalculateResult)
+async def calculate_billing(
+    billing_month: str,
+    current_user: dict = Depends(require_admin),
+):
+    """
+    Calculate and persist Jira vs AWS comparison for all active employees.
+    Reads from jira_timesheet_raw + aws_timesheet_logs_v2 + billing_config.
+    Stores results in computed_reports (upsert per month).
+    """
+    import re
+    if not re.match(r"^\d{4}-(0[1-9]|1[0-2])$", billing_month):
+        raise HTTPException(status_code=400, detail="billing_month must be YYYY-MM")
+
+    client = await get_supabase_admin_async()
+
+    # 1. Validate billing config exists
+    config_res = await (
+        client.table("billing_config")
+        .select("*")
+        .eq("billing_month", billing_month)
+        .limit(1)
+        .execute()
+    )
+    if not config_res.data:
+        raise HTTPException(status_code=400, detail=f"No billing config for {billing_month}. Configure billable hours first.")
+    config = config_res.data[0]
+    target_billable = float(config["billable_hours"])
+
+    # 2. Fetch active employees
+    emp_res = await client.table("employees").select("*").eq("status", "ACTIVE").execute()
+    employees = emp_res.data or []
+    if not employees:
+        raise HTTPException(status_code=400, detail="No active employees found")
+    emp_map = {e["id"]: e for e in employees}
+
+    # 3. Fetch Jira raw data for this month (paginated to avoid 1000-row limit)
+    jira_entries: list = []
+    chunk_off = 0
+    while True:
+        batch = await (
+            client.table("jira_timesheet_raw")
+            .select("*")
+            .eq("billing_month", billing_month)
+            .range(chunk_off, chunk_off + 999)
+            .execute()
+        )
+        jira_entries.extend(batch.data or [])
+        if len(batch.data or []) < 1000:
+            break
+        chunk_off += 1000
+
+    # Group Jira by employee — sum logged hours from non-summary, non-OOO rows
+    jira_by_emp: dict[int, dict] = {}  # emp_id -> {hours, ooo_days}
+    for entry in jira_entries:
+        eid = entry.get("employee_id")
+        if not eid or eid not in emp_map:
+            continue
+        if eid not in jira_by_emp:
+            jira_by_emp[eid] = {"hours": 0.0, "ooo_days": 0}
+        if entry.get("is_ooo"):
+            # Count OOO days: sum non-null day columns
+            for d in range(1, 32):
+                val = entry.get(f"day_{d:02d}")
+                if val is not None and float(val) > 0:
+                    jira_by_emp[eid]["ooo_days"] += 1
+        elif not entry.get("is_summary_row"):
+            logged = float(entry.get("logged") or 0)
+            jira_by_emp[eid]["hours"] += logged
+
+    # 4. Fetch AWS v2 data for this month
+    aws_res = await (
+        client.table("aws_timesheet_logs_v2")
+        .select("*")
+        .eq("billing_month", billing_month)
+        .range(0, 999)
+        .execute()
+    )
+    aws_entries = aws_res.data or []
+    aws_by_emp: dict[int, dict] = {}
+    for entry in aws_entries:
+        eid = entry.get("employee_id")
+        if eid and eid in emp_map:
+            aws_by_emp[eid] = entry
+
+    # 5. Compute per employee
+    reports: list[dict] = []
+    for emp in employees:
+        eid = emp["id"]
+        jira_data = jira_by_emp.get(eid, {"hours": 0.0, "ooo_days": 0})
+        jira_hours = round(jira_data["hours"], 2)
+        ooo_days = jira_data["ooo_days"]
+
+        aws_entry = aws_by_emp.get(eid)
+        aws_hours = None
+        if aws_entry:
+            aws_hours = round(float(aws_entry.get("work_time_secs", 0)) / 3600.0, 2)
+
+        difference = None
+        difference_pct = None
+        flag = "no_aws"
+
+        if aws_hours is not None and target_billable > 0:
+            difference = round(jira_hours - aws_hours, 2)
+            difference_pct = round((difference / target_billable) * 100, 1)
+
+        flag = classify_flag(
+            difference_pct=difference_pct,
+            any_week_low=False,  # v2 is monthly, no weekly threshold
+            has_aws_data=aws_hours is not None,
+            billable_hours=jira_hours,
+        )
+
+        reports.append({
+            "employee_id": eid,
+            "billing_month": billing_month,
+            "jira_hours": jira_hours,
+            "ooo_days": ooo_days,
+            "aws_hours": aws_hours,
+            "billable_hours": target_billable,
+            "difference": difference,
+            "difference_pct": difference_pct,
+            "flag": flag,
+        })
+
+    # 6. Upsert into computed_reports: delete existing, then insert
+    await (
+        client.table("computed_reports")
+        .delete()
+        .eq("billing_month", billing_month)
+        .execute()
+    )
+
+    if reports:
+        await client.table("computed_reports").insert(reports).execute()
+
+    # 7. Return with joined employee names
+    result_rows: list[ComputedReportRow] = []
+    for r in reports:
+        emp = emp_map.get(r["employee_id"], {})
+        result_rows.append(ComputedReportRow(
+            employee_id=r["employee_id"],
+            billing_month=billing_month,
+            jira_hours=r["jira_hours"],
+            ooo_days=r["ooo_days"],
+            aws_hours=r["aws_hours"],
+            billable_hours=r["billable_hours"],
+            difference=r["difference"],
+            difference_pct=r["difference_pct"],
+            flag=r["flag"],
+            rms_name=emp.get("rms_name"),
+            jira_username=emp.get("jira_username"),
+            aws_email=emp.get("aws_email"),
+        ))
+
+    # Sort: red first, then amber, then green, then no_aws
+    flag_order = {"red": 0, "amber": 1, "green": 2, "no_aws": 3}
+    result_rows.sort(key=lambda r: (flag_order.get(r.flag, 4), r.rms_name or ""))
+
+    logger.info("Computed %d reports for %s", len(result_rows), billing_month)
+    return CalculateResult(month=billing_month, total_computed=len(result_rows), reports=result_rows)
+
+
+@router.get("/computed", response_model=list[ComputedReportRow])
+async def get_computed_reports(
+    month: str = Query(..., description="YYYY-MM format", pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get persisted computed reports for a month, joined with employee names."""
+    client = await get_supabase_admin_async()
+
+    res = await (
+        client.table("computed_reports")
+        .select("*")
+        .eq("billing_month", month)
+        .execute()
+    )
+    rows = res.data or []
+    if not rows:
+        return []
+
+    # Join employee names
+    emp_ids = list({r["employee_id"] for r in rows})
+    emp_res = await client.table("employees").select("id, rms_name, jira_username, aws_email").in_("id", emp_ids).execute()
+    emp_map = {e["id"]: e for e in (emp_res.data or [])}
+
+    result = []
+    for r in rows:
+        emp = emp_map.get(r["employee_id"], {})
+        result.append(ComputedReportRow(
+            id=r.get("id"),
+            employee_id=r["employee_id"],
+            billing_month=r["billing_month"],
+            jira_hours=float(r.get("jira_hours") or 0),
+            ooo_days=r.get("ooo_days", 0),
+            aws_hours=float(r["aws_hours"]) if r.get("aws_hours") is not None else None,
+            billable_hours=float(r["billable_hours"]) if r.get("billable_hours") is not None else None,
+            difference=float(r["difference"]) if r.get("difference") is not None else None,
+            difference_pct=float(r["difference_pct"]) if r.get("difference_pct") is not None else None,
+            flag=r.get("flag", "no_aws"),
+            computed_at=r.get("computed_at"),
+            rms_name=emp.get("rms_name"),
+            jira_username=emp.get("jira_username"),
+            aws_email=emp.get("aws_email"),
+        ))
+
+    flag_order = {"red": 0, "amber": 1, "green": 2, "no_aws": 3}
+    result.sort(key=lambda r: (flag_order.get(r.flag, 4), r.rms_name or ""))
+    return result
+
+
+@router.get("/employee-detail/{employee_id}", response_model=EmployeeDetail)
+async def get_employee_detail(
+    employee_id: int,
+    month: str = Query(..., description="YYYY-MM format", pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get detailed drill-down data for one employee: summary + AWS + Jira raw entries."""
+    client = await get_supabase_admin_async()
+
+    # Summary from computed_reports
+    summary_res = await (
+        client.table("computed_reports")
+        .select("*")
+        .eq("employee_id", employee_id)
+        .eq("billing_month", month)
+        .limit(1)
+        .execute()
+    )
+
+    emp_res = await client.table("employees").select("rms_name, jira_username, aws_email").eq("id", employee_id).limit(1).execute()
+    emp = emp_res.data[0] if emp_res.data else {}
+
+    summary = None
+    if summary_res.data:
+        r = summary_res.data[0]
+        summary = ComputedReportRow(
+            id=r.get("id"),
+            employee_id=r["employee_id"],
+            billing_month=r["billing_month"],
+            jira_hours=float(r.get("jira_hours") or 0),
+            ooo_days=r.get("ooo_days", 0),
+            aws_hours=float(r["aws_hours"]) if r.get("aws_hours") is not None else None,
+            billable_hours=float(r["billable_hours"]) if r.get("billable_hours") is not None else None,
+            difference=float(r["difference"]) if r.get("difference") is not None else None,
+            difference_pct=float(r["difference_pct"]) if r.get("difference_pct") is not None else None,
+            flag=r.get("flag", "no_aws"),
+            computed_at=r.get("computed_at"),
+            rms_name=emp.get("rms_name"),
+            jira_username=emp.get("jira_username"),
+            aws_email=emp.get("aws_email"),
+        )
+
+    # AWS data
+    aws_res = await (
+        client.table("aws_timesheet_logs_v2")
+        .select("*")
+        .eq("employee_id", employee_id)
+        .eq("billing_month", month)
+        .limit(1)
+        .execute()
+    )
+    aws_data = aws_res.data[0] if aws_res.data else None
+
+    # Jira raw entries
+    jira_res = await (
+        client.table("jira_timesheet_raw")
+        .select("*")
+        .eq("employee_id", employee_id)
+        .eq("billing_month", month)
+        .execute()
+    )
+    jira_entries = jira_res.data or []
+
+    return EmployeeDetail(
+        summary=summary,
+        aws_data=aws_data,
+        jira_entries=jira_entries,
     )
