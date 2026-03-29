@@ -50,10 +50,13 @@ class ApiClient {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
 
+        // For FormData uploads, do NOT set Content-Type — let the browser
+        // auto-set multipart/form-data with the correct boundary.
+        const isFormData = init.body instanceof FormData;
         const config: RequestInit = {
             ...init,
             headers: {
-                ...this.getJsonHeaders(),
+                ...(isFormData ? this.getAuthHeaders() : this.getJsonHeaders()),
                 ...init.headers,
             },
             signal: controller.signal,
@@ -67,6 +70,7 @@ class ApiClient {
             if (response.status === 401) {
                 localStorage.removeItem('rms_access_token');
                 localStorage.removeItem('rms_user_profile');
+                localStorage.removeItem('rms_token_expiry');
                 if (!window.location.pathname.includes('/login')) {
                     window.location.href = '/login';
                     toast.error('Session expired. Please login again.');
@@ -154,6 +158,7 @@ class ApiClient {
             if (response.status === 401) {
                 localStorage.removeItem('rms_access_token');
                 localStorage.removeItem('rms_user_profile');
+                localStorage.removeItem('rms_token_expiry');
                 if (!window.location.pathname.includes('/login')) {
                     window.location.href = '/login';
                     toast.error('Session expired. Please login again.');

@@ -1,11 +1,16 @@
-import { useState, useEffect } from 'react';
-import { timesheetsApi, type TimesheetEntry, type ImportResult, type AwsTimesheetEntry, type AwsImportResult } from '../api/timesheets';
+import { useState, useEffect, useMemo } from 'react';
+import {
+    timesheetsApi,
+    type JiraRawEntry,
+    type JiraRawImportResult,
+    type AwsTimesheetV2Entry,
+    type AwsImportV2Result,
+} from '../api/timesheets';
 import { employeesApi, type Employee } from '../api/employees';
-import { billingApi } from '../api/billing';
-import { exportTimesheets } from '../api/exports';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useAuth, isAdminRole } from '../context/AuthContext';
+import { JiraTimesheetDrillDown } from '../components/timesheets/JiraTimesheetDrillDown';
 import {
     Upload,
     Download,
@@ -15,48 +20,71 @@ import {
     Calculator,
     Monitor,
     FileSpreadsheet,
+    Search,
+    Coffee,
+    FileText,
+    ExternalLink,
+    ArrowUpDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
+import { exportTimesheets } from '../api/exports';
+import { billingApi } from '../api/billing';
 
 type Tab = 'jira' | 'aws';
+
+/** Get number of days in a month from "YYYY-MM" */
+function daysInMonth(ym: string): number {
+    const [y, m] = ym.split('-').map(Number);
+    return new Date(y, m, 0).getDate();
+}
+
+/** Format day number + month into short label like "01/Mar" */
+function dayLabel(day: number, ym: string): string {
+    const [y, m] = ym.split('-').map(Number);
+    const d = new Date(y, m - 1, day);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${String(day).padStart(2, '0')}/${months[d.getMonth()]}`;
+}
 
 export function Timesheets() {
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
     const [activeTab, setActiveTab] = useState<Tab>('jira');
 
-    // Jira state
-    const [entries, setEntries] = useState<TimesheetEntry[]>([]);
-    const [employees, setEmployees] = useState<Employee[]>([]);
-    const [loading, setLoading] = useState(true);
     const [selectedMonth, setSelectedMonth] = useState(() => {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     });
-    const [isImportOpen, setIsImportOpen] = useState(false);
-    const [importResult, setImportResult] = useState<ImportResult | null>(null);
-    const [calculating, setCalculating] = useState(false);
 
-    // AWS state
-    const [awsEntries, setAwsEntries] = useState<AwsTimesheetEntry[]>([]);
+    // Jira raw state
+    const [jiraEntries, setJiraEntries] = useState<JiraRawEntry[]>([]);
+    const [jiraLoading, setJiraLoading] = useState(true);
+    const [isJiraImportOpen, setIsJiraImportOpen] = useState(false);
+    const [jiraImportResult, setJiraImportResult] = useState<JiraRawImportResult | null>(null);
+
+    // AWS v2 state
+    const [awsEntries, setAwsEntries] = useState<AwsTimesheetV2Entry[]>([]);
     const [awsLoading, setAwsLoading] = useState(false);
     const [isAwsImportOpen, setIsAwsImportOpen] = useState(false);
-    const [awsImportResult, setAwsImportResult] = useState<AwsImportResult | null>(null);
+    const [awsImportResult, setAwsImportResult] = useState<AwsImportV2Result | null>(null);
+
+    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [calculating, setCalculating] = useState(false);
 
     const fetchJiraData = async () => {
-        setLoading(true);
+        setJiraLoading(true);
         try {
-            const [tsData, empData] = await Promise.all([
-                timesheetsApi.list({ import_month: selectedMonth }),
-                employeesApi.list({ page_size: 200 }),
+            const [rawData, empData] = await Promise.all([
+                timesheetsApi.listJiraRaw(selectedMonth),
+                employees.length ? Promise.resolve(employees) : employeesApi.list({ page_size: 200 }),
             ]);
-            setEntries(tsData || []);
-            setEmployees(empData || []);
+            setJiraEntries(rawData || []);
+            if (!employees.length) setEmployees(empData || []);
         } catch {
-            toast.error('Failed to load timesheet data');
+            toast.error('Failed to load Jira timesheet data');
         } finally {
-            setLoading(false);
+            setJiraLoading(false);
         }
     };
 
@@ -64,7 +92,7 @@ export function Timesheets() {
         setAwsLoading(true);
         try {
             const [awsData, empData] = await Promise.all([
-                timesheetsApi.listAws(),
+                timesheetsApi.listAwsV2(selectedMonth),
                 employees.length ? Promise.resolve(employees) : employeesApi.list({ page_size: 200 }),
             ]);
             setAwsEntries(awsData || []);
@@ -81,13 +109,10 @@ export function Timesheets() {
         else fetchAwsData();
     }, [selectedMonth, activeTab]);
 
-    const empMap = Object.fromEntries(employees.map(e => [e.id, e]));
-
-    // Group Jira entries by employee
-    const grouped = entries.reduce<Record<number, TimesheetEntry[]>>((acc, e) => {
-        (acc[e.employee_id] ??= []).push(e);
-        return acc;
-    }, {});
+    const empMap = useMemo(
+        () => Object.fromEntries(employees.map(e => [e.id, e])),
+        [employees],
+    );
 
     const handleCalculate = async () => {
         setCalculating(true);
@@ -111,22 +136,22 @@ export function Timesheets() {
                     {isAdmin && activeTab === 'jira' && (
                         <>
                             <button onClick={() => exportTimesheets(selectedMonth)} className="btn btn-secondary flex items-center gap-2">
-                                <Download size={18} />
+                                <Upload size={18} />
                                 Export CSV
                             </button>
                             <button onClick={handleCalculate} className="btn btn-secondary flex items-center gap-2" disabled={calculating}>
                                 <Calculator size={18} />
                                 {calculating ? 'Calculating...' : 'Calculate Billing'}
                             </button>
-                            <button onClick={() => setIsImportOpen(true)} className="btn btn-primary flex items-center gap-2">
-                                <Upload size={18} />
+                            <button onClick={() => setIsJiraImportOpen(true)} className="btn btn-primary flex items-center gap-2">
+                                <Download size={18} />
                                 Import XLS
                             </button>
                         </>
                     )}
                     {isAdmin && activeTab === 'aws' && (
                         <button onClick={() => setIsAwsImportOpen(true)} className="btn btn-primary flex items-center gap-2">
-                            <Upload size={18} />
+                            <Download size={18} />
                             Import AWS CSV
                         </button>
                     )}
@@ -162,34 +187,35 @@ export function Timesheets() {
             </div>
 
             {activeTab === 'jira' ? (
-                <JiraTab
-                    entries={entries}
-                    grouped={grouped}
+                <JiraRawTab
+                    entries={jiraEntries}
                     empMap={empMap}
-                    loading={loading}
+                    loading={jiraLoading}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
-                    importResult={importResult}
+                    importResult={jiraImportResult}
                     isAdmin={isAdmin}
-                    onImport={() => setIsImportOpen(true)}
+                    onImport={() => setIsJiraImportOpen(true)}
                 />
             ) : (
-                <AwsTab
+                <AwsV2Tab
                     entries={awsEntries}
                     empMap={empMap}
                     loading={awsLoading}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
                     importResult={awsImportResult}
                     isAdmin={isAdmin}
                     onImport={() => setIsAwsImportOpen(true)}
                 />
             )}
 
-            {isImportOpen && (
-                <JiraImportModal
-                    isOpen={isImportOpen}
-                    onClose={() => setIsImportOpen(false)}
+            {isJiraImportOpen && (
+                <JiraRawImportModal
+                    isOpen={isJiraImportOpen}
+                    onClose={() => setIsJiraImportOpen(false)}
                     onSuccess={(result) => {
-                        setImportResult(result);
+                        setJiraImportResult(result);
                         setSelectedMonth(result.month);
                         fetchJiraData();
                     }}
@@ -198,13 +224,15 @@ export function Timesheets() {
             )}
 
             {isAwsImportOpen && (
-                <AwsImportModal
+                <AwsV2ImportModal
                     isOpen={isAwsImportOpen}
                     onClose={() => setIsAwsImportOpen(false)}
                     onSuccess={(result) => {
                         setAwsImportResult(result);
+                        setSelectedMonth(result.month);
                         fetchAwsData();
                     }}
+                    defaultMonth={selectedMonth}
                 />
             )}
         </div>
@@ -212,19 +240,283 @@ export function Timesheets() {
 }
 
 // ──────────────────────────────────────────────
-// Jira Tab
+// Jira Raw Tab — Summary cards + drill-down modal
 // ──────────────────────────────────────────────
 
-function JiraTab({
-    entries, grouped, empMap, loading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport,
+type SortField = 'name' | 'hours' | 'issues';
+type SortDir = 'asc' | 'desc';
+
+interface UserSummary {
+    user: string;
+    rows: JiraRawEntry[];
+    totalHours: number;
+    oooHours: number;
+    issueCount: number;
+}
+
+function JiraRawTab({
+    entries, empMap, loading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport,
 }: {
-    entries: TimesheetEntry[];
-    grouped: Record<number, TimesheetEntry[]>;
+    entries: JiraRawEntry[];
     empMap: Record<number, Employee>;
     loading: boolean;
     selectedMonth: string;
     setSelectedMonth: (m: string) => void;
-    importResult: ImportResult | null;
+    importResult: JiraRawImportResult | null;
+    isAdmin: boolean;
+    onImport: () => void;
+}) {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortField, setSortField] = useState<SortField>('name');
+    const [sortDir, setSortDir] = useState<SortDir>('asc');
+    const [drillDownIndex, setDrillDownIndex] = useState<number | null>(null);
+
+    // Build user summaries from raw entries
+    const userSummaries = useMemo(() => {
+        const groupMap = new Map<string, JiraRawEntry[]>();
+        for (const entry of entries) {
+            const existing = groupMap.get(entry.jira_user);
+            if (existing) {
+                existing.push(entry);
+            } else {
+                groupMap.set(entry.jira_user, [entry]);
+            }
+        }
+
+        const summaries: UserSummary[] = [];
+        for (const [user, rows] of groupMap) {
+            const summaryRow = rows.find(r => r.is_summary_row);
+            const oooRow = rows.find(r => r.is_ooo);
+            const issueRows = rows.filter(r => !r.is_summary_row && !r.is_ooo);
+
+            summaries.push({
+                user,
+                rows,
+                totalHours: summaryRow?.logged ?? 0,
+                oooHours: oooRow?.logged ?? 0,
+                issueCount: issueRows.length,
+            });
+        }
+        return summaries;
+    }, [entries]);
+
+    // Filter and sort
+    const filteredSummaries = useMemo(() => {
+        const query = searchQuery.toLowerCase().trim();
+        const filtered = query
+            ? userSummaries.filter(s => s.user.toLowerCase().includes(query))
+            : userSummaries;
+
+        return [...filtered].sort((a, b) => {
+            const dir = sortDir === 'asc' ? 1 : -1;
+            if (sortField === 'name') return a.user.localeCompare(b.user) * dir;
+            if (sortField === 'hours') return (a.totalHours - b.totalHours) * dir;
+            return (a.issueCount - b.issueCount) * dir;
+        });
+    }, [userSummaries, searchQuery, sortField, sortDir]);
+
+    const toggleSort = (field: SortField) => {
+        if (sortField === field) {
+            setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDir(field === 'name' ? 'asc' : 'desc');
+        }
+    };
+
+    return (
+        <>
+            {/* Controls bar */}
+            <div className="card flex flex-col sm:flex-row items-start sm:items-center gap-3 py-3 px-4">
+                <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-text-muted">Month</label>
+                    <input
+                        type="month"
+                        className="input-field w-48"
+                        value={selectedMonth}
+                        onChange={e => setSelectedMonth(e.target.value)}
+                    />
+                </div>
+
+                {/* Search */}
+                <div className="relative flex-1 max-w-xs">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+                    <input
+                        type="text"
+                        placeholder="Search by name..."
+                        className="input-field pl-9 w-full text-sm"
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                    />
+                </div>
+
+                <span className="text-sm text-text-muted sm:ml-auto">
+                    {filteredSummaries.length} of {userSummaries.length} users · {entries.length} rows
+                </span>
+            </div>
+
+            {/* Import result banner */}
+            {importResult && (
+                <div className="card bg-info/5 border-info/20">
+                    <h3 className="font-bold text-text mb-2">Last Import Result</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div><span className="text-text-muted">Month:</span> <span className="font-medium">{importResult.month}</span></div>
+                        <div><span className="text-text-muted">Rows:</span> <span className="font-medium">{importResult.total_rows_processed}</span></div>
+                        <div><span className="text-text-muted">Matched:</span> <span className="font-medium text-success">{importResult.employees_matched}</span></div>
+                        <div><span className="text-text-muted">Inserted:</span> <span className="font-medium">{importResult.entries_inserted}</span></div>
+                    </div>
+                    {importResult.employees_unmatched.length > 0 && (
+                        <div className="mt-2 flex items-start gap-2">
+                            <AlertTriangle size={14} className="text-warning mt-0.5 shrink-0" />
+                            <span className="text-xs text-warning">
+                                Unmatched: {importResult.employees_unmatched.join(', ')}
+                            </span>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Summary list */}
+            <div className="card overflow-hidden">
+                {loading ? (
+                    <div className="py-20 flex flex-col items-center justify-center gap-4">
+                        <div className="spinner w-8 h-8 border-cta" />
+                        <p className="text-text-muted text-sm animate-pulse">Loading timesheets...</p>
+                    </div>
+                ) : filteredSummaries.length > 0 ? (
+                    <>
+                        {/* Column header */}
+                        <div className="grid grid-cols-[1fr_90px_80px_80px_44px] sm:grid-cols-[1fr_100px_90px_90px_48px] items-center px-4 py-2.5 border-b border-border bg-surface-hover/30 text-xs font-bold text-text-muted uppercase">
+                            <button
+                                onClick={() => toggleSort('name')}
+                                className="flex items-center gap-1 cursor-pointer hover:text-text transition-colors text-left"
+                            >
+                                Employee
+                                {sortField === 'name' && <ArrowUpDown size={12} className="text-cta" />}
+                            </button>
+                            <button
+                                onClick={() => toggleSort('hours')}
+                                className="flex items-center gap-1 cursor-pointer hover:text-text transition-colors justify-end"
+                            >
+                                Hours
+                                {sortField === 'hours' && <ArrowUpDown size={12} className="text-cta" />}
+                            </button>
+                            <span className="text-center">OOO</span>
+                            <button
+                                onClick={() => toggleSort('issues')}
+                                className="flex items-center gap-1 cursor-pointer hover:text-text transition-colors justify-center"
+                            >
+                                Issues
+                                {sortField === 'issues' && <ArrowUpDown size={12} className="text-cta" />}
+                            </button>
+                            <span />
+                        </div>
+
+                        {/* Rows */}
+                        <div className="divide-y divide-border/50" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+                            {filteredSummaries.map((summary, idx) => (
+                                <button
+                                    key={summary.user}
+                                    onClick={() => setDrillDownIndex(idx)}
+                                    className="grid grid-cols-[1fr_90px_80px_80px_44px] sm:grid-cols-[1fr_100px_90px_90px_48px] items-center w-full px-4 py-3 text-left hover:bg-surface-hover/40 transition-colors cursor-pointer group"
+                                >
+                                    {/* Name */}
+                                    <div className="min-w-0">
+                                        <p className="font-semibold text-sm text-text truncate group-hover:text-cta transition-colors">
+                                            {summary.user}
+                                        </p>
+                                    </div>
+
+                                    {/* Total hours */}
+                                    <div className="flex items-center justify-end gap-1.5">
+                                        <Clock size={13} className="text-cta shrink-0" />
+                                        <span className="font-bold text-sm text-text tabular-nums">
+                                            {summary.totalHours}h
+                                        </span>
+                                    </div>
+
+                                    {/* OOO */}
+                                    <div className="flex items-center justify-center">
+                                        {summary.oooHours > 0 ? (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-warning/10 text-warning text-xs font-medium">
+                                                <Coffee size={11} />
+                                                {summary.oooHours}h
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-text-muted/40">—</span>
+                                        )}
+                                    </div>
+
+                                    {/* Issues count */}
+                                    <div className="flex items-center justify-center gap-1">
+                                        <FileText size={13} className="text-text-muted shrink-0" />
+                                        <span className="text-sm text-text-muted tabular-nums">{summary.issueCount}</span>
+                                    </div>
+
+                                    {/* Expand icon */}
+                                    <div className="flex items-center justify-center">
+                                        <ExternalLink
+                                            size={15}
+                                            className="text-text-muted/40 group-hover:text-cta transition-colors"
+                                        />
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                ) : (
+                    <EmptyState
+                        message={searchQuery
+                            ? `No users matching "${searchQuery}"`
+                            : `No Jira timesheet data for ${selectedMonth}`
+                        }
+                        action={!searchQuery && isAdmin ? (
+                            <button onClick={onImport} className="btn btn-secondary btn-sm">
+                                <Upload size={14} /> Import XLS
+                            </button>
+                        ) : undefined}
+                    />
+                )}
+            </div>
+
+            {/* Drill-down modal */}
+            {drillDownIndex !== null && (
+                <JiraTimesheetDrillDown
+                    users={filteredSummaries}
+                    currentIndex={drillDownIndex}
+                    month={selectedMonth}
+                    onClose={() => setDrillDownIndex(null)}
+                    onNavigate={(idx) => setDrillDownIndex(idx)}
+                />
+            )}
+        </>
+    );
+}
+
+// ──────────────────────────────────────────────
+// AWS v2 Tab — mirrors CSV monthly per-employee
+// ──────────────────────────────────────────────
+
+const AWS_DISPLAY_COLS: { label: string; hmsKey: keyof AwsTimesheetV2Entry; secsKey: keyof AwsTimesheetV2Entry }[] = [
+    { label: 'Work Time', hmsKey: 'work_time_hms', secsKey: 'work_time_secs' },
+    { label: 'Productive', hmsKey: 'productive_hms', secsKey: 'productive_secs' },
+    { label: 'Unproductive', hmsKey: 'unproductive_hms', secsKey: 'unproductive_secs' },
+    { label: 'Undefined', hmsKey: 'undefined_hms', secsKey: 'undefined_secs' },
+    { label: 'Active', hmsKey: 'active_hms', secsKey: 'active_secs' },
+    { label: 'Passive', hmsKey: 'passive_hms', secsKey: 'passive_secs' },
+    { label: 'Screen Time', hmsKey: 'screen_time_hms', secsKey: 'screen_time_secs' },
+    { label: 'Offline Meetings', hmsKey: 'offline_meetings_hms', secsKey: 'offline_meetings_secs' },
+];
+
+function AwsV2Tab({
+    entries, empMap, loading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport,
+}: {
+    entries: AwsTimesheetV2Entry[];
+    empMap: Record<number, Employee>;
+    loading: boolean;
+    selectedMonth: string;
+    setSelectedMonth: (m: string) => void;
+    importResult: AwsImportV2Result | null;
     isAdmin: boolean;
     onImport: () => void;
 }) {
@@ -239,134 +531,15 @@ function JiraTab({
                     onChange={e => setSelectedMonth(e.target.value)}
                 />
                 <span className="text-sm text-text-muted ml-auto">
-                    {entries.length} entries from {Object.keys(grouped).length} employees
+                    {entries.length} employees
                 </span>
             </div>
 
             {importResult && (
                 <div className="card bg-info/5 border-info/20">
-                    <h3 className="font-bold text-text mb-2">Last Import Result</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div><span className="text-text-muted">Month:</span> <span className="font-medium">{importResult.month}</span></div>
-                        <div><span className="text-text-muted">Rows:</span> <span className="font-medium">{importResult.total_rows_processed}</span></div>
-                        <div><span className="text-text-muted">Matched:</span> <span className="font-medium text-success">{importResult.employees_matched}</span></div>
-                        <div><span className="text-text-muted">Upserted:</span> <span className="font-medium">{importResult.entries_upserted}</span></div>
-                    </div>
-                    {importResult.employees_unmatched.length > 0 && (
-                        <div className="mt-2 flex items-start gap-2">
-                            <AlertTriangle size={14} className="text-warning mt-0.5 shrink-0" />
-                            <span className="text-xs text-warning">
-                                Unmatched: {importResult.employees_unmatched.join(', ')}
-                            </span>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            <div className="card overflow-hidden">
-                {loading ? (
-                    <div className="py-20 flex flex-col items-center justify-center gap-4">
-                        <div className="spinner w-8 h-8 border-cta" />
-                        <p className="text-text-muted text-sm animate-pulse">Loading timesheets...</p>
-                    </div>
-                ) : Object.keys(grouped).length > 0 ? (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-surface-hover/50 border-b border-border">
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase">Employee</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase text-center">Working Days</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase text-center">OOO Days</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase text-center">Total Hours</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase text-center">Avg/Day</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {Object.entries(grouped).map(([empIdStr, empEntries]) => {
-                                    const empId = Number(empIdStr);
-                                    const emp = empMap[empId];
-                                    const totalHours = empEntries.reduce((s, e) => s + e.hours_logged, 0);
-                                    const oooDays = empEntries.filter(e => e.is_ooo).length;
-                                    const workingDays = empEntries.filter(e => !e.is_ooo && e.hours_logged > 0).length;
-                                    const avgPerDay = workingDays > 0 ? totalHours / workingDays : 0;
-
-                                    return (
-                                        <tr key={empId} className="hover:bg-surface-hover/30 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <p className="font-bold text-text">{emp?.rms_name || `Employee #${empId}`}</p>
-                                                <p className="text-xs text-text-muted">{emp?.jira_username || '—'}</p>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="flex items-center justify-center gap-1.5">
-                                                    <Clock size={14} className="text-cta" />
-                                                    <span className="font-medium">{workingDays}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className={cn("font-medium", oooDays > 0 ? "text-warning" : "text-text-muted")}>
-                                                    {oooDays}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-center font-bold text-text">{totalHours.toFixed(1)}h</td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className={cn(
-                                                    "font-medium",
-                                                    avgPerDay >= 8 ? "text-success" : avgPerDay >= 6 ? "text-cta" : "text-danger"
-                                                )}>
-                                                    {avgPerDay.toFixed(1)}h
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                ) : (
-                    <EmptyState
-                        message={`No timesheet data for ${selectedMonth}`}
-                        action={isAdmin ? (
-                            <button onClick={onImport} className="btn btn-secondary btn-sm">
-                                <Upload size={14} /> Import XLS
-                            </button>
-                        ) : undefined}
-                    />
-                )}
-            </div>
-        </>
-    );
-}
-
-// ──────────────────────────────────────────────
-// AWS Tab
-// ──────────────────────────────────────────────
-
-function AwsTab({
-    entries, empMap, loading, importResult, isAdmin, onImport,
-}: {
-    entries: AwsTimesheetEntry[];
-    empMap: Record<number, Employee>;
-    loading: boolean;
-    importResult: AwsImportResult | null;
-    isAdmin: boolean;
-    onImport: () => void;
-}) {
-    // Group by week
-    const weekGroups = entries.reduce<Record<string, AwsTimesheetEntry[]>>((acc, e) => {
-        const key = `${e.week_start} to ${e.week_end}`;
-        (acc[key] ??= []).push(e);
-        return acc;
-    }, {});
-
-    const sortedWeeks = Object.keys(weekGroups).sort().reverse();
-
-    return (
-        <>
-            {importResult && (
-                <div className="card bg-info/5 border-info/20">
                     <h3 className="font-bold text-text mb-2">Last AWS Import Result</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div><span className="text-text-muted">Week:</span> <span className="font-medium">{importResult.week_start} — {importResult.week_end}</span></div>
+                        <div><span className="text-text-muted">Month:</span> <span className="font-medium">{importResult.month}</span></div>
                         <div><span className="text-text-muted">Total Rows:</span> <span className="font-medium">{importResult.total_rows}</span></div>
                         <div><span className="text-text-muted">Matched:</span> <span className="font-medium text-success">{importResult.employees_matched}</span></div>
                         <div><span className="text-text-muted">Inserted:</span> <span className="font-medium">{importResult.entries_inserted}</span></div>
@@ -375,13 +548,9 @@ function AwsTab({
                         <div className="mt-2 flex items-start gap-2">
                             <AlertTriangle size={14} className="text-warning mt-0.5 shrink-0" />
                             <span className="text-xs text-warning">
-                                {importResult.employees_unmatched} unmatched emails
+                                {importResult.employees_unmatched} unmatched: {importResult.unmatched_emails.slice(0, 5).join(', ')}
+                                {importResult.unmatched_emails.length > 5 && ` +${importResult.unmatched_emails.length - 5} more`}
                             </span>
-                        </div>
-                    )}
-                    {importResult.skipped_existing > 0 && (
-                        <div className="mt-1 text-xs text-text-muted">
-                            {importResult.skipped_existing} entries skipped (already imported)
                         </div>
                     )}
                 </div>
@@ -395,87 +564,46 @@ function AwsTab({
                     </div>
                 ) : entries.length > 0 ? (
                     <div className="overflow-x-auto">
-                        {sortedWeeks.map(weekLabel => {
-                            const weekEntries = weekGroups[weekLabel];
-                            const belowThreshold = weekEntries.filter(e => e.is_below_threshold).length;
-
-                            return (
-                                <div key={weekLabel} className="mb-6 last:mb-0">
-                                    <div className="px-6 py-3 bg-surface-hover/30 border-b border-border flex items-center justify-between">
-                                        <h3 className="text-sm font-bold text-text">Week: {weekLabel}</h3>
-                                        <div className="flex items-center gap-4 text-xs text-text-muted">
-                                            <span>{weekEntries.length} users</span>
-                                            {belowThreshold > 0 && (
-                                                <span className="text-danger font-medium">
-                                                    {belowThreshold} below 30hrs
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <table className="w-full text-left border-collapse">
-                                        <thead>
-                                            <tr className="border-b border-border">
-                                                <th className="px-6 py-3 text-xs font-bold text-text-muted uppercase">Employee / Email</th>
-                                                <th className="px-6 py-3 text-xs font-bold text-text-muted uppercase text-center">Work Hours</th>
-                                                <th className="px-6 py-3 text-xs font-bold text-text-muted uppercase text-center">Productive</th>
-                                                <th className="px-6 py-3 text-xs font-bold text-text-muted uppercase text-center">Active</th>
-                                                <th className="px-6 py-3 text-xs font-bold text-text-muted uppercase text-center">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-border">
-                                            {weekEntries
-                                                .sort((a, b) => a.work_time_hours - b.work_time_hours)
-                                                .map(entry => {
-                                                    const emp = entry.employee_id ? empMap[entry.employee_id] : null;
-                                                    const productiveHrs = (entry.productive_secs / 3600).toFixed(1);
-                                                    const activeHrs = (entry.active_secs / 3600).toFixed(1);
-
-                                                    return (
-                                                        <tr key={entry.id} className="hover:bg-surface-hover/30 transition-colors">
-                                                            <td className="px-6 py-3">
-                                                                <p className="font-medium text-text">
-                                                                    {emp?.rms_name || entry.aws_email}
-                                                                </p>
-                                                                {emp && (
-                                                                    <p className="text-xs text-text-muted">{entry.aws_email}</p>
-                                                                )}
-                                                                {!emp && (
-                                                                    <p className="text-xs text-warning">Unlinked</p>
-                                                                )}
-                                                            </td>
-                                                            <td className="px-6 py-3 text-center">
-                                                                <span className={cn(
-                                                                    "font-bold",
-                                                                    entry.is_below_threshold ? "text-danger" : "text-text"
-                                                                )}>
-                                                                    {entry.work_time_hours.toFixed(1)}h
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-6 py-3 text-center text-text-muted">{productiveHrs}h</td>
-                                                            <td className="px-6 py-3 text-center text-text-muted">{activeHrs}h</td>
-                                                            <td className="px-6 py-3 text-center">
-                                                                {entry.is_below_threshold ? (
-                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-danger/10 text-danger text-xs font-medium">
-                                                                        <AlertTriangle size={12} /> Below 30h
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/10 text-success text-xs font-medium">
-                                                                        <CheckCircle size={12} /> OK
-                                                                    </span>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            );
-                        })}
+                        <table className="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-surface-hover/50 border-b border-border">
+                                    <th className="sticky left-0 z-10 bg-surface-hover/50 px-4 py-3 text-xs font-bold text-text-muted uppercase min-w-[200px]">User / Email</th>
+                                    {AWS_DISPLAY_COLS.map(col => (
+                                        <th key={col.label} className="px-3 py-3 text-xs font-bold text-text-muted uppercase text-center min-w-[110px]">
+                                            {col.label}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {entries.map(entry => {
+                                    const emp = entry.employee_id ? empMap[entry.employee_id] : null;
+                                    return (
+                                        <tr key={entry.id} className="hover:bg-surface-hover/30 transition-colors">
+                                            <td className="sticky left-0 z-10 bg-surface px-4 py-2.5 min-w-[200px]">
+                                                <p className="font-medium text-text">{emp?.rms_name || entry.aws_email}</p>
+                                                {emp && <p className="text-xs text-text-muted">{entry.aws_email}</p>}
+                                                {!emp && <p className="text-xs text-warning">Unlinked</p>}
+                                            </td>
+                                            {AWS_DISPLAY_COLS.map(col => {
+                                                const hms = entry[col.hmsKey] as string | null;
+                                                const secs = entry[col.secsKey] as number;
+                                                const hrs = (secs / 3600).toFixed(1);
+                                                return (
+                                                    <td key={col.label} className="px-3 py-2.5 text-center" title={`${hrs} hours (${secs}s)`}>
+                                                        <span className="font-medium text-text">{hms || '0:00:00'}</span>
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 ) : (
                     <EmptyState
-                        message="No AWS ActiveTrack data imported yet"
+                        message={`No AWS ActiveTrack data for ${selectedMonth}`}
                         action={isAdmin ? (
                             <button onClick={onImport} className="btn btn-secondary btn-sm">
                                 <Upload size={14} /> Import AWS CSV
@@ -489,15 +617,15 @@ function AwsTab({
 }
 
 // ──────────────────────────────────────────────
-// Modals
+// Import Modals
 // ──────────────────────────────────────────────
 
-function JiraImportModal({
+function JiraRawImportModal({
     isOpen, onClose, onSuccess, defaultMonth,
 }: {
     isOpen: boolean;
     onClose: () => void;
-    onSuccess: (result: ImportResult) => void;
+    onSuccess: (result: JiraRawImportResult) => void;
     defaultMonth: string;
 }) {
     const [file, setFile] = useState<File | null>(null);
@@ -509,14 +637,13 @@ function JiraImportModal({
         if (!file) { toast.error('Select a file'); return; }
         setUploading(true);
         try {
-            const result = await timesheetsApi.import(file, month);
-            toast.success(`Imported ${result.entries_upserted} entries`);
+            const result = await timesheetsApi.importJiraRaw(file, month);
+            toast.success(`Imported ${result.entries_inserted} Jira entries`);
             onSuccess(result);
             onClose();
         } catch (error) {
             const msg = error instanceof Error ? error.message : 'Import failed';
             toast.error(msg);
-            console.error('Jira import failed:', error);
         } finally {
             setUploading(false);
         }
@@ -539,9 +666,9 @@ function JiraImportModal({
                     <input type="month" className="input-field" value={month} onChange={e => setMonth(e.target.value)} />
                 </div>
                 <div className="text-xs text-text-muted space-y-1">
-                    <p><CheckCircle size={12} className="inline text-success mr-1" />8-hour daily cap applied automatically</p>
-                    <p><AlertTriangle size={12} className="inline text-warning mr-1" />Value "01" / 1.0 = Out of Office (OOO)</p>
-                    <p><CheckCircle size={12} className="inline text-info mr-1" />Re-uploading same month overwrites previous data</p>
+                    <p><CheckCircle size={12} className="inline text-success mr-1" />Stores raw per-issue data exactly as in Excel</p>
+                    <p><AlertTriangle size={12} className="inline text-warning mr-1" />JIRA-1 key = Out of Office (OOO)</p>
+                    <p><CheckCircle size={12} className="inline text-info mr-1" />Re-uploading same month replaces previous data</p>
                 </div>
                 <div className="flex gap-3 pt-2">
                     <button type="button" onClick={onClose} className="btn btn-secondary flex-1" disabled={uploading}>Cancel</button>
@@ -554,30 +681,30 @@ function JiraImportModal({
     );
 }
 
-function AwsImportModal({
-    isOpen, onClose, onSuccess,
+function AwsV2ImportModal({
+    isOpen, onClose, onSuccess, defaultMonth,
 }: {
     isOpen: boolean;
     onClose: () => void;
-    onSuccess: (result: AwsImportResult) => void;
+    onSuccess: (result: AwsImportV2Result) => void;
+    defaultMonth: string;
 }) {
     const [file, setFile] = useState<File | null>(null);
-    const [weekStart, setWeekStart] = useState('');
-    const [weekEnd, setWeekEnd] = useState('');
+    const [month, setMonth] = useState(defaultMonth);
     const [uploading, setUploading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!file) { toast.error('Select a CSV file'); return; }
-        if (!weekStart || !weekEnd) { toast.error('Set week start and end dates'); return; }
         setUploading(true);
         try {
-            const result = await timesheetsApi.importAws(file, weekStart, weekEnd);
+            const result = await timesheetsApi.importAwsV2(file, month);
             toast.success(`Imported ${result.entries_inserted} AWS entries`);
             onSuccess(result);
             onClose();
-        } catch {
-            // handled
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'AWS import failed';
+            toast.error(msg);
         } finally {
             setUploading(false);
         }
@@ -595,34 +722,18 @@ function AwsImportModal({
                         onChange={e => setFile(e.target.files?.[0] || null)}
                     />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <label className="input-label">Week Start</label>
-                        <input
-                            type="date"
-                            className="input-field"
-                            value={weekStart}
-                            onChange={e => setWeekStart(e.target.value)}
-                        />
-                    </div>
-                    <div>
-                        <label className="input-label">Week End</label>
-                        <input
-                            type="date"
-                            className="input-field"
-                            value={weekEnd}
-                            onChange={e => setWeekEnd(e.target.value)}
-                        />
-                    </div>
+                <div>
+                    <label className="input-label">Billing Month</label>
+                    <input type="month" className="input-field" value={month} onChange={e => setMonth(e.target.value)} />
                 </div>
                 <div className="text-xs text-text-muted space-y-1">
-                    <p><Monitor size={12} className="inline text-cta mr-1" />Weekly export from AWS ActiveTrack</p>
-                    <p><CheckCircle size={12} className="inline text-success mr-1" />Users below 30 hrs/week flagged automatically</p>
-                    <p><AlertTriangle size={12} className="inline text-warning mr-1" />Unmatched emails can be linked to employees later</p>
+                    <p><Monitor size={12} className="inline text-cta mr-1" />Monthly export from AWS ActiveTrack</p>
+                    <p><CheckCircle size={12} className="inline text-success mr-1" />All h:mm:ss and seconds values stored as-is</p>
+                    <p><CheckCircle size={12} className="inline text-info mr-1" />Re-uploading same month replaces previous data</p>
                 </div>
                 <div className="flex gap-3 pt-2">
                     <button type="button" onClick={onClose} className="btn btn-secondary flex-1" disabled={uploading}>Cancel</button>
-                    <button type="submit" className="btn btn-cta flex-1" disabled={uploading || !file || !weekStart || !weekEnd}>
+                    <button type="submit" className="btn btn-cta flex-1" disabled={uploading || !file}>
                         {uploading ? <span className="spinner w-4 h-4" /> : 'Upload & Import'}
                     </button>
                 </div>

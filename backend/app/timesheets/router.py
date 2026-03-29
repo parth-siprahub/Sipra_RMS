@@ -1,4 +1,4 @@
-"""Timesheet import + listing — aligned with public.timesheet_logs + aws_timesheet_logs tables."""
+"""Timesheet import + listing — uses jira_timesheet_raw + aws_timesheet_logs_v2 tables (chunked)."""
 import logging
 import traceback
 from datetime import date as date_type
@@ -9,10 +9,13 @@ from app.timesheets.schemas import (
     TimesheetResponse,
     TimesheetUpdate,
     ImportResult,
-    AwsTimesheetResponse,
-    AwsImportResult,
+    JiraRawResponse,
+    JiraRawImportResult,
+    AwsTimesheetV2Response,
+    AwsImportV2Result,
 )
 from app.timesheets.parser import parse_tempo_xls
+from app.timesheets.jira_raw_parser import parse_jira_raw
 from app.timesheets.aws_parser import parse_aws_csv
 from app.utils.cache import api_cache
 from app.audit.service import log_audit
@@ -21,14 +24,11 @@ logger = logging.getLogger(__name__)
 
 MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
 
-# Magic numbers for Excel file validation
-_XLS_MAGIC = b'\xD0\xCF\x11\xE0'   # OLE2 Compound Document (XLS)
-_XLSX_MAGIC = b'PK\x03\x04'         # ZIP archive (XLSX)
-_CSV_BOM = b'\xef\xbb\xbf'          # UTF-8 BOM (optional in CSV)
+_XLS_MAGIC = b'\xD0\xCF\x11\xE0'
+_XLSX_MAGIC = b'PK\x03\x04'
 
 
 def _validate_file_size(file_bytes: bytes, filename: str) -> None:
-    """Reject files exceeding MAX_UPLOAD_SIZE_BYTES."""
     if len(file_bytes) > MAX_UPLOAD_SIZE_BYTES:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -37,7 +37,6 @@ def _validate_file_size(file_bytes: bytes, filename: str) -> None:
 
 
 def _validate_excel_magic(file_bytes: bytes) -> None:
-    """Verify file is actually XLS/XLSX by checking magic number."""
     if not (file_bytes[:4] == _XLS_MAGIC or file_bytes[:4] == _XLSX_MAGIC):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -46,7 +45,6 @@ def _validate_excel_magic(file_bytes: bytes) -> None:
 
 
 def _validate_import_month_strict(month: str) -> None:
-    """Validate YYYY-MM format with valid month (01-12) and reasonable year."""
     if len(month) != 7 or month[4] != "-":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "import_month must be YYYY-MM format")
     try:
@@ -62,7 +60,202 @@ router = APIRouter(prefix="/timesheets", tags=["Timesheets"])
 
 
 # ──────────────────────────────────────────────
-# Jira Timesheet Endpoints
+# Jira Raw Endpoints (jira_timesheet_raw table)
+# ──────────────────────────────────────────────
+
+@router.get("/jira-raw", response_model=list[JiraRawResponse])
+async def list_jira_raw(
+    billing_month: str | None = None,
+    employee_id: int | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(5000, ge=1, le=10000),
+    current_user: dict = Depends(get_current_user),
+):
+    """List raw Jira timesheet entries mirroring Excel layout."""
+    client = await get_supabase_admin_async()
+
+    # Chunked fetch to bypass PostgREST 1000-row server limit
+    all_rows: list = []
+    chunk_off = 0
+    while True:
+        query = client.table("jira_timesheet_raw").select("*")
+        if billing_month:
+            query = query.eq("billing_month", billing_month)
+        if employee_id:
+            query = query.eq("employee_id", employee_id)
+        batch = await query.order("jira_user").order("is_summary_row", desc=True).range(chunk_off, chunk_off + 999).execute()
+        all_rows.extend(batch.data or [])
+        if len(batch.data or []) < 1000:
+            break
+        chunk_off += 1000
+    return all_rows
+
+
+@router.post("/jira-raw/import", response_model=JiraRawImportResult)
+async def import_jira_raw(
+    file: UploadFile = File(...),
+    import_month: str = Form(..., description="YYYY-MM format"),
+    current_user: dict = Depends(require_admin),
+):
+    """
+    Upload a Jira/Tempo .xls timesheet report.
+    Stores raw per-issue rows in jira_timesheet_raw (mirrors Excel exactly).
+    Also populates legacy timesheet_logs for backward compatibility.
+    Idempotent: deletes existing entries for the month, then inserts fresh.
+    """
+    if not file.filename or not (file.filename.endswith(".xls") or file.filename.endswith(".xlsx")):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "File must be .xls or .xlsx")
+
+    _validate_import_month_strict(import_month)
+
+    file_bytes = await file.read()
+    _validate_file_size(file_bytes, file.filename)
+    _validate_excel_magic(file_bytes)
+
+    # Parse raw entries (per-issue rows)
+    try:
+        raw_entries = parse_jira_raw(file_bytes, import_month)
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+
+    if not raw_entries:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "No valid timesheet entries found in file")
+
+    # Also parse legacy format for timesheet_logs backward compat
+    try:
+        legacy_entries = parse_tempo_xls(file_bytes, import_month)
+    except ValueError:
+        legacy_entries = []
+
+    client = await get_supabase_admin_async()
+
+    # Create import_headers row
+    header_row = {
+        "import_type": "JIRA_TIMESHEET",
+        "filename": file.filename,
+        "import_month": import_month,
+        "records_total": len(raw_entries),
+        "records_matched": 0,
+        "records_unmatched": 0,
+        "records_skipped": 0,
+        "imported_by": current_user.get("id"),
+        "status": "IN_PROGRESS",
+    }
+    header_result = await client.table("import_headers").insert(header_row).execute()
+    import_header_id = header_result.data[0]["id"]
+
+    try:
+        # Build employee lookup
+        employees = await client.table("employees").select("id, jira_username, rms_name").execute()
+        emp_map: dict[str, int] = {}
+        for emp in (employees.data or []):
+            if emp.get("jira_username"):
+                emp_map[emp["jira_username"].lower()] = emp["id"]
+            if emp.get("rms_name"):
+                emp_map[emp["rms_name"].lower()] = emp["id"]
+
+        # Resolve employee IDs for raw entries
+        matched_raw = []
+        unmatched_usernames = set()
+        for entry in raw_entries:
+            username = entry["jira_user"].lower()
+            emp_id = emp_map.get(username)
+            entry["employee_id"] = emp_id
+            entry["import_header_id"] = import_header_id
+            if emp_id:
+                matched_raw.append(entry)
+            else:
+                unmatched_usernames.add(entry["jira_user"])
+                matched_raw.append(entry)  # Still insert — employee_id will be NULL
+
+        # Idempotent: delete existing raw entries for this month
+        await client.table("jira_timesheet_raw").delete().eq("billing_month", import_month).execute()
+
+        # Batch insert raw entries
+        batch_size = 100
+        for i in range(0, len(matched_raw), batch_size):
+            batch = matched_raw[i:i + batch_size]
+            await client.table("jira_timesheet_raw").insert(batch).execute()
+
+        # Also update legacy timesheet_logs for backward compat
+        if legacy_entries:
+            legacy_matched = []
+            for entry in legacy_entries:
+                username = entry["jira_username"].lower()
+                emp_id = emp_map.get(username)
+                if emp_id:
+                    legacy_matched.append({
+                        "employee_id": emp_id,
+                        "log_date": entry["log_date"],
+                        "hours_logged": entry["hours_logged"],
+                        "is_ooo": entry["is_ooo"],
+                        "import_month": entry["import_month"],
+                        "import_header_id": import_header_id,
+                    })
+
+            if legacy_matched:
+                # Delete existing legacy entries for matched employees
+                matched_emp_ids = list({e["employee_id"] for e in legacy_matched})
+                for emp_id in matched_emp_ids:
+                    frozen_check = await (
+                        client.table("timesheet_logs")
+                        .select("id")
+                        .eq("employee_id", emp_id)
+                        .eq("import_month", import_month)
+                        .eq("processed", True)
+                        .limit(1)
+                        .execute()
+                    )
+                    if frozen_check.data:
+                        logger.warning("Skipping legacy upsert for frozen employee %s in %s", emp_id, import_month)
+                        continue
+
+                for emp_id in matched_emp_ids:
+                    await client.table("timesheet_logs").delete().eq("employee_id", emp_id).eq("import_month", import_month).execute()
+
+                for i in range(0, len(legacy_matched), batch_size):
+                    batch = legacy_matched[i:i + batch_size]
+                    await client.table("timesheet_logs").insert(batch).execute()
+
+        # Count matched employees (those with employee_id set)
+        matched_count = sum(1 for e in matched_raw if e.get("employee_id"))
+
+        await client.table("import_headers").update({
+            "records_matched": matched_count,
+            "records_unmatched": len(unmatched_usernames),
+            "status": "COMPLETED",
+        }).eq("id", import_header_id).execute()
+
+    except Exception as exc:
+        error_msg = f"{type(exc).__name__}: {exc}"
+        logger.error("Jira raw import failed (header_id=%s): %s\n%s", import_header_id, error_msg, traceback.format_exc())
+        await client.table("import_headers").update({
+            "status": "FAILED",
+            "error_message": error_msg[:1000],
+        }).eq("id", import_header_id).execute()
+        raise
+
+    api_cache.clear_prefix("timesheets_")
+    api_cache.clear_prefix("billing_")
+
+    await log_audit(
+        user=current_user,
+        action="IMPORT",
+        entity_type="jira_timesheet_raw",
+        new_values={"month": import_month, "rows": len(raw_entries), "matched": matched_count},
+    )
+
+    return JiraRawImportResult(
+        month=import_month,
+        total_rows_processed=len(raw_entries),
+        employees_matched=matched_count,
+        employees_unmatched=sorted(unmatched_usernames),
+        entries_inserted=len(matched_raw),
+    )
+
+
+# ──────────────────────────────────────────────
+# Legacy Jira Endpoints (timesheet_logs — backward compat)
 # ──────────────────────────────────────────────
 
 @router.get("/", response_model=list[TimesheetResponse])
@@ -90,13 +283,8 @@ async def update_timesheet(
     body: TimesheetUpdate,
     current_user: dict = Depends(require_admin),
 ):
-    """
-    Update a single timesheet entry.
-    Returns 409 if the entry has been processed (frozen).
-    """
+    """Update a single timesheet entry. Returns 409 if processed (frozen)."""
     client = await get_supabase_admin_async()
-
-    # Fetch existing entry
     existing = await client.table("timesheet_logs").select("*").eq("id", log_id).single().execute()
     if not existing.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Timesheet entry not found")
@@ -127,9 +315,8 @@ async def import_timesheet(
     current_user: dict = Depends(require_admin),
 ):
     """
-    Upload a Jira/Tempo .xls timesheet report.
-    Performs idempotent upsert: deletes existing entries for the month, then inserts fresh.
-    Tracks progress via import_headers table.
+    Legacy Jira import — populates timesheet_logs (aggregated per user/date).
+    Prefer /jira-raw/import for the new raw Excel format.
     """
     if not file.filename or not (file.filename.endswith(".xls") or file.filename.endswith(".xlsx")):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "File must be .xls or .xlsx")
@@ -147,7 +334,6 @@ async def import_timesheet(
 
     client = await get_supabase_admin_async()
 
-    # Create import_headers row with IN_PROGRESS status
     header_row = {
         "import_type": "JIRA_TIMESHEET",
         "filename": file.filename,
@@ -163,7 +349,6 @@ async def import_timesheet(
     import_header_id = header_result.data[0]["id"]
 
     try:
-        # Resolve Jira usernames to employee IDs (case-insensitive)
         employees = await client.table("employees").select("id, jira_username, rms_name").execute()
         emp_map: dict[str, int] = {}
         for emp in (employees.data or []):
@@ -190,7 +375,6 @@ async def import_timesheet(
                 unmatched_usernames.add(entry["jira_username"])
 
         if matched_entries:
-            # Guard: check if any existing entries for this month are frozen (processed)
             matched_emp_ids = list({e["employee_id"] for e in matched_entries})
             for emp_id in matched_emp_ids:
                 frozen_check = await (
@@ -206,21 +390,17 @@ async def import_timesheet(
                     raise HTTPException(
                         status.HTTP_409_CONFLICT,
                         f"Cannot re-import: timesheet entries for employee {emp_id} "
-                        f"in {import_month} are frozen (billing processed). "
-                        "Unfreeze billing before re-importing.",
+                        f"in {import_month} are frozen (billing processed).",
                     )
 
-            # Idempotent upsert: delete existing entries for this month's matched employees
             for emp_id in matched_emp_ids:
                 await client.table("timesheet_logs").delete().eq("employee_id", emp_id).eq("import_month", import_month).execute()
 
-            # Batch insert
             batch_size = 100
             for i in range(0, len(matched_entries), batch_size):
                 batch = matched_entries[i:i + batch_size]
                 await client.table("timesheet_logs").insert(batch).execute()
 
-        # Update import_headers with final counts and COMPLETED status
         await client.table("import_headers").update({
             "records_matched": len(matched_entries),
             "records_unmatched": len(unmatched_usernames),
@@ -228,7 +408,6 @@ async def import_timesheet(
         }).eq("id", import_header_id).execute()
 
     except Exception as exc:
-        # Update import_headers with FAILED status
         error_msg = f"{type(exc).__name__}: {exc}"
         logger.error("Jira timesheet import failed (header_id=%s): %s", import_header_id, error_msg)
         await client.table("import_headers").update({
@@ -257,68 +436,63 @@ async def import_timesheet(
 
 
 # ──────────────────────────────────────────────
-# AWS ActiveTrack Endpoints
+# AWS v2 Endpoints (aws_timesheet_logs_v2 — monthly CSV)
 # ──────────────────────────────────────────────
 
-@router.get("/aws", response_model=list[AwsTimesheetResponse])
+@router.get("/aws", response_model=list[AwsTimesheetV2Response])
 async def list_aws_timesheets(
+    billing_month: str | None = None,
     employee_id: int | None = None,
-    week_start: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(200, ge=1, le=2000),
     current_user: dict = Depends(get_current_user),
 ):
-    """List AWS ActiveTrack timesheet entries."""
+    """List AWS ActiveTrack timesheet entries (monthly per-employee)."""
     client = await get_supabase_admin_async()
-    query = client.table("aws_timesheet_logs").select("*")
+    query = client.table("aws_timesheet_logs_v2").select("*")
+    if billing_month:
+        query = query.eq("billing_month", billing_month)
     if employee_id:
         query = query.eq("employee_id", employee_id)
-    if week_start:
-        query = query.eq("week_start", week_start)
     offset = (page - 1) * page_size
-    result = await query.order("week_start", desc=True).range(offset, offset + page_size - 1).execute()
+    result = await query.order("aws_email").range(offset, offset + page_size - 1).execute()
     return result.data
 
 
-@router.post("/aws/import", response_model=AwsImportResult)
+@router.post("/aws/import", response_model=AwsImportV2Result)
 async def import_aws_timesheet(
     file: UploadFile = File(...),
-    week_start: str = Form(..., description="Week start date (YYYY-MM-DD)"),
-    week_end: str = Form(..., description="Week end date (YYYY-MM-DD)"),
+    import_month: str = Form(..., description="YYYY-MM format"),
     current_user: dict = Depends(require_admin),
 ):
     """
-    Upload an AWS ActiveTrack CSV export for a specific week.
-    AWS data is additive — each weekly import creates new records, never overwrites old weeks.
-    Tracks progress via import_headers table.
+    Upload an AWS ActiveTrack CSV export for a specific month.
+    Idempotent: deletes existing entries for the month, then inserts fresh.
+    File is parsed in memory and never stored.
     """
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "File must be .csv")
 
-    # Parse dates
-    try:
-        ws = date_type.fromisoformat(week_start)
-        we = date_type.fromisoformat(week_end)
-    except ValueError:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Dates must be YYYY-MM-DD format")
-
-    if we <= ws:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "week_end must be after week_start")
+    _validate_import_month_strict(import_month)
 
     file_bytes = await file.read()
-    entries = parse_aws_csv(file_bytes, ws, we)
+    _validate_file_size(file_bytes, file.filename)
+
+    try:
+        entries = parse_aws_csv(file_bytes, import_month)
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
 
     if not entries:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No valid entries found in CSV")
 
     client = await get_supabase_admin_async()
 
-    # Create import_headers row with IN_PROGRESS status
+    # Create import_headers row
     header_row = {
         "import_type": "AWS_TIMESHEET",
         "filename": file.filename,
-        "week_start": week_start,
-        "week_end": week_end,
+        "import_month": import_month,
         "records_total": len(entries),
         "records_matched": 0,
         "records_unmatched": 0,
@@ -330,72 +504,64 @@ async def import_aws_timesheet(
     import_header_id = header_result.data[0]["id"]
 
     try:
-        # Build employee lookup by aws_email
-        employees = await client.table("employees").select("id, aws_email").execute()
+        # Build employee lookup by aws_email, rms_name, and client_name
+        employees = await client.table("employees").select("id, aws_email, rms_name, client_name").execute()
         email_to_emp: dict[str, int] = {}
+        name_to_emp: dict[str, int] = {}
         for emp in (employees.data or []):
             if emp.get("aws_email"):
                 email_to_emp[emp["aws_email"].lower()] = emp["id"]
-
-        # Check for existing records for this week to avoid duplicates
-        existing = await client.table("aws_timesheet_logs").select("aws_email").eq("week_start", week_start).execute()
-        existing_emails = {r["aws_email"].lower() for r in (existing.data or [])}
+            if emp.get("rms_name"):
+                name_to_emp[emp["rms_name"].strip().lower()] = emp["id"]
+            if emp.get("client_name"):
+                name_to_emp[emp["client_name"].strip().lower()] = emp["id"]
 
         matched = 0
         unmatched_emails: list[str] = []
-        inserted = 0
-        skipped = 0
 
         rows_to_insert = []
         for entry in entries:
             email = entry["aws_email"]
+            emp_id = email_to_emp.get(email.lower() if email else "")
 
-            # Skip if already imported for this week
-            if email in existing_emails:
-                skipped += 1
-                continue
+            # Fallback: match by name derived from email (part before @, Title Cased)
+            if not emp_id and email and "@" in email:
+                name_part = email.split("@")[0]
+                # Convert e.g. "john.doe" or "john_doe" to "John Doe"
+                name_from_email = name_part.replace(".", " ").replace("_", " ").replace("-", " ").title()
+                emp_id = name_to_emp.get(name_from_email.lower())
 
-            emp_id = email_to_emp.get(email)
             if emp_id:
                 matched += 1
             else:
                 unmatched_emails.append(email)
 
-            rows_to_insert.append({
+            row = {
                 "employee_id": emp_id,
-                "aws_email": email,
-                "week_start": entry["week_start"],
-                "week_end": entry["week_end"],
-                "work_time_secs": entry["work_time_secs"],
-                "productive_secs": entry["productive_secs"],
-                "unproductive_secs": entry["unproductive_secs"],
-                "active_secs": entry["active_secs"],
-                "passive_secs": entry["passive_secs"],
-                "screen_time_secs": entry["screen_time_secs"],
-                "work_time_hours": entry["work_time_hours"],
-                "is_below_threshold": entry["is_below_threshold"],
                 "import_header_id": import_header_id,
-            })
+                **entry,
+            }
+            rows_to_insert.append(row)
 
+        # Idempotent: delete existing entries for this month
+        await client.table("aws_timesheet_logs_v2").delete().eq("billing_month", import_month).execute()
+
+        # Batch insert
         if rows_to_insert:
-            batch_size = 100
+            batch_size = 50
             for i in range(0, len(rows_to_insert), batch_size):
                 batch = rows_to_insert[i:i + batch_size]
-                await client.table("aws_timesheet_logs").insert(batch).execute()
-            inserted = len(rows_to_insert)
+                await client.table("aws_timesheet_logs_v2").insert(batch).execute()
 
-        # Update import_headers with final counts and COMPLETED status
         await client.table("import_headers").update({
             "records_matched": matched,
             "records_unmatched": len(unmatched_emails),
-            "records_skipped": skipped,
             "status": "COMPLETED",
         }).eq("id", import_header_id).execute()
 
     except Exception as exc:
-        # Update import_headers with FAILED status
         error_msg = f"{type(exc).__name__}: {exc}"
-        logger.error("AWS timesheet import failed (header_id=%s): %s", import_header_id, error_msg)
+        logger.error("AWS import failed (header_id=%s): %s\n%s", import_header_id, error_msg, traceback.format_exc())
         await client.table("import_headers").update({
             "status": "FAILED",
             "error_message": error_msg[:1000],
@@ -407,23 +573,21 @@ async def import_aws_timesheet(
     await log_audit(
         user=current_user,
         action="IMPORT",
-        entity_type="aws_timesheet",
-        new_values={"week_start": week_start, "week_end": week_end, "total_rows": len(entries), "matched": matched},
+        entity_type="aws_timesheet_v2",
+        new_values={"month": import_month, "total_rows": len(entries), "matched": matched},
     )
 
-    return AwsImportResult(
-        week_start=week_start,
-        week_end=week_end,
+    return AwsImportV2Result(
+        month=import_month,
         total_rows=len(entries),
         employees_matched=matched,
         employees_unmatched=len(unmatched_emails),
-        entries_inserted=inserted,
-        skipped_existing=skipped,
+        entries_inserted=len(rows_to_insert),
         unmatched_emails=sorted(unmatched_emails),
     )
 
 
-@router.patch("/aws/{log_id}/link", response_model=AwsTimesheetResponse)
+@router.patch("/aws/{log_id}/link", response_model=AwsTimesheetV2Response)
 async def link_aws_to_employee(
     log_id: int,
     employee_id: int = Query(..., description="Employee ID to link"),
@@ -432,17 +596,14 @@ async def link_aws_to_employee(
     """Manually link an unmatched AWS timesheet entry to an employee."""
     client = await get_supabase_admin_async()
 
-    # Verify employee exists
     emp = await client.table("employees").select("id, aws_email").eq("id", employee_id).single().execute()
     if not emp.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Employee not found")
 
-    # Update the AWS log entry
-    result = await client.table("aws_timesheet_logs").update({"employee_id": employee_id}).eq("id", log_id).execute()
+    result = await client.table("aws_timesheet_logs_v2").update({"employee_id": employee_id}).eq("id", log_id).execute()
     if not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "AWS timesheet entry not found")
 
-    # Also update employee's aws_email if not set
     log_entry = result.data[0]
     if not emp.data.get("aws_email") and log_entry.get("aws_email"):
         await client.table("employees").update({"aws_email": log_entry["aws_email"]}).eq("id", employee_id).execute()

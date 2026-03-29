@@ -11,6 +11,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
 
+def normalize_employee_text(data: dict) -> dict:
+    """Apply text normalization rules for employee data."""
+    normalized = dict(data)
+
+    # Title Case for names
+    for field in ("rms_name", "client_name"):
+        if field in normalized and normalized[field]:
+            # Title Case, collapse whitespace
+            val = " ".join(normalized[field].split())  # collapse whitespace
+            normalized[field] = val.title()
+
+    # Lowercase for emails
+    if "aws_email" in normalized and normalized["aws_email"]:
+        normalized["aws_email"] = normalized["aws_email"].strip().lower()
+
+    # Strip whitespace for other fields
+    for field in ("github_id", "jira_username"):
+        if field in normalized and normalized[field]:
+            normalized[field] = normalized[field].strip()
+
+    return normalized
+
+
 @router.get("/", response_model=list[EmployeeResponse])
 async def list_employees(
     employee_status: str | None = None,
@@ -48,6 +71,7 @@ async def create_employee(
 
     data = payload.model_dump(exclude_none=True, mode="json")
     data["status"] = EmployeeStatus.ACTIVE.value
+    data = normalize_employee_text(data)
 
     try:
         result = await client.table("employees").insert(data).execute()
@@ -93,6 +117,7 @@ async def create_employee_from_candidate(
         "status": EmployeeStatus.ACTIVE.value,
     }
     employee_data = {k: v for k, v in employee_data.items() if v is not None}
+    employee_data = normalize_employee_text(employee_data)
 
     try:
         result = await client.table("employees").insert(employee_data).execute()
@@ -127,6 +152,7 @@ async def update_employee(
     data = payload.model_dump(exclude_none=True, mode="json")
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
+    data = normalize_employee_text(data)
 
     result = await client.table("employees").update(data).eq("id", employee_id).execute()
     if not result.data:

@@ -4,8 +4,10 @@ import {
     type ComparisonReport,
     type ComplianceReport,
     type TimesheetComparison,
+    type ComputedReport,
 } from '../api/reports';
 import { EmptyState } from '../components/ui/EmptyState';
+import { EmployeeDrillDownModal } from '../components/reports/EmployeeDrillDownModal';
 import { useAuth, isAdminRole } from '../context/AuthContext';
 import {
     BarChart3,
@@ -15,6 +17,8 @@ import {
     CheckCircle,
     XCircle,
     MinusCircle,
+    Calculator,
+    ExternalLink,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
@@ -29,6 +33,9 @@ export function Reports() {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     });
+
+    // Drill-down modal state
+    const [drillDown, setDrillDown] = useState<{ employeeId: number; name: string } | null>(null);
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -84,9 +91,22 @@ export function Reports() {
             </div>
 
             {activeTab === 'comparison' ? (
-                <ComparisonTab month={selectedMonth} />
+                <ComparisonTab
+                    month={selectedMonth}
+                    isAdmin={isAdmin}
+                    onDrillDown={(id, name) => setDrillDown({ employeeId: id, name })}
+                />
             ) : (
                 <ComplianceTab month={selectedMonth} />
+            )}
+
+            {drillDown && (
+                <EmployeeDrillDownModal
+                    employeeId={drillDown.employeeId}
+                    employeeName={drillDown.name}
+                    month={selectedMonth}
+                    onClose={() => setDrillDown(null)}
+                />
             )}
         </div>
     );
@@ -96,25 +116,57 @@ export function Reports() {
 // Comparison Tab
 // ──────────────────────────────────────────────
 
-function ComparisonTab({ month }: { month: string }) {
+function ComparisonTab({
+    month,
+    isAdmin,
+    onDrillDown,
+}: {
+    month: string;
+    isAdmin: boolean;
+    onDrillDown: (employeeId: number, name: string) => void;
+}) {
     const [report, setReport] = useState<ComparisonReport | null>(null);
+    const [computed, setComputed] = useState<ComputedReport[] | null>(null);
     const [loading, setLoading] = useState(true);
+    const [calculating, setCalculating] = useState(false);
     const [flagFilter, setFlagFilter] = useState<string>('all');
 
-    useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            try {
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            // Try computed reports first, fallback to live comparison
+            const computedData = await reportsApi.getComputedReports(month);
+            if (computedData && computedData.length > 0) {
+                setComputed(computedData);
+                setReport(null);
+            } else {
                 const data = await reportsApi.getComparison(month);
                 setReport(data);
-            } catch {
-                toast.error('Failed to load comparison data');
-            } finally {
-                setLoading(false);
+                setComputed(null);
             }
-        };
-        fetchData();
-    }, [month]);
+        } catch {
+            toast.error('Failed to load comparison data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchData(); }, [month]);
+
+    const handleCalculate = async () => {
+        setCalculating(true);
+        try {
+            const result = await reportsApi.calculateBilling(month);
+            toast.success(`Calculated billing for ${result.total_computed} employees`);
+            setComputed(result.reports);
+            setReport(null);
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Calculation failed';
+            toast.error(msg);
+        } finally {
+            setCalculating(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -125,38 +177,100 @@ function ComparisonTab({ month }: { month: string }) {
         );
     }
 
-    if (!report || report.comparisons.length === 0) {
-        return <EmptyState message={`No comparison data for ${month}`} />;
+    // Use computed data if available, otherwise live comparison
+    const rows: RowData[] = computed
+        ? computed.map(c => ({
+            employee_id: c.employee_id,
+            rms_name: c.rms_name || 'Unknown',
+            jira_username: c.jira_username,
+            aws_email: c.aws_email,
+            jira_hours: c.jira_hours,
+            billable_hours: c.billable_hours,
+            ooo_days: c.ooo_days,
+            aws_hours: c.aws_hours,
+            difference: c.difference,
+            difference_pct: c.difference_pct,
+            flag: c.flag,
+        }))
+        : (report?.comparisons || []).map(c => ({
+            employee_id: c.employee_id,
+            rms_name: c.rms_name,
+            jira_username: c.jira_username,
+            aws_email: c.aws_email,
+            jira_hours: c.jira_billable_hours,
+            billable_hours: null,
+            ooo_days: c.jira_ooo_days,
+            aws_hours: c.aws_total_hours,
+            difference: c.difference,
+            difference_pct: c.difference_pct,
+            flag: c.flag,
+        }));
+
+    if (rows.length === 0) {
+        return (
+            <>
+                {isAdmin && (
+                    <div className="flex justify-end">
+                        <button onClick={handleCalculate} className="btn btn-primary flex items-center gap-2" disabled={calculating}>
+                            <Calculator size={16} />
+                            {calculating ? 'Calculating...' : 'Calculate Billing'}
+                        </button>
+                    </div>
+                )}
+                <EmptyState message={`No comparison data for ${month}. Import data and run Calculate Billing.`} />
+            </>
+        );
     }
 
-    const filtered = flagFilter === 'all'
-        ? report.comparisons
-        : report.comparisons.filter(c => c.flag === flagFilter);
+    const filtered = flagFilter === 'all' ? rows : rows.filter(c => c.flag === flagFilter);
 
-    const redCount = report.comparisons.filter(c => c.flag === 'red').length;
-    const greenCount = report.comparisons.filter(c => c.flag === 'green').length;
-    const noAwsCount = report.comparisons.filter(c => c.flag === 'no_aws').length;
+    const redCount = rows.filter(c => c.flag === 'red').length;
+    const amberCount = rows.filter(c => c.flag === 'amber').length;
+    const greenCount = rows.filter(c => c.flag === 'green').length;
+    const noAwsCount = rows.filter(c => c.flag === 'no_aws').length;
 
     return (
         <>
+            {/* Calculate button */}
+            {isAdmin && (
+                <div className="flex justify-end">
+                    <button onClick={handleCalculate} className="btn btn-primary flex items-center gap-2" disabled={calculating}>
+                        <Calculator size={16} />
+                        {calculating ? 'Calculating...' : 'Calculate Billing'}
+                    </button>
+                </div>
+            )}
+
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <SummaryCard label="Total Employees" value={report.total_employees} />
-                <SummaryCard label="With Jira Data" value={report.employees_with_jira} color="text-cta" />
-                <SummaryCard label="With AWS Data" value={report.employees_with_aws} color="text-info" />
+                <SummaryCard label="Total" value={rows.length} />
                 <SummaryCard
-                    label="Flagged (Red)"
+                    label="Red"
                     value={redCount}
                     color="text-danger"
                     onClick={() => setFlagFilter(f => f === 'red' ? 'all' : 'red')}
                     active={flagFilter === 'red'}
                 />
                 <SummaryCard
-                    label="OK (Green)"
+                    label="Amber"
+                    value={amberCount}
+                    color="text-warning"
+                    onClick={() => setFlagFilter(f => f === 'amber' ? 'all' : 'amber')}
+                    active={flagFilter === 'amber'}
+                />
+                <SummaryCard
+                    label="Green"
                     value={greenCount}
                     color="text-success"
                     onClick={() => setFlagFilter(f => f === 'green' ? 'all' : 'green')}
                     active={flagFilter === 'green'}
+                />
+                <SummaryCard
+                    label="No AWS"
+                    value={noAwsCount}
+                    color="text-text-muted"
+                    onClick={() => setFlagFilter(f => f === 'no_aws' ? 'all' : 'no_aws')}
+                    active={flagFilter === 'no_aws'}
                 />
             </div>
 
@@ -167,18 +281,66 @@ function ComparisonTab({ month }: { month: string }) {
                         <thead>
                             <tr className="bg-surface-hover/50 border-b border-border">
                                 <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase">Employee</th>
+                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-right">Billable Target</th>
                                 <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-right">Jira Hrs</th>
-                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-right">Billable</th>
-                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-center">OOO</th>
                                 <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-right">AWS Hrs</th>
+                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-center">OOO</th>
                                 <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-right">Diff</th>
                                 <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-right">%</th>
                                 <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-center">Flag</th>
+                                <th className="px-4 py-3 w-10"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                             {filtered.map(row => (
-                                <ComparisonRow key={row.employee_id} row={row} />
+                                <tr
+                                    key={row.employee_id}
+                                    className="hover:bg-surface-hover/30 transition-colors cursor-pointer"
+                                    onClick={() => onDrillDown(row.employee_id, row.rms_name)}
+                                >
+                                    <td className="px-4 py-3">
+                                        <p className="font-medium text-text">{row.rms_name}</p>
+                                        <p className="text-xs text-text-muted">{row.jira_username || row.aws_email || '—'}</p>
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-text-muted">
+                                        {row.billable_hours != null ? `${row.billable_hours}h` : '—'}
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-bold text-text">{row.jira_hours.toFixed(1)}</td>
+                                    <td className="px-4 py-3 text-right">
+                                        {row.aws_hours != null ? (
+                                            <span className="font-medium">{row.aws_hours.toFixed(1)}</span>
+                                        ) : (
+                                            <span className="text-text-muted text-xs">N/A</span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <span className={cn("font-medium", row.ooo_days > 0 ? "text-warning" : "text-text-muted")}>
+                                            {row.ooo_days}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                        {row.difference != null ? (
+                                            <span className={cn("font-medium", row.difference > 0 ? "text-success" : row.difference < -10 ? "text-danger" : "text-text")}>
+                                                {row.difference > 0 ? '+' : ''}{row.difference.toFixed(1)}
+                                            </span>
+                                        ) : (
+                                            <span className="text-text-muted">—</span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                        {row.difference_pct != null ? (
+                                            <span className="text-sm text-text-muted">{row.difference_pct.toFixed(1)}%</span>
+                                        ) : (
+                                            <span className="text-text-muted">—</span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <FlagBadge flag={row.flag} />
+                                    </td>
+                                    <td className="px-2 py-3 text-center">
+                                        <ExternalLink size={14} className="text-text-muted" />
+                                    </td>
+                                </tr>
                             ))}
                         </tbody>
                     </table>
@@ -193,48 +355,18 @@ function ComparisonTab({ month }: { month: string }) {
     );
 }
 
-function ComparisonRow({ row }: { row: TimesheetComparison }) {
-    return (
-        <tr className="hover:bg-surface-hover/30 transition-colors">
-            <td className="px-4 py-3">
-                <p className="font-medium text-text">{row.rms_name}</p>
-                <p className="text-xs text-text-muted">{row.jira_username || row.aws_email || '—'}</p>
-            </td>
-            <td className="px-4 py-3 text-right font-medium">{row.jira_total_hours.toFixed(1)}</td>
-            <td className="px-4 py-3 text-right font-bold text-text">{row.jira_billable_hours.toFixed(1)}</td>
-            <td className="px-4 py-3 text-center">
-                <span className={cn("font-medium", row.jira_ooo_days > 0 ? "text-warning" : "text-text-muted")}>
-                    {row.jira_ooo_days}
-                </span>
-            </td>
-            <td className="px-4 py-3 text-right">
-                {row.aws_total_hours !== null ? (
-                    <span className="font-medium">{row.aws_total_hours.toFixed(1)}</span>
-                ) : (
-                    <span className="text-text-muted text-xs">N/A</span>
-                )}
-            </td>
-            <td className="px-4 py-3 text-right">
-                {row.difference !== null ? (
-                    <span className={cn("font-medium", row.difference > 0 ? "text-success" : row.difference < -10 ? "text-danger" : "text-text")}>
-                        {row.difference > 0 ? '+' : ''}{row.difference.toFixed(1)}
-                    </span>
-                ) : (
-                    <span className="text-text-muted">—</span>
-                )}
-            </td>
-            <td className="px-4 py-3 text-right">
-                {row.difference_pct !== null ? (
-                    <span className="text-sm text-text-muted">{row.difference_pct.toFixed(1)}%</span>
-                ) : (
-                    <span className="text-text-muted">—</span>
-                )}
-            </td>
-            <td className="px-4 py-3 text-center">
-                <FlagBadge flag={row.flag} />
-            </td>
-        </tr>
-    );
+interface RowData {
+    employee_id: number;
+    rms_name: string;
+    jira_username: string | null;
+    aws_email: string | null;
+    jira_hours: number;
+    billable_hours: number | null;
+    ooo_days: number;
+    aws_hours: number | null;
+    difference: number | null;
+    difference_pct: number | null;
+    flag: string;
 }
 
 function FlagBadge({ flag }: { flag: string }) {
@@ -242,6 +374,13 @@ function FlagBadge({ flag }: { flag: string }) {
         return (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-danger/10 text-danger text-xs font-medium">
                 <XCircle size={12} /> Red
+            </span>
+        );
+    }
+    if (flag === 'amber') {
+        return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/10 text-warning text-xs font-medium">
+                <AlertTriangle size={12} /> Amber
             </span>
         );
     }

@@ -12,7 +12,7 @@ export interface TimesheetComparison {
     aws_total_hours: number | null;
     difference: number | null;
     difference_pct: number | null;
-    flag: 'green' | 'red' | 'no_aws';
+    flag: 'green' | 'amber' | 'red' | 'no_aws';
 }
 
 export interface ComparisonReport {
@@ -41,6 +41,36 @@ export interface ComplianceReport {
     entries: ComplianceEntry[];
 }
 
+export interface ComputedReport {
+    id: number;
+    employee_id: number;
+    billing_month: string;
+    jira_hours: number;
+    ooo_days: number;
+    aws_hours: number | null;
+    billable_hours: number | null;
+    difference: number | null;
+    difference_pct: number | null;
+    flag: 'green' | 'amber' | 'red' | 'no_aws';
+    computed_at: string | null;
+    // Joined fields
+    rms_name?: string;
+    jira_username?: string | null;
+    aws_email?: string | null;
+}
+
+export interface CalculateResult {
+    month: string;
+    total_computed: number;
+    reports: ComputedReport[];
+}
+
+export interface EmployeeDetail {
+    summary: ComputedReport;
+    aws_data: Record<string, unknown> | null;
+    jira_entries: Record<string, unknown>[];
+}
+
 export const reportsApi = {
     getComparison: (month: string) =>
         api.get<ComparisonReport>('/reports/timesheet-comparison', { month }),
@@ -48,13 +78,15 @@ export const reportsApi = {
     getCompliance: (month: string) =>
         api.get<ComplianceReport>('/reports/compliance', { month }),
 
-    exportComparison: (month: string) => {
-        // Direct download — open in new tab
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        const token = localStorage.getItem('rms_access_token');
-        window.open(
-            `${baseUrl}/reports/timesheet-comparison/export?month=${month}`,
-            '_blank'
-        );
-    },
+    exportComparison: (month: string) =>
+        api.download(`/reports/timesheet-comparison/export?month=${month}`, `comparison_${month}.csv`),
+
+    calculateBilling: (month: string) =>
+        api.post<CalculateResult>(`/reports/calculate/${month}`, {}),
+
+    getComputedReports: (month: string) =>
+        api.get<ComputedReport[]>('/reports/computed', { month }),
+
+    getEmployeeDetail: (employeeId: number, month: string) =>
+        api.get<EmployeeDetail>(`/reports/employee-detail/${employeeId}`, { month }),
 };
