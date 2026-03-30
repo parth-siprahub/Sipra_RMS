@@ -148,6 +148,7 @@ export function Sows() {
                             <thead>
                                 <tr className="bg-surface-hover/50 border-b border-border">
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">SOW Details</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Job Profile</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Duration</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider text-center">Resources</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider text-right">Actions</th>
@@ -169,16 +170,20 @@ export function Sows() {
                                                         )}
                                                     </div>
                                                     <p className="text-sm text-text-muted">{sow.client_name}</p>
-                                                    {sow.job_profile_id && (
-                                                        <div className="flex items-center gap-1 mt-0.5">
-                                                            <Briefcase size={11} className="text-cta" />
-                                                            <span className="text-[11px] text-cta font-medium">
-                                                                {jobProfiles.find(p => p.id === sow.job_profile_id)?.role_name || 'Unknown Profile'}
-                                                            </span>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {sow.job_profile_id ? (
+                                                <div className="flex items-center gap-1.5">
+                                                    <Briefcase size={14} className="text-cta" />
+                                                    <span className="text-sm font-medium text-text">
+                                                        {jobProfiles.find(p => p.id === sow.job_profile_id)?.role_name || 'Unknown Profile'}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-sm text-text-muted italic">No profile linked</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-sm">
                                             <div className="flex items-center gap-2 text-text-muted">
