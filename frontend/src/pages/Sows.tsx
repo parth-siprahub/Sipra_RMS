@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { sowApi } from '../api/sows';
 import { type SOW } from '../api/sows';
 import { SowModal } from '../components/sows/SowModal';
@@ -8,7 +8,9 @@ import {
     Search,
     Edit2,
     Calendar,
-    Briefcase
+    Briefcase,
+    Download,
+    ChevronDown
 } from 'lucide-react';
 import { EmptyState } from '../components/ui/EmptyState';
 import toast from 'react-hot-toast';
@@ -17,6 +19,8 @@ import { resourceRequestsApi } from '../api/resourceRequests';
 import { candidatesApi } from '../api/candidates';
 import { jobProfileApi, type JobProfile } from '../api/jobProfiles';
 import { useAuth, isAdminRole } from '../context/AuthContext';
+import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
 
 export function Sows() {
     const { user } = useAuth();
@@ -29,6 +33,8 @@ export function Sows() {
     const [selectedSow, setSelectedSow] = useState<SOW | undefined>();
     const [onboardedCounts, setOnboardedCounts] = useState<Record<number, number>>({});
     const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
+    const [isExportOpen, setIsExportOpen] = useState(false);
+    const exportRef = useRef<HTMLDivElement>(null);
 
     const fetchSows = async () => {
         try {
@@ -66,6 +72,17 @@ export function Sows() {
         fetchSows();
     }, []);
 
+    // Click outside to close export dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (exportRef.current && !exportRef.current.contains(event.target as Node)) {
+                setIsExportOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     const filteredSows = (sows || []).filter(sow => {
         const matchesSearch = (sow.sow_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
             (sow.client_name || '').toLowerCase().includes(searchQuery.toLowerCase());
@@ -76,6 +93,41 @@ export function Sows() {
 
         return matchesSearch && matchesStatus;
     });
+
+    const handleExport = (formatType: 'xlsx' | 'csv') => {
+        const activeSows = sows.filter(s => s.is_active !== false);
+        
+        if (activeSows.length === 0) {
+            toast.error('No active SOWs to export');
+            return;
+        }
+
+        const data = activeSows.map(s => ({
+            'SOW Number': s.sow_number,
+            'Client': s.client_name,
+            'Job Profile': jobProfiles.find(p => p.id === s.job_profile_id)?.role_name || 'N/A',
+            'Start Date': s.start_date || 'N/A',
+            'Target Date': s.target_date || 'N/A',
+            'Max Resources': s.max_resources || 0,
+            'Resources Onboarded': onboardedCounts[s.id] || 0,
+            'Status': s.is_active !== false ? 'Active' : 'Inactive'
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Active SOWs');
+
+        const fileName = `Active_SOWs_${format(new Date(), 'yyyyMMdd')}`;
+        
+        if (formatType === 'xlsx') {
+            XLSX.writeFile(wb, `${fileName}.xlsx`);
+        } else {
+            XLSX.writeFile(wb, `${fileName}.csv`, { bookType: 'csv' });
+        }
+        
+        setIsExportOpen(false);
+        toast.success(`Exported ${activeSows.length} SOWs as ${formatType.toUpperCase()}`);
+    };
 
     const handleEdit = (sow: SOW) => {
         setSelectedSow(sow);
@@ -94,15 +146,47 @@ export function Sows() {
                 <div>
                     <p className="text-text-muted">Manage client contracts and resource allocations</p>
                 </div>
-                {isAdmin && (
-                    <button
-                        onClick={handleCreate}
-                        className="btn btn-primary flex items-center gap-2 shadow-lg shadow-cta/20"
-                    >
-                        <Plus size={20} />
-                        <span>New SOW</span>
-                    </button>
-                )}
+                <div className="flex items-center gap-3">
+                    <div className="relative" ref={exportRef}>
+                        <button
+                            onClick={() => setIsExportOpen(!isExportOpen)}
+                            className="btn btn-secondary flex items-center gap-2 bg-surface backdrop-blur-md border border-border group"
+                        >
+                            <Download size={18} className="text-text-muted group-hover:text-cta transition-colors" />
+                            <span>Export</span>
+                            <ChevronDown size={16} className={cn("transition-transform duration-200", isExportOpen && "rotate-180")} />
+                        </button>
+
+                        {isExportOpen && (
+                            <div className="absolute right-0 mt-2 w-48 rounded-xl bg-surface border border-border shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                <button
+                                    onClick={() => handleExport('xlsx')}
+                                    className="w-full text-left px-4 py-2 text-sm hover:bg-surface-hover hover:text-cta transition-colors flex items-center gap-2"
+                                >
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                    Download as Excel (.xlsx)
+                                </button>
+                                <button
+                                    onClick={() => handleExport('csv')}
+                                    className="w-full text-left px-4 py-2 text-sm hover:bg-surface-hover hover:text-cta transition-colors flex items-center gap-2"
+                                >
+                                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                    Download as CSV (.csv)
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {isAdmin && (
+                        <button
+                            onClick={handleCreate}
+                            className="btn btn-primary flex items-center gap-2 shadow-lg shadow-cta/20"
+                        >
+                            <Plus size={20} />
+                            <span>New SOW</span>
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Filter Bar */}

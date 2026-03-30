@@ -7,7 +7,7 @@ const ROUTE_LABELS: Record<string, string> = {
     '/resource-requests': 'Staffing Requests',
     '/candidates': 'Candidate Pipeline',
     '/job-profiles': 'Job Profiles',
-    '/sows': 'Statements of Work',
+    '/sows': 'Statement of Work',
     '/communication-logs': 'Interaction History',
     '/vendors': 'Partner Vendors',
     '/employees': 'Employee Directory',
