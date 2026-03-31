@@ -368,6 +368,11 @@ export function ResourceRequests() {
                 >
                     Clear
                 </button>
+                {!loading && requests.length > 0 && (
+                    <span className="ml-2 text-xs font-semibold text-text-muted bg-surface-hover px-3 py-1.5 rounded-full border border-border">
+                        {requests.length} total
+                    </span>
+                )}
                 <button
                     onClick={fetchRequests}
                     className="btn btn-ghost btn-icon ml-auto"
@@ -402,7 +407,7 @@ export function ResourceRequests() {
                         />
                     </div>
                 ) : (
-                    <div className="table-container border-none">
+                    <div className="table-container border-none max-h-[70vh] overflow-y-auto custom-scrollbar">
                         <table className="data-table">
                             <thead>
                                 <tr>

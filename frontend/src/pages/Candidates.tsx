@@ -1239,7 +1239,9 @@ export function Candidates() {
         try {
             const [cData, rData, vData, sowData, jpData] = await Promise.all([
                 candidatesApi.list(
-                    statusFilter && viewMode === 'table' ? { status: statusFilter } : undefined
+                    statusFilter && viewMode === 'table'
+                        ? { status: statusFilter, page_size: 2000 }
+                        : { page_size: 2000 }
                 ),
                 resourceRequestsApi.list(),
                 vendorsApi.list(),
@@ -1419,7 +1421,7 @@ export function Candidates() {
             ) : viewMode === 'table' ? (
                 <>
                     <div className="card p-0 overflow-hidden">
-                        <div className="table-container border-none">
+                        <div className="table-container border-none max-h-[70vh] overflow-y-auto custom-scrollbar">
                             <table className="data-table">
                                 <thead>
                                     <tr>
