@@ -16,15 +16,23 @@ def normalize_employee_text(data: dict) -> dict:
     normalized = dict(data)
 
     # Title Case for names
-    for field in ("rms_name", "client_name"):
+    for field in ("rms_name",):
         if field in normalized and normalized[field]:
             # Title Case, collapse whitespace
             val = " ".join(normalized[field].split())  # collapse whitespace
             normalized[field] = val.title()
 
+    # Uppercase for client_name (e.g., "DCLI")
+    if "client_name" in normalized and normalized["client_name"]:
+        val = " ".join(normalized["client_name"].split())
+        normalized["client_name"] = val.upper()
+
     # Lowercase for emails
     if "aws_email" in normalized and normalized["aws_email"]:
         normalized["aws_email"] = normalized["aws_email"].strip().lower()
+
+    if "siprahub_email" in normalized and normalized["siprahub_email"]:
+        normalized["siprahub_email"] = normalized["siprahub_email"].strip().lower()
 
     # Strip whitespace for other fields
     for field in ("github_id", "jira_username"):
@@ -38,7 +46,7 @@ def normalize_employee_text(data: dict) -> dict:
 async def list_employees(
     employee_status: str | None = None,
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=500),
+    page_size: int = Query(1000, ge=1, le=1000),
     current_user: dict = Depends(get_current_user),
 ):
     cache_key = f"employees_list_{employee_status}_{page}_{page_size}"

@@ -11,6 +11,7 @@ import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useAuth, isAdminRole } from '../context/AuthContext';
 import { JiraTimesheetDrillDown } from '../components/timesheets/JiraTimesheetDrillDown';
+import { AwsTimesheetDrillDown } from '../components/timesheets/AwsTimesheetDrillDown';
 import {
     Upload,
     Download,
@@ -45,6 +46,32 @@ function dayLabel(day: number, ym: string): string {
     const d = new Date(y, m - 1, day);
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return `${String(day).padStart(2, '0')}/${months[d.getMonth()]}`;
+}
+
+function exportAwsCsv(entries: AwsTimesheetV2Entry[], month: string) {
+    if (!entries.length) return;
+    const headers = ['Employee Email', 'Work Time', 'Productive', 'Unproductive', 'Undefined', 'Active', 'Passive', 'Screen Time', 'Offline Meetings'];
+    const csvRows = [headers.join(',')];
+    for (const e of entries) {
+        csvRows.push([
+            e.aws_email || '',
+            e.work_time_hms || '0:00:00',
+            e.productive_hms || '0:00:00',
+            e.unproductive_hms || '0:00:00',
+            e.undefined_hms || '0:00:00',
+            e.active_hms || '0:00:00',
+            e.passive_hms || '0:00:00',
+            e.screen_time_hms || '0:00:00',
+            e.offline_meetings_hms || '0:00:00',
+        ].join(','));
+    }
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aws_activetrack_${month}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 export function Timesheets() {
@@ -150,10 +177,16 @@ export function Timesheets() {
                         </>
                     )}
                     {isAdmin && activeTab === 'aws' && (
-                        <button onClick={() => setIsAwsImportOpen(true)} className="btn btn-primary flex items-center gap-2">
-                            <Download size={18} />
-                            Import AWS CSV
-                        </button>
+                        <>
+                            <button onClick={() => exportAwsCsv(awsEntries, selectedMonth)} className="btn btn-secondary flex items-center gap-2">
+                                <Upload size={18} />
+                                Export CSV
+                            </button>
+                            <button onClick={() => setIsAwsImportOpen(true)} className="btn btn-primary flex items-center gap-2">
+                                <Download size={18} />
+                                Import AWS CSV
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -520,6 +553,8 @@ function AwsV2Tab({
     isAdmin: boolean;
     onImport: () => void;
 }) {
+    const [awsDrillDownIndex, setAwsDrillDownIndex] = useState<number | null>(null);
+
     return (
         <>
             <div className="card flex items-center gap-4 py-3 px-4">
@@ -579,7 +614,7 @@ function AwsV2Tab({
                                 {entries.map(entry => {
                                     const emp = entry.employee_id ? empMap[entry.employee_id] : null;
                                     return (
-                                        <tr key={entry.id} className="hover:bg-surface-hover/30 transition-colors">
+                                        <tr key={entry.id} className="hover:bg-surface-hover/30 transition-colors cursor-pointer" onClick={() => setAwsDrillDownIndex(entries.indexOf(entry))}>
                                             <td className="sticky left-0 z-10 bg-surface px-4 py-2.5 min-w-[200px]">
                                                 <p className="font-medium text-text">{emp?.rms_name || entry.aws_email}</p>
                                                 {emp && <p className="text-xs text-text-muted">{entry.aws_email}</p>}
@@ -612,6 +647,16 @@ function AwsV2Tab({
                     />
                 )}
             </div>
+
+            {awsDrillDownIndex !== null && (
+                <AwsTimesheetDrillDown
+                    entries={entries}
+                    currentIndex={awsDrillDownIndex}
+                    onClose={() => setAwsDrillDownIndex(null)}
+                    onNavigate={(idx) => setAwsDrillDownIndex(idx)}
+                    empMap={empMap}
+                />
+            )}
         </>
     );
 }

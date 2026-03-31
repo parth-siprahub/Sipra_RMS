@@ -168,6 +168,8 @@ app.add_middleware(
 )
 
 # ─── Routers ──────────────────────────────────────────────────────────────────
+from app.job_profiles.jd import router as jd_router
+app.include_router(jd_router)
 app.include_router(auth_router)
 app.include_router(job_profiles_router)
 app.include_router(resource_requests_router)
