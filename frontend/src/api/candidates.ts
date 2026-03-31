@@ -83,7 +83,7 @@ export interface CreateCandidatePayload {
 }
 
 export const candidatesApi = {
-    list: (filters?: { status?: string; request_id?: number }) =>
+    list: (filters?: { status?: string; request_id?: number; page_size?: number }) =>
         api.get<Candidate[]>('/candidates/', filters),
 
     create: (payload: CreateCandidatePayload) =>

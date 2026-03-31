@@ -112,7 +112,7 @@ function EditEmployeeModal({
 export function Employees() {
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
-    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('ACTIVE');
@@ -121,8 +121,8 @@ export function Employees() {
     const fetchEmployees = async () => {
         setLoading(true);
         try {
-            const data = await employeesApi.list({ employee_status: statusFilter });
-            setEmployees(data || []);
+            const data = await employeesApi.list({});
+            setAllEmployees(data || []);
         } catch {
             toast.error('Failed to load employees');
         } finally {
@@ -132,7 +132,12 @@ export function Employees() {
 
     useEffect(() => {
         fetchEmployees();
-    }, [statusFilter]);
+    }, []);
+
+    const activeCount = allEmployees.filter(e => e.status === 'ACTIVE').length;
+    const exitedCount = allEmployees.filter(e => e.status === 'EXITED').length;
+
+    const employees = allEmployees.filter(e => e.status === statusFilter);
 
     const filtered = employees.filter(emp => {
         const q = searchQuery.toLowerCase();
@@ -168,20 +173,40 @@ export function Employees() {
                     />
                 </div>
                 <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
-                    {['ACTIVE', 'EXITED'].map(s => (
-                        <button
-                            key={s}
-                            onClick={() => setStatusFilter(s)}
-                            className={cn(
-                                'px-4 py-2 text-sm font-medium transition-colors',
-                                statusFilter === s
-                                    ? 'bg-primary text-text-inverse'
-                                    : 'bg-surface text-text-muted hover:bg-surface-hover'
-                            )}
-                        >
-                            {s}
-                        </button>
-                    ))}
+                    <button
+                        onClick={() => setStatusFilter('ACTIVE')}
+                        className={cn(
+                            'px-4 py-2 text-sm font-medium transition-colors flex items-center gap-2',
+                            statusFilter === 'ACTIVE'
+                                ? 'bg-primary text-text-inverse'
+                                : 'bg-surface text-text-muted hover:bg-surface-hover'
+                        )}
+                    >
+                        ACTIVE
+                        <span className={cn(
+                            'text-xs font-bold px-1.5 py-0.5 rounded-full',
+                            statusFilter === 'ACTIVE' ? 'bg-white/20' : 'bg-success/10 text-success'
+                        )}>
+                            {activeCount}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => setStatusFilter('EXITED')}
+                        className={cn(
+                            'px-4 py-2 text-sm font-medium transition-colors flex items-center gap-2 border-l border-border',
+                            statusFilter === 'EXITED'
+                                ? 'bg-primary text-text-inverse'
+                                : 'bg-surface text-text-muted hover:bg-surface-hover'
+                        )}
+                    >
+                        EXITED
+                        <span className={cn(
+                            'text-xs font-bold px-1.5 py-0.5 rounded-full',
+                            statusFilter === 'EXITED' ? 'bg-white/20' : 'bg-danger/10 text-danger'
+                        )}>
+                            {exitedCount}
+                        </span>
+                    </button>
                 </div>
             </div>
 
@@ -192,7 +217,7 @@ export function Employees() {
                         <p className="text-text-muted text-sm animate-pulse">Loading employees...</p>
                     </div>
                 ) : filtered.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-auto max-h-[70vh] custom-scrollbar">
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-surface-hover/50 border-b border-border">

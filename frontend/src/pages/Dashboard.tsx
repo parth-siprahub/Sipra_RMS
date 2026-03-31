@@ -763,7 +763,7 @@ export function Dashboard() {
                         SOW Utilization
                     </h2>
                     {metrics?.sow_utilization && metrics.sow_utilization.length > 0 ? (
-                        <div className="space-y-4">
+                        <div className="max-h-[250px] overflow-y-auto custom-scrollbar pr-2 space-y-4">
                             {metrics.sow_utilization.map((sow) => {
                                 const pct = sow.max > 0 ? Math.round((sow.current / sow.max) * 100) : 0;
                                 const barColor = pct >= 80 ? 'bg-danger' : pct >= 50 ? 'bg-warning' : 'bg-success';
@@ -811,29 +811,6 @@ export function Dashboard() {
                             </Link>
                         </div>
                     </div>
-
-                    <div className="card">
-                        <h2 className="text-base font-bold mb-4">Infrastructure Status</h2>
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="flex items-center gap-2"><CheckCircle size={16} className="text-success" /> Gateway Status</span>
-                                <span className="text-success font-bold uppercase text-[10px]">Operational</span>
-                            </div>
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="flex items-center gap-2"><Clock size={16} className="text-info" /> Latency</span>
-                                <span className="text-text-muted font-bold">14ms</span>
-                            </div>
-                            <div className="pt-4 border-t border-border">
-                                <div className="flex items-center justify-between text-[10px] font-bold text-text-muted uppercase">
-                                    <span>Database Shard</span>
-                                    <span>Replica-01</span>
-                                </div>
-                                <div className="w-full h-1.5 bg-surface-hover rounded-full mt-2 overflow-hidden">
-                                    <div className="w-3/4 h-full bg-success" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -864,42 +841,6 @@ export function Dashboard() {
                             icon={XCircle}
                         />
                     </div>
-
-                    {/* Compliance Tracker */}
-                    {metrics.missing_identifiers && metrics.missing_identifiers.length > 0 && (
-                        <div className="card">
-                            <h2 className="text-base font-bold mb-4 flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 rounded-full bg-warning" />
-                                Compliance Tracker — Missing Triad IDs
-                            </h2>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b border-border">
-                                            <th className="text-left py-2 text-xs text-text-muted uppercase">Employee</th>
-                                            <th className="text-left py-2 text-xs text-text-muted uppercase">Missing Fields</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {metrics.missing_identifiers.map(mi => (
-                                            <tr key={mi.employee_id} className="border-b border-border/50">
-                                                <td className="py-2 font-medium text-text">{mi.rms_name}</td>
-                                                <td className="py-2">
-                                                    <div className="flex gap-1.5 flex-wrap">
-                                                        {mi.missing_fields.map(f => (
-                                                            <span key={f} className="badge badge-warning text-[10px] px-2 py-0.5">
-                                                                {f.replace('_', ' ')}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
 
                     {/* Triad Billing Summary */}
                     {metrics.triad_summary && metrics.triad_summary.length > 0 && (

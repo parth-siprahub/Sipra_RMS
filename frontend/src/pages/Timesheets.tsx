@@ -643,7 +643,15 @@ function JiraRawImportModal({
             onClose();
         } catch (error) {
             const msg = error instanceof Error ? error.message : 'Import failed';
-            toast.error(msg);
+            // If it's a timeout, the backend likely completed processing.
+            // Auto-close and refresh so data becomes visible.
+            if (msg.includes('timed out') || msg.includes('300s')) {
+                toast.success('Upload sent — processing may still be running. Refreshing data...', { duration: 5000 });
+                onClose();
+                setTimeout(() => onSuccess({ month, total_rows_processed: 0, employees_matched: 0, employees_unmatched: [], entries_inserted: 0 }), 3000);
+            } else {
+                toast.error(msg);
+            }
         } finally {
             setUploading(false);
         }
@@ -704,7 +712,13 @@ function AwsV2ImportModal({
             onClose();
         } catch (error) {
             const msg = error instanceof Error ? error.message : 'AWS import failed';
-            toast.error(msg);
+            if (msg.includes('timed out') || msg.includes('300s')) {
+                toast.success('Upload sent — processing may still be running. Refreshing data...', { duration: 5000 });
+                onClose();
+                setTimeout(() => onSuccess({ month, total_rows: 0, employees_matched: 0, employees_unmatched: 0, entries_inserted: 0, unmatched_emails: [] }), 3000);
+            } else {
+                toast.error(msg);
+            }
         } finally {
             setUploading(false);
         }

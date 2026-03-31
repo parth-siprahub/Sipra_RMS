@@ -99,7 +99,7 @@ async def list_candidates(
     request_id: int | None = None,
     candidate_status: str | None = Query(None, alias="status"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
+    page_size: int = Query(2000, ge=1, le=5000),
     current_user: dict = Depends(get_current_user),
 ):
     cache_key = f"candidates_list_{request_id}_{candidate_status}_{page}_{page_size}"
