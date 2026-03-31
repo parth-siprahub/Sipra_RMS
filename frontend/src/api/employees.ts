@@ -6,6 +6,7 @@ export interface Employee {
     rms_name: string;
     client_name: string | null;
     aws_email: string | null;
+    siprahub_email: string | null;
     github_id: string | null;
     jira_username: string | null;
     start_date: string | null;
@@ -29,6 +30,7 @@ export interface EmployeeUpdate {
     rms_name?: string;
     client_name?: string;
     aws_email?: string;
+    siprahub_email?: string;
     github_id?: string;
     jira_username?: string;
     start_date?: string;

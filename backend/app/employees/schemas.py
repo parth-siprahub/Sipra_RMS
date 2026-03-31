@@ -15,6 +15,7 @@ class EmployeeCreate(BaseModel):
     rms_name: str
     client_name: str | None = None
     aws_email: EmailStr | None = None
+    siprahub_email: EmailStr | None = None
     github_id: str | None = None
     jira_username: str | None = None
     start_date: date | None = None
@@ -24,6 +25,7 @@ class EmployeeUpdate(BaseModel):
     rms_name: str | None = None
     client_name: str | None = None
     aws_email: EmailStr | None = None
+    siprahub_email: EmailStr | None = None
     github_id: str | None = None
     jira_username: str | None = None
     start_date: date | None = None
@@ -37,6 +39,7 @@ class EmployeeResponse(BaseModel):
     rms_name: str
     client_name: str | None = None
     aws_email: str | None = None
+    siprahub_email: str | None = None
     github_id: str | None = None
     jira_username: str | None = None
     start_date: date | None = None

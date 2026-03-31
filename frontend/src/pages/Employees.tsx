@@ -35,6 +35,7 @@ function EditEmployeeModal({
         rms_name: employee.rms_name,
         client_name: employee.client_name || '',
         aws_email: employee.aws_email || '',
+        siprahub_email: employee.siprahub_email || '',
         github_id: employee.github_id || '',
         jira_username: employee.jira_username || '',
     });
@@ -52,6 +53,7 @@ function EditEmployeeModal({
             if (form.rms_name && form.rms_name !== employee.rms_name) payload.rms_name = form.rms_name;
             if (form.client_name !== undefined) payload.client_name = form.client_name || undefined;
             if (form.aws_email !== undefined) payload.aws_email = form.aws_email || undefined;
+            if (form.siprahub_email !== undefined) payload.siprahub_email = form.siprahub_email || undefined;
             if (form.github_id !== undefined) payload.github_id = form.github_id || undefined;
             if (form.jira_username !== undefined) payload.jira_username = form.jira_username || undefined;
 
@@ -89,6 +91,10 @@ function EditEmployeeModal({
                 <div>
                     <label className="input-label">AWS Email</label>
                     <input className="input-field" type="email" value={form.aws_email || ''} onChange={e => setForm(p => ({ ...p, aws_email: e.target.value }))} placeholder="user@client.awsapps.com" />
+                </div>
+                <div>
+                    <label className="input-label">SipraHub Email</label>
+                    <input className="input-field" type="email" value={form.siprahub_email || ''} onChange={e => setForm(p => ({ ...p, siprahub_email: e.target.value }))} placeholder="user@siprahub.com" />
                 </div>
                 <div>
                     <label className="input-label">GitHub ID</label>
@@ -144,7 +150,8 @@ export function Employees() {
         return (emp.rms_name || '').toLowerCase().includes(q)
             || (emp.client_name || '').toLowerCase().includes(q)
             || (emp.jira_username || '').toLowerCase().includes(q)
-            || (emp.aws_email || '').toLowerCase().includes(q);
+            || (emp.aws_email || '').toLowerCase().includes(q)
+            || (emp.siprahub_email || '').toLowerCase().includes(q);
     });
 
     const triadComplete = (emp: Employee) =>
@@ -247,13 +254,17 @@ export function Employees() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text">
-                                            {emp.client_name ? emp.client_name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') : '—'}
+                                            {emp.client_name ? emp.client_name.toUpperCase() : '—'}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="space-y-1 text-xs">
                                                 <div className="flex items-center gap-1.5">
                                                     <Mail size={12} className={emp.aws_email ? 'text-success' : 'text-text-muted'} />
                                                     <span className={emp.aws_email ? 'text-text' : 'text-text-muted italic'}>{emp.aws_email || 'Missing AWS'}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <Mail size={12} className={emp.siprahub_email ? 'text-success' : 'text-text-muted'} />
+                                                    <span className={emp.siprahub_email ? 'text-text' : 'text-text-muted italic'}>{emp.siprahub_email || 'Missing SipraHub'}</span>
                                                 </div>
                                                 <div className="flex items-center gap-1.5">
                                                     <GitBranch size={12} className={emp.github_id ? 'text-success' : 'text-text-muted'} />

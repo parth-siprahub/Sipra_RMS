@@ -48,7 +48,7 @@ class ApiClient {
         }
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        const timeoutId = setTimeout(() => controller.abort(), 300000);
 
         // For FormData uploads, do NOT set Content-Type — let the browser
         // auto-set multipart/form-data with the correct boundary.
@@ -106,7 +106,7 @@ class ApiClient {
         } catch (error) {
             if (error instanceof Error) {
                 if (error.name === 'AbortError') {
-                    const msg = 'Request timed out (30s). The server might be busy.';
+                    const msg = 'Request timed out (300s). The server might be busy.';
                     toast.error(msg);
                     throw new Error(msg);
                 }

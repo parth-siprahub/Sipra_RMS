@@ -22,7 +22,7 @@ from app.audit.service import log_audit
 
 logger = logging.getLogger(__name__)
 
-MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
+MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024  # 50MB
 
 _XLS_MAGIC = b'\xD0\xCF\x11\xE0'
 _XLSX_MAGIC = b'PK\x03\x04'
@@ -194,28 +194,33 @@ async def import_jira_raw(
                     })
 
             if legacy_matched:
-                # Delete existing legacy entries for matched employees
-                matched_emp_ids = list({e["employee_id"] for e in legacy_matched})
-                for emp_id in matched_emp_ids:
-                    frozen_check = await (
-                        client.table("timesheet_logs")
-                        .select("id")
-                        .eq("employee_id", emp_id)
-                        .eq("import_month", import_month)
-                        .eq("processed", True)
-                        .limit(1)
-                        .execute()
-                    )
-                    if frozen_check.data:
-                        logger.warning("Skipping legacy upsert for frozen employee %s in %s", emp_id, import_month)
-                        continue
+                # 1. Batch check for frozen records in this month
+                frozen_check = await (
+                    client.table("timesheet_logs")
+                    .select("employee_id")
+                    .in_("employee_id", list({e["employee_id"] for e in legacy_matched}))
+                    .eq("import_month", import_month)
+                    .eq("processed", True)
+                    .execute()
+                )
+                frozen_emp_ids = {r["employee_id"] for r in (frozen_check.data or [])}
 
-                for emp_id in matched_emp_ids:
-                    await client.table("timesheet_logs").delete().eq("employee_id", emp_id).eq("import_month", import_month).execute()
+                # 2. Filter out frozen employees
+                legacy_to_insert = [
+                    e for e in legacy_matched 
+                    if e["employee_id"] not in frozen_emp_ids
+                ]
 
-                for i in range(0, len(legacy_matched), batch_size):
-                    batch = legacy_matched[i:i + batch_size]
-                    await client.table("timesheet_logs").insert(batch).execute()
+                if legacy_to_insert:
+                    # 3. Batch delete existing records for this month (only for non-frozen employees)
+                    to_delete_emp_ids = list({e["employee_id"] for e in legacy_to_insert})
+                    # Chunk deletions if necessary, but 100-200 is fine for a single IN clause
+                    await client.table("timesheet_logs").delete().in_("employee_id", to_delete_emp_ids).eq("import_month", import_month).execute()
+
+                    # 4. Batch insert legacy entries
+                    for i in range(0, len(legacy_to_insert), batch_size):
+                        batch = legacy_to_insert[i:i + batch_size]
+                        await client.table("timesheet_logs").insert(batch).execute()
 
         # Count matched employees (those with employee_id set)
         matched_count = sum(1 for e in matched_raw if e.get("employee_id"))
@@ -375,27 +380,28 @@ async def import_timesheet(
                 unmatched_usernames.add(entry["jira_username"])
 
         if matched_entries:
-            matched_emp_ids = list({e["employee_id"] for e in matched_entries})
-            for emp_id in matched_emp_ids:
-                frozen_check = await (
-                    client.table("timesheet_logs")
-                    .select("id")
-                    .eq("employee_id", emp_id)
-                    .eq("import_month", import_month)
-                    .eq("processed", True)
-                    .limit(1)
-                    .execute()
+            # 1. Batch check for frozen records
+            frozen_check = await (
+                client.table("timesheet_logs")
+                .select("employee_id")
+                .in_("employee_id", list({e["employee_id"] for e in matched_entries}))
+                .eq("import_month", import_month)
+                .eq("processed", True)
+                .execute()
+            )
+            if frozen_check.data:
+                frozen_ids = [str(r["employee_id"]) for r in frozen_check.data]
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT,
+                    f"Cannot re-import: timesheet entries for employees [{', '.join(frozen_ids)}] "
+                    f"in {import_month} are frozen (billing processed).",
                 )
-                if frozen_check.data:
-                    raise HTTPException(
-                        status.HTTP_409_CONFLICT,
-                        f"Cannot re-import: timesheet entries for employee {emp_id} "
-                        f"in {import_month} are frozen (billing processed).",
-                    )
 
-            for emp_id in matched_emp_ids:
-                await client.table("timesheet_logs").delete().eq("employee_id", emp_id).eq("import_month", import_month).execute()
+            # 2. Batch delete existing records
+            matched_emp_ids = list({e["employee_id"] for e in matched_entries})
+            await client.table("timesheet_logs").delete().in_("employee_id", matched_emp_ids).eq("import_month", import_month).execute()
 
+            # 3. Batch insert
             batch_size = 100
             for i in range(0, len(matched_entries), batch_size):
                 batch = matched_entries[i:i + batch_size]
@@ -611,3 +617,50 @@ async def link_aws_to_employee(
 
     api_cache.clear_prefix("aws_timesheets_")
     return result.data[0]
+
+
+# ──────────────────────────────────────────────
+# Jira Import Verification
+# ──────────────────────────────────────────────
+
+@router.get("/jira-raw/verify")
+async def verify_jira_import(
+    billing_month: str = Query(..., description="YYYY-MM format"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Verify Jira import completeness: compare DB row count with import header."""
+    client = await get_supabase_admin_async()
+
+    # Get actual row count in DB
+    rows = await client.table("jira_timesheet_raw").select("id", count="exact").eq("billing_month", billing_month).execute()
+    db_count = rows.count if rows.count is not None else len(rows.data or [])
+
+    # Get import header for this month
+    header = await (
+        client.table("import_headers")
+        .select("*")
+        .eq("import_type", "JIRA_TIMESHEET")
+        .eq("import_month", billing_month)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    header_data = header.data[0] if header.data else None
+    expected_count = header_data["records_total"] if header_data else 0
+
+    # Count unique users
+    users_result = await client.table("jira_timesheet_raw").select("jira_user").eq("billing_month", billing_month).execute()
+    unique_users = len(set(r["jira_user"] for r in (users_result.data or [])))
+
+    return {
+        "month": billing_month,
+        "db_row_count": db_count,
+        "import_expected_count": expected_count,
+        "match": db_count == expected_count,
+        "unique_users": unique_users,
+        "import_status": header_data["status"] if header_data else "NOT_FOUND",
+        "import_filename": header_data["filename"] if header_data else None,
+        "matched_employees": header_data["records_matched"] if header_data else 0,
+        "unmatched_employees": header_data["records_unmatched"] if header_data else 0,
+    }

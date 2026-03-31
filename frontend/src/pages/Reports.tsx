@@ -243,7 +243,13 @@ function ComparisonTab({
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <SummaryCard label="Total" value={rows.length} />
+                <SummaryCard
+                    label="Total"
+                    value={rows.length}
+                    color="text-cta"
+                    onClick={() => setFlagFilter('all')}
+                    active={flagFilter === 'all'}
+                />
                 <SummaryCard
                     label="Red"
                     value={redCount}
@@ -536,7 +542,13 @@ function SummaryCard({
             className={cn(
                 "card py-4 px-5 text-center transition-all",
                 onClick && "cursor-pointer hover:shadow-md",
-                active && "ring-2 ring-cta"
+                active && "ring-2 ring-offset-2",
+                active && color === "text-danger" && "ring-danger",
+                active && color === "text-warning" && "ring-warning",
+                active && color === "text-success" && "ring-success",
+                active && color === "text-cta" && "ring-cta",
+                active && color === "text-text-muted" && "ring-text-muted",
+                active && !color && "ring-cta",
             )}
             onClick={onClick}
         >
