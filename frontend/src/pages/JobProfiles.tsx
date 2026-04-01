@@ -3,13 +3,14 @@ import { jobProfileApi } from '../api/jobProfiles';
 import type { JobProfile } from '../api/jobProfiles';
 import { JobProfileModal } from '../components/jobProfiles/JobProfileModal';
 import {
-    Briefcase,
     Plus,
     Search,
     Edit2,
     Trash2,
     Code,
-    Layers
+    Layers,
+    LayoutGrid,
+    Table2
 } from 'lucide-react';
 import { EmptyState } from '../components/ui/EmptyState';
 import toast from 'react-hot-toast';
@@ -21,6 +22,7 @@ export function JobProfiles() {
     const [profiles, setProfiles] = useState<JobProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedProfile, setSelectedProfile] = useState<JobProfile | undefined>();
 
@@ -99,66 +101,102 @@ export function JobProfiles() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
+                <div className="flex rounded-lg overflow-hidden border border-border">
+                    <button
+                        onClick={() => setViewMode('grid')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${viewMode === 'grid' ? 'bg-cta text-white' : 'bg-surface text-text-muted hover:bg-surface-hover'}`}
+                    >
+                        <LayoutGrid size={13} /> Grid
+                    </button>
+                    <button
+                        onClick={() => setViewMode('table')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${viewMode === 'table' ? 'bg-cta text-white' : 'bg-surface text-text-muted hover:bg-surface-hover'}`}
+                    >
+                        <Table2 size={13} /> Table
+                    </button>
+                </div>
             </div>
 
-            {/* Grid Container */}
+            {/* Content */}
             {loading ? (
                 <div className="py-20 flex flex-col items-center justify-center gap-4 card">
                     <div className="spinner w-8 h-8 border-cta"></div>
                     <p className="text-text-muted text-sm animate-pulse">Loading profiles...</p>
                 </div>
             ) : filteredProfiles.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredProfiles.map((profile) => (
-                        <div key={profile.id} className="card group hover:border-cta/50 transition-all hover:shadow-xl hover:shadow-cta/5">
-                            <div className="flex items-start justify-between mb-4">
-                                <div className="p-3 bg-cta/10 text-cta rounded-xl group-hover:scale-110 transition-transform">
-                                    <Briefcase size={24} />
+                viewMode === 'grid' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredProfiles.map((profile) => (
+                            <div key={profile.id} className="card group hover:border-cta/50 transition-all hover:shadow-xl hover:shadow-cta/5">
+                                <div className="flex items-start justify-between mb-3">
+                                    <h3 className="text-lg font-bold text-text">{profile.role_name}</h3>
+                                    <div className="flex gap-1">
+                                        {isAdmin && (
+                                        <button onClick={() => handleEdit(profile)} className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors" title="Edit" aria-label="Edit">
+                                            <Edit2 size={16} />
+                                        </button>
+                                        )}
+                                        {isAdmin && (
+                                        <button onClick={() => handleDelete(profile.id)} className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-danger transition-colors" title="Delete" aria-label="Delete">
+                                            <Trash2 size={16} />
+                                        </button>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="flex gap-1">
-                                    {isAdmin && (
-                                    <button
-                                        onClick={() => handleEdit(profile)}
-                                        className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors"
-                                        title="Edit Profile"
-                                        aria-label="Edit Profile"
-                                    >
-                                        <Edit2 size={16} />
-                                    </button>
-                                    )}
-                                    {isAdmin && (
-                                    <button
-                                        onClick={() => handleDelete(profile.id)}
-                                        className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-danger transition-colors"
-                                        title="Delete Profile"
-                                        aria-label="Delete Profile"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                    )}
+                                <div className="space-y-3 mt-2">
+                                    <div className="flex items-center gap-2 text-sm text-text-muted">
+                                        <Code size={16} className="text-cta" />
+                                        <span>{profile.technology}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-text-muted">
+                                        <Layers size={16} className="text-info" />
+                                        <span className="font-medium">{profile.experience_level || 'Not Specified'}</span>
+                                    </div>
                                 </div>
-                            </div>
-
-                            <h3 className="text-lg font-bold text-text mb-1">{profile.role_name}</h3>
-
-                            <div className="space-y-3 mt-4">
-                                <div className="flex items-center gap-2 text-sm text-text-muted">
-                                    <Code size={16} className="text-cta" />
-                                    <span>{profile.technology}</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm text-text-muted">
-                                    <Layers size={16} className="text-info" />
-                                    <span className="font-medium">{profile.experience_level || 'Not Specified'}</span>
+                                <div className="mt-5 pt-3 border-t border-border flex items-center justify-between text-xs text-text-muted">
+                                    <span>ID: #{profile.id}</span>
+                                    <span>{new Date(profile.created_at || '').toLocaleDateString()}</span>
                                 </div>
                             </div>
-
-                            <div className="mt-6 pt-4 border-t border-border flex items-center justify-between text-xs text-text-muted">
-                                <span>ID: #{profile.id}</span>
-                                <span>Added {new Date(profile.created_at || '').toLocaleDateString()}</span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="card overflow-hidden">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-border text-xs font-bold text-text-muted uppercase">
+                                    <th className="text-left py-3 px-4">Role Name</th>
+                                    <th className="text-left py-3 px-4">Technology</th>
+                                    <th className="text-left py-3 px-4">Experience Level</th>
+                                    <th className="text-left py-3 px-4">Created</th>
+                                    {isAdmin && <th className="text-right py-3 px-4">Actions</th>}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredProfiles.map((profile) => (
+                                    <tr key={profile.id} className="border-b border-border/50 hover:bg-surface-hover/50 transition-colors">
+                                        <td className="py-3 px-4 font-medium text-text">{profile.role_name}</td>
+                                        <td className="py-3 px-4 text-text-muted">{profile.technology}</td>
+                                        <td className="py-3 px-4 text-text-muted">{profile.experience_level || '—'}</td>
+                                        <td className="py-3 px-4 text-text-muted">{new Date(profile.created_at || '').toLocaleDateString()}</td>
+                                        {isAdmin && (
+                                            <td className="py-3 px-4 text-right">
+                                                <div className="flex gap-1 justify-end">
+                                                    <button onClick={() => handleEdit(profile)} className="p-1.5 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors" title="Edit">
+                                                        <Edit2 size={14} />
+                                                    </button>
+                                                    <button onClick={() => handleDelete(profile.id)} className="p-1.5 hover:bg-surface-hover rounded-lg text-text-muted hover:text-danger transition-colors" title="Delete">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        )}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )
             ) : (
                 <div className="card">
                     <EmptyState

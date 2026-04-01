@@ -14,7 +14,7 @@ import { useAuth, isAdminRole } from '../context/AuthContext';
 import { JiraTimesheetDrillDown } from '../components/timesheets/JiraTimesheetDrillDown';
 import { AwsTimesheetDrillDown } from '../components/timesheets/AwsTimesheetDrillDown';
 import { UnmatchedRecordsModal } from '../components/timesheets/UnmatchedRecordsModal';
-import { TimesheetMetrics } from '../components/timesheets/TimesheetMetrics';
+
 import {
     Upload,
     Download,
@@ -63,31 +63,27 @@ function exportAwsCsv(entries: AwsTimesheetV2Entry[], month: string) {
     URL.revokeObjectURL(url);
 }
 
-function exportAwsCsv(entries: AwsTimesheetV2Entry[], month: string) {
-    if (!entries.length) return;
-    const headers = ['Employee Email', 'Work Time', 'Productive', 'Unproductive', 'Undefined', 'Active', 'Passive', 'Screen Time', 'Offline Meetings'];
-    const csvRows = [headers.join(',')];
-    for (const e of entries) {
-        csvRows.push([
-            e.aws_email || '',
-            e.work_time_hms || '0:00:00',
-            e.productive_hms || '0:00:00',
-            e.unproductive_hms || '0:00:00',
-            e.undefined_hms || '0:00:00',
-            e.active_hms || '0:00:00',
-            e.passive_hms || '0:00:00',
-            e.screen_time_hms || '0:00:00',
-            e.offline_meetings_hms || '0:00:00',
-        ].join(','));
+/** Generate month options from Jan 2025 to 3 months ahead of today */
+function getMonthOptions(): { value: string; label: string }[] {
+    const options: { value: string; label: string }[] = [];
+    const now = new Date();
+    const endYear = now.getFullYear();
+    const endMonth = now.getMonth() + 4; // 3 months ahead
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    for (let y = 2025; y <= endYear + 1; y++) {
+        for (let m = 1; m <= 12; m++) {
+            if (y === 2025 && m < 1) continue;
+            if (y === endYear && m > endMonth) break;
+            if (y > endYear) break;
+            const value = `${y}-${String(m).padStart(2, '0')}`;
+            options.push({ value, label: `${months[m - 1]} ${y}` });
+        }
     }
-    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `aws_activetrack_${month}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    return options.reverse(); // newest first
 }
+
+const MONTH_OPTIONS = getMonthOptions();
 
 export function Timesheets() {
     const { user } = useAuth();
@@ -419,15 +415,16 @@ function JiraRawTab({
             <div className="card flex flex-col sm:flex-row items-start sm:items-center gap-3 py-3 px-4">
                 <div className="flex items-center gap-3">
                     <label className="text-sm font-medium text-text-muted" htmlFor="jira-month-select">Month</label>
-                    <input
+                    <select
                         id="jira-month-select"
-                        type="month"
                         className="input-field w-48"
                         value={selectedMonth}
                         onChange={e => setSelectedMonth(e.target.value)}
-                        title="Select Month"
-                        placeholder="YYYY-MM"
-                    />
+                    >
+                        {MONTH_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                    </select>
                 </div>
 
                 {/* Search */}
@@ -636,15 +633,16 @@ function AwsV2Tab({
         <>
             <div className="card flex items-center gap-4 py-3 px-4">
                 <label className="text-sm font-medium text-text-muted" htmlFor="aws-month-select">Month</label>
-                <input
+                <select
                     id="aws-month-select"
-                    type="month"
                     className="input-field w-48"
                     value={selectedMonth}
                     onChange={e => setSelectedMonth(e.target.value)}
-                    title="Select Month"
-                    placeholder="YYYY-MM"
-                />
+                >
+                    {MONTH_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </select>
                 <span className="text-sm text-text-muted ml-auto">
                     {entries.length} employees
                 </span>

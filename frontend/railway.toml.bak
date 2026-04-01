@@ -1,0 +1,7 @@
+[build]
+builder = "DOCKER"
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"

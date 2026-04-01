@@ -43,9 +43,12 @@ export function AwsTimesheetDrillDown({ entries, currentIndex, onClose, onNaviga
     const displayName = emp?.rms_name || current.aws_email || 'Unknown';
 
     return (
-        <div className="fixed inset-0 z-50 bg-surface flex flex-col" role="dialog" aria-modal="true">
+        <>
+        {/* Backdrop */}
+        <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={onClose} />
+        <div className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-3xl bg-surface shadow-xl flex flex-col animate-slide-in-right" role="dialog" aria-modal="true">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-hover/20 shrink-0">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-surface-hover/20 shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
                     <button
                         onClick={() => { if (hasPrev) onNavigate(currentIndex - 1); }}
@@ -122,5 +125,6 @@ export function AwsTimesheetDrillDown({ entries, currentIndex, onClose, onNaviga
                 </div>
             </div>
         </div>
+        </>
     );
 }
