@@ -63,6 +63,32 @@ function exportAwsCsv(entries: AwsTimesheetV2Entry[], month: string) {
     URL.revokeObjectURL(url);
 }
 
+function exportAwsCsv(entries: AwsTimesheetV2Entry[], month: string) {
+    if (!entries.length) return;
+    const headers = ['Employee Email', 'Work Time', 'Productive', 'Unproductive', 'Undefined', 'Active', 'Passive', 'Screen Time', 'Offline Meetings'];
+    const csvRows = [headers.join(',')];
+    for (const e of entries) {
+        csvRows.push([
+            e.aws_email || '',
+            e.work_time_hms || '0:00:00',
+            e.productive_hms || '0:00:00',
+            e.unproductive_hms || '0:00:00',
+            e.undefined_hms || '0:00:00',
+            e.active_hms || '0:00:00',
+            e.passive_hms || '0:00:00',
+            e.screen_time_hms || '0:00:00',
+            e.offline_meetings_hms || '0:00:00',
+        ].join(','));
+    }
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aws_activetrack_${month}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
 export function Timesheets() {
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
