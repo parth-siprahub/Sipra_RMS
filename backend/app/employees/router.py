@@ -45,11 +45,12 @@ def normalize_employee_text(data: dict) -> dict:
 @router.get("/", response_model=list[EmployeeResponse])
 async def list_employees(
     employee_status: str | None = None,
+    search: str | None = Query(None, description="Search by name, email, or username"),
     page: int = Query(1, ge=1),
     page_size: int = Query(1000, ge=1, le=1000),
     current_user: dict = Depends(get_current_user),
 ):
-    cache_key = f"employees_list_{employee_status}_{page}_{page_size}"
+    cache_key = f"employees_list_{employee_status}_{search}_{page}_{page_size}"
     cached = api_cache.get(cache_key)
     if cached:
         return cached
@@ -58,6 +59,14 @@ async def list_employees(
     query = client.table("employees").select("*")
     if employee_status:
         query = query.eq("status", employee_status)
+    if search:
+        # Case-insensitive substring search across multiple fields
+        query = query.or_(
+            f"rms_name.ilike.%{search}%,"
+            f"aws_email.ilike.%{search}%,"
+            f"jira_username.ilike.%{search}%,"
+            f"siprahub_email.ilike.%{search}%"
+        )
     offset = (page - 1) * page_size
     result = await query.order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
     api_cache.set(cache_key, result.data)

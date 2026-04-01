@@ -72,6 +72,26 @@
   --color-info-text: #1E40AF;
   /* Blue 800 */
 
+  /* SipraHub Brand Palette (from manager's dashboard sample) */
+  --brand-red: #CC1A24;
+  --brand-red-dark: #A8141D;
+  --brand-red-soft: rgba(204, 26, 36, 0.08);
+  --brand-green: #0F9D58;
+  --brand-blue: #1967D2;
+  --brand-orange: #E37400;
+  --brand-amber: #F4B400;
+  --brand-purple: #7B2FBE;
+  --brand-teal: #0097A7;
+  --brand-indigo: #3949AB;
+  --brand-pink: #D81B60;
+
+  /* KPI Accent Gradients */
+  --kpi-accent-0: linear-gradient(90deg, #CC1A24, #FF5C5C);
+  --kpi-accent-1: linear-gradient(90deg, #0F9D58, #34D399);
+  --kpi-accent-2: linear-gradient(90deg, #E37400, #F4B400);
+  --kpi-accent-3: linear-gradient(90deg, #7B2FBE, #A78BFA);
+  --kpi-accent-4: linear-gradient(90deg, #1967D2, #60A5FA);
+
   /* Candidate Pipeline Status Colors */
   --status-new: #3B82F6;
   /* Blue */
