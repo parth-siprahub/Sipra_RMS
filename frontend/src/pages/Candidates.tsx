@@ -1189,7 +1189,6 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, onViewDuplicate, req
                             id="c-resume"
                             type="file"
                             accept=".pdf,.doc,.docx"
-                            title="Resume Attachment"
                             className="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-surface-hover file:text-cta hover:file:bg-cta/10 file:cursor-pointer transition-all"
                             title="Upload Resume File"
                             onChange={(e) => setResumeFile(e.target.files?.[0] || null)}

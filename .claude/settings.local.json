@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(railway whoami:*)",
+      "Bash(railway status:*)",
+      "Bash(railway list:*)"
+    ]
+  }
+}
