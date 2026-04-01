@@ -14,7 +14,7 @@ import { useAuth, isAdminRole } from '../context/AuthContext';
 import { JiraTimesheetDrillDown } from '../components/timesheets/JiraTimesheetDrillDown';
 import { AwsTimesheetDrillDown } from '../components/timesheets/AwsTimesheetDrillDown';
 import { UnmatchedRecordsModal } from '../components/timesheets/UnmatchedRecordsModal';
-import { TimesheetMetrics } from '../components/timesheets/TimesheetMetrics';
+
 import {
     Upload,
     Download,
@@ -63,6 +63,28 @@ function exportAwsCsv(entries: AwsTimesheetV2Entry[], month: string) {
     URL.revokeObjectURL(url);
 }
 
+/** Generate month options from Jan 2025 to 3 months ahead of today */
+function getMonthOptions(): { value: string; label: string }[] {
+    const options: { value: string; label: string }[] = [];
+    const now = new Date();
+    const endYear = now.getFullYear();
+    const endMonth = now.getMonth() + 4; // 3 months ahead
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    for (let y = 2025; y <= endYear + 1; y++) {
+        for (let m = 1; m <= 12; m++) {
+            if (y === 2025 && m < 1) continue;
+            if (y === endYear && m > endMonth) break;
+            if (y > endYear) break;
+            const value = `${y}-${String(m).padStart(2, '0')}`;
+            options.push({ value, label: `${months[m - 1]} ${y}` });
+        }
+    }
+    return options.reverse(); // newest first
+}
+
+const MONTH_OPTIONS = getMonthOptions();
+
 export function Timesheets() {
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
@@ -87,7 +109,6 @@ export function Timesheets() {
 
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [calculating, setCalculating] = useState(false);
-    const [combinedLoading, setCombinedLoading] = useState(false);
 
     // Unmatched records modal state
     const [isUnmatchedModalOpen, setIsUnmatchedModalOpen] = useState(false);
@@ -191,12 +212,6 @@ export function Timesheets() {
                     )}
                 </div>
             </div>
-
-            <TimesheetMetrics 
-                jiraEntries={jiraEntries} 
-                awsEntries={awsEntries} 
-                loading={combinedLoading} 
-            />
 
             {/* Tabs */}
             <div className="flex gap-1 border-b border-border">
@@ -393,15 +408,16 @@ function JiraRawTab({
             <div className="card flex flex-col sm:flex-row items-start sm:items-center gap-3 py-3 px-4">
                 <div className="flex items-center gap-3">
                     <label className="text-sm font-medium text-text-muted" htmlFor="jira-month-select">Month</label>
-                    <input
+                    <select
                         id="jira-month-select"
-                        type="month"
                         className="input-field w-48"
                         value={selectedMonth}
                         onChange={e => setSelectedMonth(e.target.value)}
-                        title="Select Month"
-                        placeholder="YYYY-MM"
-                    />
+                    >
+                        {MONTH_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                    </select>
                 </div>
 
                 {/* Search */}
@@ -610,15 +626,16 @@ function AwsV2Tab({
         <>
             <div className="card flex items-center gap-4 py-3 px-4">
                 <label className="text-sm font-medium text-text-muted" htmlFor="aws-month-select">Month</label>
-                <input
+                <select
                     id="aws-month-select"
-                    type="month"
                     className="input-field w-48"
                     value={selectedMonth}
                     onChange={e => setSelectedMonth(e.target.value)}
-                    title="Select Month"
-                    placeholder="YYYY-MM"
-                />
+                >
+                    {MONTH_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </select>
                 <span className="text-sm text-text-muted ml-auto">
                     {entries.length} employees
                 </span>
