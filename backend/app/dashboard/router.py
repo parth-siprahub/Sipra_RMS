@@ -116,6 +116,77 @@ async def get_metrics(current_user: dict = Depends(get_current_user)):
         total = stats["total"]
         stats["rejection_rate"] = round(stats["rejected"] / total * 100, 1) if total > 0 else 0.0
 
+    # 7b. Risk metrics (vendor-level + pipeline-level)
+    vendor_risks: list[dict] = []
+    for v_name, stats in vendor_stats.items():
+        rate = stats["rejection_rate"]
+        if rate > 60:
+            risk_level = "Critical"
+        elif rate > 45:
+            risk_level = "High"
+        elif rate > 30:
+            risk_level = "Medium"
+        else:
+            risk_level = "Low"
+        vendor_risks.append({
+            "vendor_name": v_name,
+            "total": stats["total"],
+            "rejected": stats["rejected"],
+            "rejection_rate": rate,
+            "risk_level": risk_level,
+        })
+
+    total_cand = len(all_candidates)
+    total_rejected = sum(s["rejected"] for s in vendor_stats.values())
+    total_on_hold = candidates_by_status.get("ON_HOLD", 0)
+
+    pipeline_dropout_pct = round(total_rejected / total_cand * 100, 1) if total_cand > 0 else 0.0
+    bottleneck_pct = round(total_on_hold / total_cand * 100, 1) if total_cand > 0 else 0.0
+
+    success_count = sum(
+        1 for c in all_candidates if c.get("status") in ("SELECTED", "ONBOARDED")
+    )
+    success_rate = success_count / total_cand if total_cand > 0 else 0.0
+    dropout_rate = total_rejected / total_cand if total_cand > 0 else 0.0
+    bottleneck_rate = total_on_hold / total_cand if total_cand > 0 else 0.0
+
+    pipeline_health_score = round(
+        (0.4 * success_rate + 0.3 * (1 - dropout_rate) + 0.3 * (1 - bottleneck_rate)) * 100, 1
+    )
+
+    critical_vendor_count = sum(1 for vr in vendor_risks if vr["risk_level"] == "Critical")
+
+    risk = {
+        "pipeline_dropout_pct": pipeline_dropout_pct,
+        "bottleneck_pct": bottleneck_pct,
+        "pipeline_health_score": pipeline_health_score,
+        "critical_vendor_count": critical_vendor_count,
+        "vendor_risks": vendor_risks,
+    }
+
+    # 7c. Skill-status cross-tabulation matrix
+    skill_status_map: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for c in all_candidates:
+        raw_skills = c.get("skills") or ""
+        cs = c.get("status", "UNKNOWN")
+        for s in raw_skills.split(","):
+            s = s.strip()
+            if s:
+                skill_status_map[s][cs] += 1
+
+    skill_status_matrix = sorted(
+        [
+            {
+                "skill": skill,
+                "statuses": dict(statuses),
+                "total": sum(statuses.values()),
+            }
+            for skill, statuses in skill_status_map.items()
+        ],
+        key=lambda x: x["total"],
+        reverse=True,
+    )
+
     # 8. Employee & Triad Metrics
     employees_raw = await client.table("employees").select("*").execute()
     all_employees = employees_raw.data or []
@@ -174,6 +245,8 @@ async def get_metrics(current_user: dict = Depends(get_current_user)):
         "missing_identifiers": missing_identifiers,
         "triad_summary": triad_summary,
         "triad_billing_month": latest_month,
+        "risk": risk,
+        "skill_status_matrix": skill_status_matrix,
     }
 
     api_cache.set(cache_key, result)
