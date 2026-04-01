@@ -101,12 +101,19 @@ class JiraRawResponse(BaseModel):
     created_at: datetime | None = None
 
 
+class UnmatchedDetail(BaseModel):
+    source_name: str
+    source_type: str  # "JIRA" or "AWS"
+    suggestions: list[dict] = []  # [{employee_id, rms_name, score, match_type}]
+
+
 class JiraRawImportResult(BaseModel):
     month: str
     total_rows_processed: int
     employees_matched: int
     employees_unmatched: list[str]
     entries_inserted: int
+    unmatched_details: list[UnmatchedDetail] = []
 
 
 # ──────────────────────────────────────────────
@@ -157,6 +164,7 @@ class AwsImportV2Result(BaseModel):
     employees_unmatched: int
     entries_inserted: int
     unmatched_emails: list[str]
+    unmatched_details: list[UnmatchedDetail] = []
 
 
 # ──────────────────────────────────────────────

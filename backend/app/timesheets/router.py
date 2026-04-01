@@ -17,6 +17,7 @@ from app.timesheets.schemas import (
 from app.timesheets.parser import parse_tempo_xls
 from app.timesheets.jira_raw_parser import parse_jira_raw
 from app.timesheets.aws_parser import parse_aws_csv
+from app.timesheets.matching import EmployeeMatcher, Confidence
 from app.utils.cache import api_cache
 from app.audit.service import log_audit
 
@@ -145,7 +146,11 @@ async def import_jira_raw(
     import_header_id = header_result.data[0]["id"]
 
     try:
-        # Build employee lookup
+        # Build multi-tier employee matcher
+        matcher = EmployeeMatcher()
+        await matcher.load(client)
+
+        # Also build legacy emp_map for backward-compat legacy_entries
         employees = await client.table("employees").select("id, jira_username, rms_name").execute()
         emp_map: dict[str, int] = {}
         for emp in (employees.data or []):
@@ -154,19 +159,32 @@ async def import_jira_raw(
             if emp.get("rms_name"):
                 emp_map[emp["rms_name"].lower()] = emp["id"]
 
-        # Resolve employee IDs for raw entries
+        # Resolve employee IDs for raw entries using multi-tier matcher
         matched_raw = []
         unmatched_usernames = set()
+        unmatched_details: list[dict] = []
+        seen_unmatched: set[str] = set()
         for entry in raw_entries:
-            username = entry["jira_user"].lower()
-            emp_id = emp_map.get(username)
-            entry["employee_id"] = emp_id
+            result = matcher.match(entry["jira_user"], system="JIRA")
+            entry["employee_id"] = result.employee_id
             entry["import_header_id"] = import_header_id
-            if emp_id:
+            if result.employee_id:
                 matched_raw.append(entry)
             else:
-                unmatched_usernames.add(entry["jira_user"])
                 matched_raw.append(entry)  # Still insert — employee_id will be NULL
+                username = entry["jira_user"]
+                if username not in seen_unmatched:
+                    seen_unmatched.add(username)
+                    unmatched_usernames.add(username)
+                    suggestions = matcher.suggest(username, system="JIRA", top_n=3)
+                    unmatched_details.append({
+                        "source_name": username,
+                        "source_type": "JIRA",
+                        "suggestions": [
+                            {"employee_id": s.employee_id, "rms_name": s.rms_name, "score": s.score, "match_type": s.match_type}
+                            for s in suggestions
+                        ],
+                    })
 
         # Idempotent: delete existing raw entries for this month
         await client.table("jira_timesheet_raw").delete().eq("billing_month", import_month).execute()
@@ -256,6 +274,7 @@ async def import_jira_raw(
         employees_matched=matched_count,
         employees_unmatched=sorted(unmatched_usernames),
         entries_inserted=len(matched_raw),
+        unmatched_details=unmatched_details,
     )
 
 
@@ -510,40 +529,35 @@ async def import_aws_timesheet(
     import_header_id = header_result.data[0]["id"]
 
     try:
-        # Build employee lookup by aws_email, rms_name, and client_name
-        employees = await client.table("employees").select("id, aws_email, rms_name, client_name").execute()
-        email_to_emp: dict[str, int] = {}
-        name_to_emp: dict[str, int] = {}
-        for emp in (employees.data or []):
-            if emp.get("aws_email"):
-                email_to_emp[emp["aws_email"].lower()] = emp["id"]
-            if emp.get("rms_name"):
-                name_to_emp[emp["rms_name"].strip().lower()] = emp["id"]
-            if emp.get("client_name"):
-                name_to_emp[emp["client_name"].strip().lower()] = emp["id"]
+        # Build multi-tier employee matcher
+        matcher = EmployeeMatcher()
+        await matcher.load(client)
 
         matched = 0
         unmatched_emails: list[str] = []
+        aws_unmatched_details: list[dict] = []
 
         rows_to_insert = []
         for entry in entries:
             email = entry["aws_email"]
-            emp_id = email_to_emp.get(email.lower() if email else "")
+            result = matcher.match(email or "", system="AWS")
 
-            # Fallback: match by name derived from email (part before @, Title Cased)
-            if not emp_id and email and "@" in email:
-                name_part = email.split("@")[0]
-                # Convert e.g. "john.doe" or "john_doe" to "John Doe"
-                name_from_email = name_part.replace(".", " ").replace("_", " ").replace("-", " ").title()
-                emp_id = name_to_emp.get(name_from_email.lower())
-
-            if emp_id:
+            if result.employee_id:
                 matched += 1
             else:
                 unmatched_emails.append(email)
+                suggestions = matcher.suggest(email or "", system="AWS", top_n=3)
+                aws_unmatched_details.append({
+                    "source_name": email,
+                    "source_type": "AWS",
+                    "suggestions": [
+                        {"employee_id": s.employee_id, "rms_name": s.rms_name, "score": s.score, "match_type": s.match_type}
+                        for s in suggestions
+                    ],
+                })
 
             row = {
-                "employee_id": emp_id,
+                "employee_id": result.employee_id,
                 "import_header_id": import_header_id,
                 **entry,
             }
@@ -590,6 +604,7 @@ async def import_aws_timesheet(
         employees_unmatched=len(unmatched_emails),
         entries_inserted=len(rows_to_insert),
         unmatched_emails=sorted(unmatched_emails),
+        unmatched_details=aws_unmatched_details,
     )
 
 
@@ -617,6 +632,161 @@ async def link_aws_to_employee(
 
     api_cache.clear_prefix("aws_timesheets_")
     return result.data[0]
+
+
+# ──────────────────────────────────────────────
+# Bulk Link + Unmatched Records
+# ──────────────────────────────────────────────
+
+
+@router.post("/link-bulk")
+async def link_bulk(
+    source_type: str = Form(..., description="JIRA or AWS"),
+    source_identifier: str = Form(..., description="jira_user or aws_email to link"),
+    employee_id: int = Form(..., description="Employee ID to link to"),
+    billing_month: str = Form(..., description="YYYY-MM format"),
+    current_user: dict = Depends(require_admin),
+):
+    """Bulk-link all unmatched rows for a given identifier to an employee.
+
+    Also persists the mapping in employee_system_mappings so future imports auto-match.
+    """
+    client = await get_supabase_admin_async()
+
+    # Validate employee exists
+    emp = await client.table("employees").select("id, rms_name, jira_username, aws_email").eq("id", employee_id).single().execute()
+    if not emp.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Employee not found")
+
+    updated_count = 0
+    source_upper = source_type.upper()
+
+    if source_upper == "JIRA":
+        # Update all jira_timesheet_raw rows for this user + month
+        result = await (
+            client.table("jira_timesheet_raw")
+            .update({"employee_id": employee_id})
+            .eq("jira_user", source_identifier)
+            .eq("billing_month", billing_month)
+            .execute()
+        )
+        updated_count = len(result.data or [])
+
+        # Also update legacy timesheet_logs if applicable
+        await (
+            client.table("timesheet_logs")
+            .update({"employee_id": employee_id})
+            .eq("jira_username", source_identifier)
+            .eq("import_month", billing_month)
+            .execute()
+        )
+
+        # Optionally fill employee's jira_username if empty
+        if not emp.data.get("jira_username"):
+            await client.table("employees").update({"jira_username": source_identifier}).eq("id", employee_id).execute()
+
+    elif source_upper == "AWS":
+        result = await (
+            client.table("aws_timesheet_logs_v2")
+            .update({"employee_id": employee_id})
+            .eq("aws_email", source_identifier)
+            .eq("billing_month", billing_month)
+            .execute()
+        )
+        updated_count = len(result.data or [])
+
+        # Optionally fill employee's aws_email if empty
+        if not emp.data.get("aws_email"):
+            await client.table("employees").update({"aws_email": source_identifier}).eq("id", employee_id).execute()
+    else:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "source_type must be JIRA or AWS")
+
+    # Persist mapping in employee_system_mappings for future auto-match
+    system_name = "JIRA" if source_upper == "JIRA" else "AWS"
+    try:
+        await client.table("employee_system_mappings").insert({
+            "employee_id": employee_id,
+            "system_name": system_name,
+            "external_uid": source_identifier.strip(),
+            "is_primary": False,
+            "verified": True,
+        }).execute()
+    except Exception:
+        # Ignore duplicate — mapping may already exist
+        logger.debug("System mapping already exists for %s=%s", system_name, source_identifier)
+
+    api_cache.clear_prefix("timesheets_")
+    api_cache.clear_prefix("aws_timesheets_")
+    api_cache.clear_prefix("employees_")
+
+    return {
+        "status": "linked",
+        "source_type": source_upper,
+        "source_identifier": source_identifier,
+        "employee_id": employee_id,
+        "employee_name": emp.data.get("rms_name"),
+        "rows_updated": updated_count,
+    }
+
+
+@router.get("/unmatched")
+async def get_unmatched(
+    billing_month: str = Query(..., description="YYYY-MM format"),
+    source_type: str = Query(..., description="JIRA or AWS"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get all unmatched records for a billing month with fuzzy suggestions."""
+    client = await get_supabase_admin_async()
+
+    matcher = EmployeeMatcher()
+    await matcher.load(client)
+
+    source_upper = source_type.upper()
+    unmatched: list[dict] = []
+
+    if source_upper == "JIRA":
+        rows = await (
+            client.table("jira_timesheet_raw")
+            .select("jira_user")
+            .eq("billing_month", billing_month)
+            .is_("employee_id", "null")
+            .execute()
+        )
+        unique_users = sorted(set(r["jira_user"] for r in (rows.data or [])))
+        for user in unique_users:
+            suggestions = matcher.suggest(user, system="JIRA", top_n=3)
+            unmatched.append({
+                "source_name": user,
+                "source_type": "JIRA",
+                "suggestions": [
+                    {"employee_id": s.employee_id, "rms_name": s.rms_name, "score": s.score, "match_type": s.match_type}
+                    for s in suggestions
+                ],
+            })
+
+    elif source_upper == "AWS":
+        rows = await (
+            client.table("aws_timesheet_logs_v2")
+            .select("aws_email")
+            .eq("billing_month", billing_month)
+            .is_("employee_id", "null")
+            .execute()
+        )
+        unique_emails = sorted(set(r["aws_email"] for r in (rows.data or [])))
+        for email in unique_emails:
+            suggestions = matcher.suggest(email, system="AWS", top_n=3)
+            unmatched.append({
+                "source_name": email,
+                "source_type": "AWS",
+                "suggestions": [
+                    {"employee_id": s.employee_id, "rms_name": s.rms_name, "score": s.score, "match_type": s.match_type}
+                    for s in suggestions
+                ],
+            })
+    else:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "source_type must be JIRA or AWS")
+
+    return {"billing_month": billing_month, "source_type": source_upper, "unmatched": unmatched}
 
 
 # ──────────────────────────────────────────────

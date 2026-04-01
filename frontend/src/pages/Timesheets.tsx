@@ -5,6 +5,7 @@ import {
     type JiraRawImportResult,
     type AwsTimesheetV2Entry,
     type AwsImportV2Result,
+    type UnmatchedDetail,
 } from '../api/timesheets';
 import { employeesApi, type Employee } from '../api/employees';
 import { Modal } from '../components/ui/Modal';
@@ -12,6 +13,8 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { useAuth, isAdminRole } from '../context/AuthContext';
 import { JiraTimesheetDrillDown } from '../components/timesheets/JiraTimesheetDrillDown';
 import { AwsTimesheetDrillDown } from '../components/timesheets/AwsTimesheetDrillDown';
+import { UnmatchedRecordsModal } from '../components/timesheets/UnmatchedRecordsModal';
+import { TimesheetMetrics } from '../components/timesheets/TimesheetMetrics';
 import {
     Upload,
     Download,
@@ -34,18 +37,30 @@ import { billingApi } from '../api/billing';
 
 type Tab = 'jira' | 'aws';
 
-/** Get number of days in a month from "YYYY-MM" */
-function daysInMonth(ym: string): number {
-    const [y, m] = ym.split('-').map(Number);
-    return new Date(y, m, 0).getDate();
-}
-
-/** Format day number + month into short label like "01/Mar" */
-function dayLabel(day: number, ym: string): string {
-    const [y, m] = ym.split('-').map(Number);
-    const d = new Date(y, m - 1, day);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${String(day).padStart(2, '0')}/${months[d.getMonth()]}`;
+function exportAwsCsv(entries: AwsTimesheetV2Entry[], month: string) {
+    if (!entries.length) return;
+    const headers = ['Employee Email', 'Work Time', 'Productive', 'Unproductive', 'Undefined', 'Active', 'Passive', 'Screen Time', 'Offline Meetings'];
+    const csvRows = [headers.join(',')];
+    for (const e of entries) {
+        csvRows.push([
+            e.aws_email || '',
+            e.work_time_hms || '0:00:00',
+            e.productive_hms || '0:00:00',
+            e.unproductive_hms || '0:00:00',
+            e.undefined_hms || '0:00:00',
+            e.active_hms || '0:00:00',
+            e.passive_hms || '0:00:00',
+            e.screen_time_hms || '0:00:00',
+            e.offline_meetings_hms || '0:00:00',
+        ].join(','));
+    }
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aws_activetrack_${month}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 function exportAwsCsv(entries: AwsTimesheetV2Entry[], month: string) {
@@ -98,46 +113,58 @@ export function Timesheets() {
 
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [calculating, setCalculating] = useState(false);
+    const [combinedLoading, setCombinedLoading] = useState(false);
 
-    const fetchJiraData = async () => {
+    // Unmatched records modal state
+    const [isUnmatchedModalOpen, setIsUnmatchedModalOpen] = useState(false);
+    const [unmatchedModalSource, setUnmatchedModalSource] = useState<'JIRA' | 'AWS'>('JIRA');
+    const [unmatchedDetails, setUnmatchedDetails] = useState<UnmatchedDetail[]>([]);
+
+    const fetchAllData = async (month: string) => {
+        setCombinedLoading(true);
         setJiraLoading(true);
-        try {
-            const [rawData, empData] = await Promise.all([
-                timesheetsApi.listJiraRaw(selectedMonth),
-                employees.length ? Promise.resolve(employees) : employeesApi.list({ page_size: 200 }),
-            ]);
-            setJiraEntries(rawData || []);
-            if (!employees.length) setEmployees(empData || []);
-        } catch {
-            toast.error('Failed to load Jira timesheet data');
-        } finally {
-            setJiraLoading(false);
-        }
-    };
-
-    const fetchAwsData = async () => {
         setAwsLoading(true);
         try {
-            const [awsData, empData] = await Promise.all([
-                timesheetsApi.listAwsV2(selectedMonth),
+            const [jiraRaw, awsRaw, empData] = await Promise.all([
+                timesheetsApi.listJiraRaw(month),
+                timesheetsApi.listAwsV2(month),
                 employees.length ? Promise.resolve(employees) : employeesApi.list({ page_size: 200 }),
             ]);
-            setAwsEntries(awsData || []);
+            setJiraEntries(jiraRaw || []);
+            setAwsEntries(awsRaw || []);
             if (!employees.length) setEmployees(empData || []);
         } catch {
-            toast.error('Failed to load AWS data');
+            toast.error('Failed to load dashboard data');
         } finally {
+            setCombinedLoading(false);
+            setJiraLoading(false);
             setAwsLoading(false);
         }
     };
 
     useEffect(() => {
-        if (activeTab === 'jira') fetchJiraData();
-        else fetchAwsData();
-    }, [selectedMonth, activeTab]);
+        fetchAllData(selectedMonth);
+    }, [selectedMonth]);
 
     const empMap = useMemo(
         () => Object.fromEntries(employees.map(e => [e.id, e])),
+        [employees],
+    );
+
+    const jiraEmpMap = useMemo(
+        () => Object.fromEntries(employees.filter(e => e.jira_username).map(e => [e.jira_username!, e])),
+        [employees],
+    );
+
+    const awsEmpMap = useMemo(
+        () => Object.fromEntries(
+            employees.flatMap(e => {
+                const results = [];
+                if (e.aws_email) results.push([e.aws_email.toLowerCase(), e]);
+                if (e.siprahub_email) results.push([e.siprahub_email.toLowerCase(), e]);
+                return results;
+            })
+        ),
         [employees],
     );
 
@@ -191,6 +218,12 @@ export function Timesheets() {
                 </div>
             </div>
 
+            <TimesheetMetrics 
+                jiraEntries={jiraEntries} 
+                awsEntries={awsEntries} 
+                loading={combinedLoading} 
+            />
+
             {/* Tabs */}
             <div className="flex gap-1 border-b border-border">
                 <button
@@ -222,26 +255,45 @@ export function Timesheets() {
             {activeTab === 'jira' ? (
                 <JiraRawTab
                     entries={jiraEntries}
-                    empMap={empMap}
+                    jiraEmpMap={jiraEmpMap}
                     loading={jiraLoading}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     importResult={jiraImportResult}
                     isAdmin={isAdmin}
                     onImport={() => setIsJiraImportOpen(true)}
+                    setUnmatchedModalOpen={setIsUnmatchedModalOpen}
+                    setUnmatchedModalSource={setUnmatchedModalSource}
+                    setUnmatchedDetails={setUnmatchedDetails}
                 />
             ) : (
                 <AwsV2Tab
                     entries={awsEntries}
                     empMap={empMap}
+                    awsEmpMap={awsEmpMap}
                     loading={awsLoading}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     importResult={awsImportResult}
                     isAdmin={isAdmin}
                     onImport={() => setIsAwsImportOpen(true)}
+                    setUnmatchedModalOpen={setIsUnmatchedModalOpen}
+                    setUnmatchedModalSource={setUnmatchedModalSource}
+                    setUnmatchedDetails={setUnmatchedDetails}
                 />
             )}
+
+            {/* Unmatched Records Resolution Modal */}
+            <UnmatchedRecordsModal
+                isOpen={isUnmatchedModalOpen}
+                onClose={() => setIsUnmatchedModalOpen(false)}
+                billingMonth={selectedMonth}
+                sourceType={unmatchedModalSource}
+                initialUnmatched={unmatchedDetails}
+                onLinked={() => {
+                    fetchAllData(selectedMonth);
+                }}
+            />
 
             {isJiraImportOpen && (
                 <JiraRawImportModal
@@ -250,7 +302,7 @@ export function Timesheets() {
                     onSuccess={(result) => {
                         setJiraImportResult(result);
                         setSelectedMonth(result.month);
-                        fetchJiraData();
+                        fetchAllData(result.month);
                     }}
                     defaultMonth={selectedMonth}
                 />
@@ -263,7 +315,7 @@ export function Timesheets() {
                     onSuccess={(result) => {
                         setAwsImportResult(result);
                         setSelectedMonth(result.month);
-                        fetchAwsData();
+                        fetchAllData(result.month);
                     }}
                     defaultMonth={selectedMonth}
                 />
@@ -288,16 +340,20 @@ interface UserSummary {
 }
 
 function JiraRawTab({
-    entries, empMap, loading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport,
+    entries, jiraEmpMap, loading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport,
+    setUnmatchedModalOpen, setUnmatchedModalSource, setUnmatchedDetails
 }: {
     entries: JiraRawEntry[];
-    empMap: Record<number, Employee>;
+    jiraEmpMap: Record<string, Employee>;
     loading: boolean;
     selectedMonth: string;
     setSelectedMonth: (m: string) => void;
     importResult: JiraRawImportResult | null;
     isAdmin: boolean;
     onImport: () => void;
+    setUnmatchedModalOpen: (open: boolean) => void;
+    setUnmatchedModalSource: (source: 'JIRA' | 'AWS') => void;
+    setUnmatchedDetails: (details: UnmatchedDetail[]) => void;
 }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [sortField, setSortField] = useState<SortField>('name');
@@ -362,12 +418,15 @@ function JiraRawTab({
             {/* Controls bar */}
             <div className="card flex flex-col sm:flex-row items-start sm:items-center gap-3 py-3 px-4">
                 <div className="flex items-center gap-3">
-                    <label className="text-sm font-medium text-text-muted">Month</label>
+                    <label className="text-sm font-medium text-text-muted" htmlFor="jira-month-select">Month</label>
                     <input
+                        id="jira-month-select"
                         type="month"
                         className="input-field w-48"
                         value={selectedMonth}
                         onChange={e => setSelectedMonth(e.target.value)}
+                        title="Select Month"
+                        placeholder="YYYY-MM"
                     />
                 </div>
 
@@ -399,11 +458,21 @@ function JiraRawTab({
                         <div><span className="text-text-muted">Inserted:</span> <span className="font-medium">{importResult.entries_inserted}</span></div>
                     </div>
                     {importResult.employees_unmatched.length > 0 && (
-                        <div className="mt-2 flex items-start gap-2">
-                            <AlertTriangle size={14} className="text-warning mt-0.5 shrink-0" />
+                        <div className="mt-2 flex items-center gap-2">
+                            <AlertTriangle size={14} className="text-warning shrink-0" />
                             <span className="text-xs text-warning">
-                                Unmatched: {importResult.employees_unmatched.join(', ')}
+                                {importResult.employees_unmatched.length} unmatched
                             </span>
+                            <button
+                                onClick={() => {
+                                    setUnmatchedModalSource('JIRA');
+                                    setUnmatchedDetails(importResult.unmatched_details || []);
+                                    setUnmatchedModalOpen(true);
+                                }}
+                                className="btn btn-ghost text-xs px-2 py-1 text-warning hover:text-text"
+                            >
+                                Resolve Unmatched →
+                            </button>
                         </div>
                     )}
                 </div>
@@ -446,7 +515,7 @@ function JiraRawTab({
                         </div>
 
                         {/* Rows */}
-                        <div className="divide-y divide-border/50" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+                        <div className="divide-y divide-border/50 max-h-[65vh] overflow-y-auto">
                             {filteredSummaries.map((summary, idx) => (
                                 <button
                                     key={summary.user}
@@ -456,8 +525,11 @@ function JiraRawTab({
                                     {/* Name */}
                                     <div className="min-w-0">
                                         <p className="font-semibold text-sm text-text truncate group-hover:text-cta transition-colors">
-                                            {summary.user}
+                                            {jiraEmpMap[summary.user]?.rms_name || summary.user}
                                         </p>
+                                        {jiraEmpMap[summary.user] && (
+                                            <p className="text-xs text-text-muted truncate">{summary.user}</p>
+                                        )}
                                     </div>
 
                                     {/* Total hours */}
@@ -542,28 +614,36 @@ const AWS_DISPLAY_COLS: { label: string; hmsKey: keyof AwsTimesheetV2Entry; secs
 ];
 
 function AwsV2Tab({
-    entries, empMap, loading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport,
+    entries, empMap, awsEmpMap, loading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport,
+    setUnmatchedModalOpen, setUnmatchedModalSource, setUnmatchedDetails
 }: {
     entries: AwsTimesheetV2Entry[];
     empMap: Record<number, Employee>;
+    awsEmpMap: Record<string, Employee>;
     loading: boolean;
     selectedMonth: string;
     setSelectedMonth: (m: string) => void;
     importResult: AwsImportV2Result | null;
     isAdmin: boolean;
     onImport: () => void;
+    setUnmatchedModalOpen: (open: boolean) => void;
+    setUnmatchedModalSource: (source: 'JIRA' | 'AWS') => void;
+    setUnmatchedDetails: (details: UnmatchedDetail[]) => void;
 }) {
     const [awsDrillDownIndex, setAwsDrillDownIndex] = useState<number | null>(null);
 
     return (
         <>
             <div className="card flex items-center gap-4 py-3 px-4">
-                <label className="text-sm font-medium text-text-muted">Month</label>
+                <label className="text-sm font-medium text-text-muted" htmlFor="aws-month-select">Month</label>
                 <input
+                    id="aws-month-select"
                     type="month"
                     className="input-field w-48"
                     value={selectedMonth}
                     onChange={e => setSelectedMonth(e.target.value)}
+                    title="Select Month"
+                    placeholder="YYYY-MM"
                 />
                 <span className="text-sm text-text-muted ml-auto">
                     {entries.length} employees
@@ -580,12 +660,21 @@ function AwsV2Tab({
                         <div><span className="text-text-muted">Inserted:</span> <span className="font-medium">{importResult.entries_inserted}</span></div>
                     </div>
                     {importResult.unmatched_emails.length > 0 && (
-                        <div className="mt-2 flex items-start gap-2">
-                            <AlertTriangle size={14} className="text-warning mt-0.5 shrink-0" />
+                        <div className="mt-2 flex items-center gap-2">
+                            <AlertTriangle size={14} className="text-warning shrink-0" />
                             <span className="text-xs text-warning">
-                                {importResult.employees_unmatched} unmatched: {importResult.unmatched_emails.slice(0, 5).join(', ')}
-                                {importResult.unmatched_emails.length > 5 && ` +${importResult.unmatched_emails.length - 5} more`}
+                                {importResult.unmatched_emails.length} unmatched
                             </span>
+                            <button
+                                onClick={() => {
+                                    setUnmatchedModalSource('AWS');
+                                    setUnmatchedDetails(importResult.unmatched_details || []);
+                                    setUnmatchedModalOpen(true);
+                                }}
+                                className="btn btn-ghost text-xs px-2 py-1 text-warning hover:text-text"
+                            >
+                                Resolve Unmatched →
+                            </button>
                         </div>
                     )}
                 </div>
@@ -618,7 +707,10 @@ function AwsV2Tab({
                                             <td className="sticky left-0 z-10 bg-surface px-4 py-2.5 min-w-[200px]">
                                                 <p className="font-medium text-text">{emp?.rms_name || entry.aws_email}</p>
                                                 {emp && <p className="text-xs text-text-muted">{entry.aws_email}</p>}
-                                                {!emp && <p className="text-xs text-warning">Unlinked</p>}
+                                                {!emp && awsEmpMap[entry.aws_email?.toLowerCase() || ''] && (
+                                                    <p className="text-xs text-info italic">Matchable: {awsEmpMap[entry.aws_email?.toLowerCase() || '']?.rms_name}</p>
+                                                )}
+                                                {!emp && !awsEmpMap[entry.aws_email?.toLowerCase() || ''] && <p className="text-xs text-warning font-medium">Unlinked</p>}
                                             </td>
                                             {AWS_DISPLAY_COLS.map(col => {
                                                 const hms = entry[col.hmsKey] as string | null;
@@ -657,6 +749,7 @@ function AwsV2Tab({
                     empMap={empMap}
                 />
             )}
+
         </>
     );
 }
@@ -715,8 +808,16 @@ function JiraRawImportModal({
                     />
                 </div>
                 <div>
-                    <label className="input-label">Import Month</label>
-                    <input type="month" className="input-field" value={month} onChange={e => setMonth(e.target.value)} />
+                    <label className="input-label" htmlFor="jira-import-month">Import Month</label>
+                    <input 
+                        id="jira-import-month"
+                        type="month" 
+                        className="input-field" 
+                        value={month} 
+                        onChange={e => setMonth(e.target.value)} 
+                        title="Import Month"
+                        placeholder="YYYY-MM"
+                    />
                 </div>
                 <div className="text-xs text-text-muted space-y-1">
                     <p><CheckCircle size={12} className="inline text-success mr-1" />Stores raw per-issue data exactly as in Excel</p>
@@ -782,8 +883,16 @@ function AwsV2ImportModal({
                     />
                 </div>
                 <div>
-                    <label className="input-label">Billing Month</label>
-                    <input type="month" className="input-field" value={month} onChange={e => setMonth(e.target.value)} />
+                    <label className="input-label" htmlFor="aws-import-month">Billing Month</label>
+                    <input 
+                        id="aws-import-month"
+                        type="month" 
+                        className="input-field" 
+                        value={month} 
+                        onChange={e => setMonth(e.target.value)} 
+                        title="Billing Month"
+                        placeholder="YYYY-MM"
+                    />
                 </div>
                 <div className="text-xs text-text-muted space-y-1">
                     <p><Monitor size={12} className="inline text-cta mr-1" />Monthly export from AWS ActiveTrack</p>

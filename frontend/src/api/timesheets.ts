@@ -45,12 +45,26 @@ export interface JiraRawEntry {
     created_at: string | null;
 }
 
+export interface UnmatchedSuggestion {
+    employee_id: number;
+    rms_name: string;
+    score: number;
+    match_type: string;
+}
+
+export interface UnmatchedDetail {
+    source_name: string;
+    source_type: 'JIRA' | 'AWS';
+    suggestions: UnmatchedSuggestion[];
+}
+
 export interface JiraRawImportResult {
     month: string;
     total_rows_processed: number;
     employees_matched: number;
     employees_unmatched: string[];
     entries_inserted: number;
+    unmatched_details?: UnmatchedDetail[];
 }
 
 // ── AWS v2 types (aws_timesheet_logs_v2 — mirrors CSV) ──────────────────────
@@ -98,6 +112,7 @@ export interface AwsImportV2Result {
     employees_unmatched: number;
     entries_inserted: number;
     unmatched_emails: string[];
+    unmatched_details?: UnmatchedDetail[];
 }
 
 // ── Legacy AWS types (kept for backward compat) ─────────────────────────────
@@ -165,6 +180,24 @@ export const timesheetsApi = {
 
     linkAwsToEmployee: (logId: number, employeeId: number) =>
         api.patch<AwsTimesheetV2Entry>(`/timesheets/aws/${logId}/link?employee_id=${employeeId}`, {}),
+
+    // ── Unmatched records management ──────────────────────────────────────────
+    getUnmatched: (billingMonth: string, sourceType: 'JIRA' | 'AWS') =>
+        api.get<{ unmatched: UnmatchedDetail[] }>('/timesheets/unmatched', {
+            billing_month: billingMonth,
+            source_type: sourceType,
+        }),
+
+    linkBulk: (sourceType: 'JIRA' | 'AWS', sourceIdentifier: string, employeeId: number, billingMonth: string) =>
+        api.post<{ updated_count: number; mapping_created: boolean }>(
+            '/timesheets/link-bulk',
+            {
+                source_type: sourceType,
+                source_identifier: sourceIdentifier,
+                employee_id: employeeId,
+                billing_month: billingMonth,
+            },
+        ),
 
     // ── Legacy AWS endpoints (kept for backward compat) ─────────────────────
     listAws: (filters?: { employee_id?: number; week_start?: string; page_size?: number }) =>
