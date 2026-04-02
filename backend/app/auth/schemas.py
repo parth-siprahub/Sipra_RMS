@@ -28,3 +28,10 @@ class UserProfile(BaseModel):
     role: UserRole
     full_name: str | None = None
     avatar_url: str | None = None
+
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    role: UserRole
