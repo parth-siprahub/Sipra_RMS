@@ -38,6 +38,7 @@ class ResourceRequestUpdate(BaseModel):
     sow_id: int | None = None
     priority: RequestPriority | None = None
     source: RequestSource | None = None
+    is_backfill: bool | None = None
 
 
 class StatusTransition(BaseModel):

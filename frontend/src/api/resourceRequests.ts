@@ -33,6 +33,9 @@ export const resourceRequestsApi = {
     create: (payload: CreateResourceRequestPayload) =>
         api.post<ResourceRequest>('/requests/', payload),
 
+    update: (id: number, data: Partial<CreateResourceRequestPayload>) =>
+        api.patch<ResourceRequest>(`/requests/${id}`, data),
+
     updateStatus: (id: number, status: RequestStatus) =>
         api.patch<ResourceRequest>(`/requests/${id}/status/`, { status }),
 };
