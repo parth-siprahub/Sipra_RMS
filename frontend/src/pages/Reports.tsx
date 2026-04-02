@@ -25,6 +25,26 @@ import { cn } from '../lib/utils';
 
 type Tab = 'comparison' | 'compliance';
 
+function getMonthOptions(): { value: string; label: string }[] {
+    const options: { value: string; label: string }[] = [];
+    const now = new Date();
+    const endYear = now.getFullYear();
+    const endMonth = now.getMonth() + 4;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    for (let y = 2025; y <= endYear + 1; y++) {
+        for (let m = 1; m <= 12; m++) {
+            if (y === 2025 && m < 1) continue;
+            if (y === endYear && m > endMonth) break;
+            if (y > endYear) break;
+            const value = `${y}-${String(m).padStart(2, '0')}`;
+            options.push({ value, label: `${months[m - 1]} ${y}` });
+        }
+    }
+    return options.reverse();
+}
+
+const MONTH_OPTIONS = getMonthOptions();
+
 export function Reports() {
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
@@ -44,12 +64,15 @@ export function Reports() {
                     <p className="text-text-muted">Timesheet comparison, compliance tracking, and exports</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <input
-                        type="month"
+                    <select
                         className="input-field w-48"
                         value={selectedMonth}
                         onChange={e => setSelectedMonth(e.target.value)}
-                    />
+                    >
+                        {MONTH_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                    </select>
                     {isAdmin && activeTab === 'comparison' && (
                         <button
                             onClick={() => reportsApi.exportComparison(selectedMonth)}
@@ -222,7 +245,9 @@ function ComparisonTab({
         );
     }
 
-    const filtered = flagFilter === 'all' ? rows : rows.filter(c => c.flag === flagFilter);
+    const filtered = (flagFilter === 'all' ? rows : rows.filter(c => c.flag === flagFilter))
+        .slice()
+        .sort((a, b) => (FLAG_ORDER[a.flag] ?? 9) - (FLAG_ORDER[b.flag] ?? 9) || a.rms_name.localeCompare(b.rms_name));
 
     const redCount = rows.filter(c => c.flag === 'red').length;
     const amberCount = rows.filter(c => c.flag === 'amber').length;
@@ -375,31 +400,33 @@ interface RowData {
     flag: string;
 }
 
+const FLAG_ORDER: Record<string, number> = { red: 0, amber: 1, no_aws: 2, green: 3 };
+
 function FlagBadge({ flag }: { flag: string }) {
     if (flag === 'red') {
         return (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-danger/10 text-danger text-xs font-medium">
-                <XCircle size={12} /> Red
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-danger/15" title="Red — Non-compliant">
+                <span className="w-3 h-3 rounded-full bg-danger shadow-[0_0_6px_var(--color-danger)]" />
             </span>
         );
     }
     if (flag === 'amber') {
         return (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/10 text-warning text-xs font-medium">
-                <AlertTriangle size={12} /> Amber
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-warning/15" title="Amber — Needs attention">
+                <span className="w-3 h-3 rounded-full bg-warning shadow-[0_0_6px_var(--color-warning)]" />
             </span>
         );
     }
     if (flag === 'green') {
         return (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/10 text-success text-xs font-medium">
-                <CheckCircle size={12} /> OK
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-success/15" title="Green — Compliant">
+                <span className="w-3 h-3 rounded-full bg-success shadow-[0_0_6px_var(--color-success)]" />
             </span>
         );
     }
     return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-hover text-text-muted text-xs font-medium">
-            <MinusCircle size={12} /> No AWS
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-surface-hover" title="No AWS data">
+            <span className="w-3 h-3 rounded-full bg-text-muted/40" />
         </span>
     );
 }

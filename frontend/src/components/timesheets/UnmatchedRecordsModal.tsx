@@ -278,26 +278,24 @@ export function UnmatchedRecordsModal({
                                             </div>
                                         ) : (
                                             <div className="space-y-2">
-                                                {/* Fuzzy suggestions */}
-                                                {record.suggestions && record.suggestions.length > 0 && (
+                                                {/* Show suggestion only when exactly 1 high-confidence match */}
+                                                {record.suggestions && record.suggestions.length === 1 && record.suggestions[0].score >= 0.5 && (
                                                     <div className="flex flex-wrap gap-1.5">
-                                                        <span className="text-xs text-text-muted">Suggestions:</span>
-                                                        {record.suggestions.map(s => (
-                                                            <button
-                                                                key={s.employee_id}
-                                                                onClick={() => handleSelectSuggestion(record.source_name, s)}
-                                                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-all cursor-pointer ${
-                                                                    state.selectedEmployeeId === s.employee_id
-                                                                        ? 'bg-cta text-white'
-                                                                        : 'bg-surface-hover text-text hover:bg-surface-active'
-                                                                }`}
-                                                            >
-                                                                {s.rms_name}
-                                                                <span className="opacity-60">
-                                                                    ({Math.round(s.score * 100)}%)
-                                                                </span>
-                                                            </button>
-                                                        ))}
+                                                        <span className="text-xs text-text-muted">Best match:</span>
+                                                        <button
+                                                            onClick={() => handleSelectSuggestion(record.source_name, record.suggestions![0])}
+                                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-all cursor-pointer ${
+                                                                state.selectedEmployeeId === record.suggestions![0].employee_id
+                                                                    ? 'bg-cta text-white'
+                                                                    : 'bg-success/10 text-success hover:bg-success/20'
+                                                            }`}
+                                                        >
+                                                            <CheckCircle size={10} />
+                                                            {record.suggestions![0].rms_name}
+                                                            <span className="opacity-60">
+                                                                ({Math.round(record.suggestions![0].score * 100)}%)
+                                                            </span>
+                                                        </button>
                                                     </div>
                                                 )}
 

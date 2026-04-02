@@ -109,7 +109,6 @@ export function Timesheets() {
 
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [calculating, setCalculating] = useState(false);
-    const [combinedLoading, setCombinedLoading] = useState(false);
 
     // Unmatched records modal state
     const [isUnmatchedModalOpen, setIsUnmatchedModalOpen] = useState(false);
@@ -117,7 +116,6 @@ export function Timesheets() {
     const [unmatchedDetails, setUnmatchedDetails] = useState<UnmatchedDetail[]>([]);
 
     const fetchAllData = async (month: string) => {
-        setCombinedLoading(true);
         setJiraLoading(true);
         setAwsLoading(true);
         try {
@@ -132,7 +130,6 @@ export function Timesheets() {
         } catch {
             toast.error('Failed to load dashboard data');
         } finally {
-            setCombinedLoading(false);
             setJiraLoading(false);
             setAwsLoading(false);
         }
@@ -213,12 +210,6 @@ export function Timesheets() {
                     )}
                 </div>
             </div>
-
-            <TimesheetMetrics 
-                jiraEntries={jiraEntries} 
-                awsEntries={awsEntries} 
-                loading={combinedLoading} 
-            />
 
             {/* Tabs */}
             <div className="flex gap-1 border-b border-border">
