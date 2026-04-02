@@ -6,13 +6,9 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { useAuth, isAdminRole } from '../context/AuthContext';
 import {
-    Users,
     Search,
     Edit2,
-    UserCheck,
-    UserX,
     Mail,
-    GitBranch,
     Calendar,
     Download,
 } from 'lucide-react';
@@ -230,7 +226,7 @@ export function Employees() {
                                 <tr className="bg-surface-hover/50 border-b border-border">
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Employee</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Client Name</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Triad IDs</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">IDs</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Status</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Dates</th>
                                     {isAdmin && <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider text-right">Actions</th>}
@@ -240,17 +236,9 @@ export function Employees() {
                                 {filtered.map(emp => (
                                     <tr key={emp.id} className="hover:bg-surface-hover/30 transition-colors">
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className={cn(
-                                                    "p-2 rounded-lg",
-                                                    triadComplete(emp) ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
-                                                )}>
-                                                    {triadComplete(emp) ? <UserCheck size={20} /> : <UserX size={20} />}
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-text">{emp.rms_name}</p>
-                                                    <p className="text-xs text-text-muted">ID: #{emp.id}</p>
-                                                </div>
+                                            <div>
+                                                <p className="font-bold text-text">{emp.rms_name}</p>
+                                                <p className="text-xs text-text-muted">ID: #{emp.id}</p>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text">
@@ -260,19 +248,11 @@ export function Employees() {
                                             <div className="space-y-1 text-xs">
                                                 <div className="flex items-center gap-1.5">
                                                     <Mail size={12} className={emp.aws_email ? 'text-success' : 'text-text-muted'} />
-                                                    <span className={emp.aws_email ? 'text-text' : 'text-text-muted italic'}>{emp.aws_email || 'Missing AWS'}</span>
+                                                    <span className={emp.aws_email ? 'text-text' : 'text-text-muted italic'}>{emp.aws_email || 'Missing DCLI Email'}</span>
                                                 </div>
                                                 <div className="flex items-center gap-1.5">
                                                     <Mail size={12} className={emp.siprahub_email ? 'text-success' : 'text-text-muted'} />
                                                     <span className={emp.siprahub_email ? 'text-text' : 'text-text-muted italic'}>{emp.siprahub_email || 'Missing SipraHub'}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5">
-                                                    <GitBranch size={12} className={emp.github_id ? 'text-success' : 'text-text-muted'} />
-                                                    <span className={emp.github_id ? 'text-text' : 'text-text-muted italic'}>{emp.github_id || 'Missing GitHub'}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5">
-                                                    <Users size={12} className={emp.jira_username ? 'text-success' : 'text-text-muted'} />
-                                                    <span className={emp.jira_username ? 'text-text' : 'text-text-muted italic'}>{emp.jira_username || 'Missing Jira'}</span>
                                                 </div>
                                             </div>
                                         </td>
