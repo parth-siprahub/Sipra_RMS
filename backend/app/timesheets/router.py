@@ -3,6 +3,7 @@ import logging
 import traceback
 from datetime import date as date_type
 from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Form, Query
+from pydantic import BaseModel
 from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
 from app.timesheets.schemas import (
@@ -639,12 +640,16 @@ async def link_aws_to_employee(
 # ──────────────────────────────────────────────
 
 
+class LinkBulkRequest(BaseModel):
+    source_type: str
+    source_identifier: str
+    employee_id: int
+    billing_month: str
+
+
 @router.post("/link-bulk")
 async def link_bulk(
-    source_type: str = Form(..., description="JIRA or AWS"),
-    source_identifier: str = Form(..., description="jira_user or aws_email to link"),
-    employee_id: int = Form(..., description="Employee ID to link to"),
-    billing_month: str = Form(..., description="YYYY-MM format"),
+    payload: LinkBulkRequest,
     current_user: dict = Depends(require_admin),
 ):
     """Bulk-link all unmatched rows for a given identifier to an employee.
@@ -652,6 +657,10 @@ async def link_bulk(
     Also persists the mapping in employee_system_mappings so future imports auto-match.
     """
     client = await get_supabase_admin_async()
+    source_type = payload.source_type
+    source_identifier = payload.source_identifier
+    employee_id = payload.employee_id
+    billing_month = payload.billing_month
 
     # Validate employee exists
     emp = await client.table("employees").select("id, rms_name, jira_username, aws_email").eq("id", employee_id).single().execute()
