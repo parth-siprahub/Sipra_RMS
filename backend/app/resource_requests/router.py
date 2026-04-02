@@ -99,6 +99,25 @@ async def update_request(
     return result.data[0]
 
 
+@router.patch("/{request_id}", response_model=ResourceRequestResponse)
+async def patch_request(
+    request_id: int,
+    payload: ResourceRequestUpdate,
+    current_user: dict = Depends(require_admin),
+):
+    """Partial update of a resource request (PATCH)."""
+    client = await get_supabase_admin_async()
+    data = payload.model_dump(exclude_none=True)
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
+    result = await client.table("resource_requests").update(data).eq("id", request_id).execute()
+    if not result.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Request not found")
+    api_cache.clear_prefix("requests_")
+    api_cache.clear_prefix("dashboard_")
+    return result.data[0]
+
+
 @router.patch("/{request_id}/status", response_model=ResourceRequestResponse)
 async def transition_status(
     request_id: int,

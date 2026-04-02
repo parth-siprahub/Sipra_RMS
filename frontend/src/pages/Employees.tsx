@@ -238,7 +238,6 @@ export function Employees() {
                                         <td className="px-6 py-4">
                                             <div>
                                                 <p className="font-bold text-text">{emp.rms_name}</p>
-                                                <p className="text-xs text-text-muted">ID: #{emp.id}</p>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text">

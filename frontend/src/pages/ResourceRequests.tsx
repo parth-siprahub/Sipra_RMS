@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, RefreshCw, ChevronDown } from 'lucide-react';
+import { Plus, RefreshCw, ChevronDown, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { resourceRequestsApi } from '../api/resourceRequests';
 import type {
@@ -262,11 +262,199 @@ function CreateRequestModal({ isOpen, onClose, onCreated }: CreateModalProps) {
     );
 }
 
+// ─── Edit Request Modal ──────────────────────────────────────────────────────
+interface EditModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onUpdated: () => void;
+    request: ResourceRequest | null;
+}
+
+function EditRequestModal({ isOpen, onClose, onUpdated, request }: EditModalProps) {
+    const [sows, setSows] = useState<SOW[]>([]);
+    const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
+    const [sowId, setSowId] = useState<number | ''>('');
+    const [jobProfileId, setJobProfileId] = useState<number | ''>('');
+    const [priority, setPriority] = useState<RequestPriority>('MEDIUM');
+    const [isBackfill, setIsBackfill] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+
+    // Pre-populate fields when request changes
+    useEffect(() => {
+        if (isOpen && request) {
+            setSowId(request.sow_id ?? '');
+            setJobProfileId(request.job_profile_id ?? '');
+            setPriority((request.priority as RequestPriority) ?? 'MEDIUM');
+            setIsBackfill(request.is_backfill ?? false);
+
+            const fetchData = async () => {
+                try {
+                    const [sowsRes, profilesRes] = await Promise.all([
+                        sowApi.list(),
+                        jobProfileApi.list()
+                    ]);
+                    setSows(sowsRes.filter(s => s.is_active !== false));
+                    setJobProfiles(profilesRes);
+                } catch (error) {
+                    console.error('Failed to fetch master data:', error);
+                }
+            };
+            fetchData();
+        }
+    }, [isOpen, request]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!request) return;
+        if (!sowId || !jobProfileId) {
+            toast.error('SOW and Job Profile are required');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            await resourceRequestsApi.update(request.id, {
+                priority,
+                is_backfill: isBackfill,
+                sow_id: Number(sowId),
+                job_profile_id: Number(jobProfileId),
+            });
+            toast.success('Resource request updated!');
+            onUpdated();
+            onClose();
+        } catch {
+            // error toast handled by client.ts
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Edit Resource Request">
+            <form onSubmit={handleSubmit} className="space-y-5">
+                {/* SOW Selection */}
+                <div>
+                    <label className="input-label" htmlFor="edit-rr-sow">
+                        Statement of Work (SOW) <span className="text-danger">*</span>
+                    </label>
+                    <select
+                        id="edit-rr-sow"
+                        className="input-field"
+                        value={sowId}
+                        onChange={(e) => {
+                            const selectedSowId = e.target.value ? Number(e.target.value) : '';
+                            setSowId(selectedSowId);
+                            if (selectedSowId) {
+                                const selectedSow = sows.find(s => s.id === selectedSowId);
+                                if (selectedSow?.job_profile_id) {
+                                    setJobProfileId(selectedSow.job_profile_id);
+                                }
+                            }
+                        }}
+                        required
+                    >
+                        <option value="">— Select SOW —</option>
+                        {sows.map((s) => {
+                            const linkedProfile = s.job_profile_id
+                                ? jobProfiles.find(p => p.id === s.job_profile_id)
+                                : null;
+                            return (
+                                <option key={s.id} value={s.id}>
+                                    {s.sow_number} - {s.client_name}{linkedProfile ? ` (${linkedProfile.role_name})` : ''}
+                                </option>
+                            );
+                        })}
+                    </select>
+                </div>
+
+                {/* Job Profile Selection */}
+                <div>
+                    <label className="input-label" htmlFor="edit-rr-profile">
+                        Job Profile <span className="text-danger">*</span>
+                    </label>
+                    <select
+                        id="edit-rr-profile"
+                        className="input-field"
+                        value={jobProfileId}
+                        onChange={(e) => setJobProfileId(e.target.value ? Number(e.target.value) : '')}
+                        required
+                    >
+                        <option value="">— Select Profile —</option>
+                        {jobProfiles.map((p) => (
+                            <option key={p.id} value={p.id}>
+                                {p.role_name} ({p.technology})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Priority */}
+                <div>
+                    <label className="input-label" htmlFor="edit-rr-priority">
+                        Priority <span className="text-danger">*</span>
+                    </label>
+                    <select
+                        id="edit-rr-priority"
+                        className="input-field"
+                        value={priority}
+                        onChange={(e) => setPriority(e.target.value as RequestPriority)}
+                        required
+                    >
+                        {(['URGENT', 'HIGH', 'MEDIUM', 'LOW'] as RequestPriority[]).map((p) => (
+                            <option key={p} value={p}>
+                                {p.charAt(0) + p.slice(1).toLowerCase()}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Backfill */}
+                <div className="flex items-center gap-3">
+                    <input
+                        id="edit-rr-backfill"
+                        type="checkbox"
+                        className="w-4 h-4 accent-cta cursor-pointer"
+                        checked={isBackfill}
+                        onChange={(e) => setIsBackfill(e.target.checked)}
+                    />
+                    <label htmlFor="edit-rr-backfill" className="text-sm font-medium text-text cursor-pointer">
+                        This is a backfill request
+                    </label>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-2">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="btn btn-secondary flex-1"
+                        disabled={submitting}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        className="btn btn-cta flex-1"
+                        disabled={submitting}
+                    >
+                        {submitting ? (
+                            <span className="spinner w-4 h-4" />
+                        ) : (
+                            'Save Changes'
+                        )}
+                    </button>
+                </div>
+            </form>
+        </Modal>
+    );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export function ResourceRequests() {
     const [requests, setRequests] = useState<ResourceRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingRequest, setEditingRequest] = useState<ResourceRequest | null>(null);
     const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
     const [sows, setSows] = useState<SOW[]>([]);
 
@@ -407,7 +595,7 @@ export function ResourceRequests() {
                         />
                     </div>
                 ) : (
-                    <div className="table-container border-none max-h-[70vh] overflow-y-auto custom-scrollbar">
+                    <div className="table-container border-none max-h-[70vh] overflow-y-auto overflow-x-auto custom-scrollbar">
                         <table className="data-table">
                             <thead>
                                 <tr>
@@ -417,6 +605,7 @@ export function ResourceRequests() {
                                     <th>Priority</th>
                                     <th>Status</th>
                                     <th>Created</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -456,10 +645,23 @@ export function ResourceRequests() {
                                                 onStatusChange={handleStatusChange}
                                             />
                                         </td>
-                                        <td>
+                                        <td className="whitespace-nowrap">
                                             <span className="text-xs text-text-muted">
                                                 {req.created_at ? new Date(req.created_at).toLocaleDateString() : '—'}
                                             </span>
+                                        </td>
+                                        <td>
+                                            <button
+                                                onClick={() => {
+                                                    setEditingRequest(req);
+                                                    setIsEditModalOpen(true);
+                                                }}
+                                                className="btn btn-ghost btn-icon"
+                                                title="Edit request"
+                                                aria-label={`Edit ${req.request_display_id}`}
+                                            >
+                                                <Pencil size={14} />
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
@@ -481,6 +683,17 @@ export function ResourceRequests() {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onCreated={fetchRequests}
+            />
+
+            {/* Edit Modal */}
+            <EditRequestModal
+                isOpen={isEditModalOpen}
+                onClose={() => {
+                    setIsEditModalOpen(false);
+                    setEditingRequest(null);
+                }}
+                onUpdated={fetchRequests}
+                request={editingRequest}
             />
         </div>
     );

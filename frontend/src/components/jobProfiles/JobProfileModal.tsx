@@ -3,7 +3,7 @@ import { Modal } from '../ui/Modal';
 import { jobProfileApi } from '../../api/jobProfiles';
 import type { JobProfile } from '../../api/jobProfiles';
 import toast from 'react-hot-toast';
-import { Briefcase, Code, Layers, FileText, Upload } from 'lucide-react';
+import { Briefcase, Code, Layers, FileText, Upload, ExternalLink } from 'lucide-react';
 
 interface JobProfileModalProps {
     isOpen: boolean;
@@ -98,6 +98,23 @@ export function JobProfileModal({ isOpen, onClose, onSuccess, jobProfile }: JobP
             maxWidth="max-w-lg"
         >
             <form onSubmit={handleSubmit} className="space-y-6">
+                {jobProfile && (
+                    <div className="flex items-center gap-2 text-sm">
+                        <FileText size={14} className="text-text-muted shrink-0" />
+                        {jobProfile.jd_file_url ? (
+                            <a
+                                href={jobProfile.jd_file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cta/10 text-cta font-semibold hover:bg-cta/20 transition-colors"
+                            >
+                                View JD <ExternalLink size={13} />
+                            </a>
+                        ) : (
+                            <span className="text-text-muted">No JD uploaded</span>
+                        )}
+                    </div>
+                )}
                 <div className="space-y-4">
                     <div>
                         <label className="input-label" htmlFor="role_name">Role Name *</label>

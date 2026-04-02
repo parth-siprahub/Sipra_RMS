@@ -3,12 +3,10 @@ import { sowApi } from '../api/sows';
 import { type SOW } from '../api/sows';
 import { SowModal } from '../components/sows/SowModal';
 import {
-    FileText,
     Plus,
     Search,
     Edit2,
     Calendar,
-    Briefcase,
     Download,
     ChevronDown
 } from 'lucide-react';
@@ -233,7 +231,7 @@ export function Sows() {
                                 <tr className="bg-surface-hover/50 border-b border-border">
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">SOW Details</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Job Profile</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Duration</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider whitespace-nowrap" style={{ minWidth: '220px' }}>Duration</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider text-center">Resources</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider text-right">Actions</th>
                                 </tr>
@@ -243,9 +241,6 @@ export function Sows() {
                                     <tr key={sow.id} className="hover:bg-surface-hover/30 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-cta/10 text-cta rounded-lg">
-                                                    <FileText size={20} />
-                                                </div>
                                                 <div>
                                                     <div className="flex items-center gap-2">
                                                         <p className="font-bold text-text">{sow.sow_number}</p>
@@ -260,7 +255,6 @@ export function Sows() {
                                         <td className="px-6 py-4">
                                             {sow.job_profile_id ? (
                                                 <div className="flex items-center gap-1.5">
-                                                    <Briefcase size={14} className="text-cta" />
                                                     <span className="text-sm font-medium text-text">
                                                         {jobProfiles.find(p => p.id === sow.job_profile_id)?.role_name || 'Unknown Profile'}
                                                     </span>
@@ -269,7 +263,7 @@ export function Sows() {
                                                 <span className="text-sm text-text-muted italic">No profile linked</span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-sm">
+                                        <td className="px-6 py-4 text-sm whitespace-nowrap">
                                             <div className="flex items-center gap-2 text-text-muted">
                                                 <Calendar size={14} />
                                                 <span>{sow.start_date || 'N/A'}</span>

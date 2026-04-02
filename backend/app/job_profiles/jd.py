@@ -67,7 +67,7 @@ async def upload_jd(
         await client.storage.from_("jds").upload(
             storage_path,
             content,
-            file_options={"contentType": file.content_type, "upsert": "true"},
+            file_options={"content-type": file.content_type, "upsert": "true"},
         )
     except Exception as e:
         logger.error("JD Storage upload failed for profile %d: %s | type=%s", profile_id, str(e), type(e).__name__)
