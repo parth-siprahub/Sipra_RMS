@@ -55,7 +55,11 @@ export function JiraTimesheetDrillDown({ users, currentIndex, month, onClose, on
 
     const handleExportCsv = () => {
         const headers = ['Issue', 'Key', 'Logged', ...Array.from({ length: numDays }, (_, i) => dayLabel(i + 1, month))];
-        const csvRows = [headers.join(',')];
+        const csvRows = [
+            `Employee: ${current.user}`,
+            '',
+            headers.join(','),
+        ];
 
         // Summary row
         if (summaryRow) {
@@ -135,8 +139,8 @@ export function JiraTimesheetDrillDown({ users, currentIndex, month, onClose, on
                             <Coffee size={14} /> {current.oooHours}h OOO
                         </span>
                     )}
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-hover text-text-muted text-sm font-semibold">
-                        <FileText size={14} /> {current.issueCount}
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-info/10 text-info text-sm font-semibold">
+                        <FileText size={14} /> {current.issueCount} Issues
                     </span>
                     <button
                         onClick={handleExportCsv}

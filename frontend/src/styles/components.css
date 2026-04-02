@@ -283,6 +283,7 @@
     background-color: var(--color-surface);
     position: sticky;
     top: 0;
+    z-index: 10;
 }
 
 .data-table th {
@@ -315,6 +316,10 @@
 
 .data-table tbody tr:hover td {
     background-color: var(--color-cta-subtle) !important;
+}
+
+.data-table .cell-nowrap {
+    white-space: nowrap;
 }
 
 .data-table tbody tr:last-child td {
@@ -533,6 +538,7 @@
 /* Table zebra & hover */
 [data-theme='dark'] .data-table thead {
     background-color: var(--color-surface);
+    z-index: 10;
 }
 
 [data-theme='dark'] .data-table tbody tr:nth-child(even) td {

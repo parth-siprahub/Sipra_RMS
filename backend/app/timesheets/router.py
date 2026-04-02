@@ -681,14 +681,9 @@ async def link_bulk(
         )
         updated_count = len(result.data or [])
 
-        # Also update legacy timesheet_logs if applicable
-        await (
-            client.table("timesheet_logs")
-            .update({"employee_id": employee_id})
-            .eq("jira_username", source_identifier)
-            .eq("import_month", billing_month)
-            .execute()
-        )
+        # Note: legacy timesheet_logs has no jira_username column —
+        # rows are already matched by employee_id during import, so no
+        # retroactive linking is needed here.
 
         # Optionally fill employee's jira_username if empty
         if not emp.data.get("jira_username"):
