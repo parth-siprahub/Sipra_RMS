@@ -3,18 +3,17 @@ import { employeesApi, type Employee, type EmployeeUpdate } from '../api/employe
 import { clientsApi, type Client } from '../api/clients';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
-import { StatusBadge } from '../components/ui/StatusBadge';
+import { cn } from '../lib/utils';
 import { useAuth, isAdminRole } from '../context/AuthContext';
+import { exportEmployees } from '../api/exports';
+import { authApi, type UserCreate } from '../api/auth';
+import toast from 'react-hot-toast';
 import {
     Search,
     Edit2,
-    Mail,
-    Calendar,
     Download,
+    Plus,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { cn } from '../lib/utils';
-import { exportEmployees } from '../api/exports';
 
 function EditEmployeeModal({
     isOpen,
@@ -68,12 +67,14 @@ function EditEmployeeModal({
         <Modal isOpen={isOpen} onClose={onClose} title="Edit Employee — Triad Mapping">
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <label className="input-label">RMS Name</label>
-                    <input className="input-field" value={form.rms_name || ''} onChange={e => setForm(p => ({ ...p, rms_name: e.target.value }))} />
+                    <label className="input-label" htmlFor="rms_name">RMS Name</label>
+                    <input id="rms_name" title="RMS Name" placeholder="Full Name" className="input-field" value={form.rms_name || ''} onChange={e => setForm(p => ({ ...p, rms_name: e.target.value }))} />
                 </div>
                 <div>
-                    <label className="input-label">Client Name</label>
+                    <label className="input-label" htmlFor="client_name">Client Name</label>
                     <select
+                        id="client_name"
+                        title="Client Name"
                         className="input-field"
                         value={form.client_name || ''}
                         onChange={e => setForm(p => ({ ...p, client_name: e.target.value }))}
@@ -111,6 +112,108 @@ function EditEmployeeModal({
     );
 }
 
+function CreateUserModal({
+    isOpen,
+    onClose,
+    onSuccess,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+}) {
+    const [form, setForm] = useState<UserCreate>({
+        email: '',
+        password: '',
+        full_name: '',
+        role: 'MANAGER',
+    });
+    const [submitting, setSubmitting] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!form.password || form.password.length < 6) {
+            return toast.error('Password must be at least 6 characters');
+        }
+        setSubmitting(true);
+        try {
+            await authApi.createUser(form);
+            toast.success('User created successfully');
+            onSuccess();
+            onClose();
+        } catch {
+            // handled by client
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Add New User Account">
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label className="input-label text-xs uppercase tracking-wider font-bold text-text-muted mb-1" htmlFor="full_name_input">Full Name</label>
+                    <input 
+                        id="full_name_input"
+                        className="input-field" 
+                        required
+                        value={form.full_name} 
+                        onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} 
+                        placeholder="e.g. John Doe"
+                        title="Full Name"
+                    />
+                </div>
+                <div>
+                    <label className="input-label text-xs uppercase tracking-wider font-bold text-text-muted mb-1" htmlFor="email_input">Email Address</label>
+                    <input 
+                        id="email_input"
+                        className="input-field" 
+                        type="email" 
+                        required
+                        value={form.email} 
+                        onChange={e => setForm(p => ({ ...p, email: e.target.value }))} 
+                        placeholder="user@siprahub.com"
+                        title="Email Address"
+                    />
+                </div>
+                <div>
+                    <label className="input-label text-xs uppercase tracking-wider font-bold text-text-muted mb-1" htmlFor="password_input">Temporary Password</label>
+                    <input 
+                        id="password_input"
+                        className="input-field" 
+                        type="password" 
+                        required
+                        value={form.password} 
+                        onChange={e => setForm(p => ({ ...p, password: e.target.value }))} 
+                        placeholder="Min 6 characters"
+                        title="Temporary Password"
+                    />
+                </div>
+                <div>
+                    <label className="input-label text-xs uppercase tracking-wider font-bold text-text-muted mb-1" htmlFor="sys_role">System Role</label>
+                    <select
+                        id="sys_role"
+                        title="System Role"
+                        className="input-field"
+                        value={form.role}
+                        onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
+                    >
+                        <option value="MANAGER">MANAGER</option>
+                        <option value="ADMIN">ADMIN</option>
+                        <option value="RECRUITER">RECRUITER</option>
+                        <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                    </select>
+                </div>
+                <div className="flex gap-3 pt-4 border-t border-border mt-6">
+                    <button type="button" onClick={onClose} className="btn btn-secondary flex-1" disabled={submitting}>Cancel</button>
+                    <button type="submit" className="btn btn-cta flex-1" disabled={submitting}>
+                        {submitting ? <span className="spinner w-4 h-4" /> : 'Create User'}
+                    </button>
+                </div>
+            </form>
+        </Modal>
+    );
+}
+
 export function Employees() {
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
@@ -119,6 +222,7 @@ export function Employees() {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('ACTIVE');
     const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
+    const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
 
     const fetchEmployees = async () => {
         setLoading(true);
@@ -150,18 +254,25 @@ export function Employees() {
             || (emp.siprahub_email || '').toLowerCase().includes(q);
     });
 
-    const triadComplete = (emp: Employee) =>
-        !!emp.jira_username && !!emp.aws_email && !!emp.github_id;
-
     return (
         <div className="space-y-6 animate-fade-in">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <p className="text-text-muted">Manage employee identifiers and the Verification Triad</p>
                 </div>
-                <button onClick={() => exportEmployees()} className="btn btn-secondary flex items-center gap-2">
-                    <Download size={18} /> Export CSV
-                </button>
+                <div className="flex items-center gap-3">
+                    {user?.role === 'SUPER_ADMIN' && (
+                        <button 
+                            onClick={() => setIsCreateUserModalOpen(true)} 
+                            className="btn btn-cta flex items-center gap-2"
+                        >
+                            <Plus size={18} /> Add User
+                        </button>
+                    )}
+                    <button onClick={() => exportEmployees()} className="btn btn-secondary flex items-center gap-2">
+                        <Download size={18} /> Export CSV
+                    </button>
+                </div>
             </div>
 
             <div className="card flex flex-col md:flex-row items-center gap-4 py-3 px-4">
@@ -245,39 +356,44 @@ export function Employees() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="space-y-1 text-xs">
-                                                <div className="flex items-center gap-1.5">
-                                                    <Mail size={12} className={emp.aws_email ? 'text-success' : 'text-text-muted'} />
-                                                    <span className={emp.aws_email ? 'text-text' : 'text-text-muted italic'}>{emp.aws_email || 'Missing DCLI Email'}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5">
-                                                    <Mail size={12} className={emp.siprahub_email ? 'text-success' : 'text-text-muted'} />
-                                                    <span className={emp.siprahub_email ? 'text-text' : 'text-text-muted italic'}>{emp.siprahub_email || 'Missing SipraHub'}</span>
-                                                </div>
+                                                <span className={emp.aws_email ? 'text-text' : 'text-text-muted italic'}>{emp.aws_email || 'Missing DCLI Email'}</span>
+                                                <br />
+                                                <span className={emp.siprahub_email ? 'text-text' : 'text-text-muted italic'}>{emp.siprahub_email || 'Missing SipraHub'}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <StatusBadge value={emp.status || 'ACTIVE'} type="request" />
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-text-muted">
-                                            <div className="flex items-center gap-1.5">
-                                                <Calendar size={12} />
-                                                <span>{emp.start_date || 'N/A'}</span>
-                                                {emp.exit_date && (
-                                                    <>
-                                                        <span className="text-danger">→ {emp.exit_date}</span>
-                                                    </>
-                                                )}
+                                            <div className="flex items-center gap-2">
+                                                <div className={cn(
+                                                    'w-2 h-2 rounded-full',
+                                                    emp.status === 'EXITED' 
+                                                        ? 'bg-danger shadow-[0_0_8px_rgba(239,68,68,0.5)]' 
+                                                        : 'bg-[#0F9D58] shadow-[0_0_8px_rgba(15,157,88,0.5)]'
+                                                )} />
+                                                <span className={cn(
+                                                    'text-sm font-medium',
+                                                    emp.status === 'EXITED' ? 'text-danger' : 'text-[#0F9D58]'
+                                                )}>
+                                                    {emp.status === 'EXITED' ? 'Exited' : 'Active'}
+                                                </span>
                                             </div>
                                         </td>
+                                        <td className="px-6 py-4 text-sm text-text-muted whitespace-nowrap">
+                                            <span>{emp.start_date || 'N/A'}</span>
+                                            {emp.exit_date && (
+                                                <span className="text-danger"> → {emp.exit_date}</span>
+                                            )}
+                                        </td>
                                         {isAdmin && (
-                                            <td className="px-6 py-4 text-right">
-                                                <button
-                                                    onClick={() => setEditEmployee(emp)}
-                                                    className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors"
-                                                    title="Edit Employee"
-                                                >
-                                                    <Edit2 size={18} />
-                                                </button>
+                                            <td className="px-6 py-4">
+                                                <div className="flex justify-end">
+                                                    <button
+                                                        onClick={() => setEditEmployee(emp)}
+                                                        className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors"
+                                                        title="Edit Employee"
+                                                    >
+                                                        <Edit2 size={18} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         )}
                                     </tr>
@@ -296,6 +412,13 @@ export function Employees() {
                     onClose={() => setEditEmployee(null)}
                     onSuccess={fetchEmployees}
                     employee={editEmployee}
+                />
+            )}
+            {isCreateUserModalOpen && (
+                <CreateUserModal
+                    isOpen={isCreateUserModalOpen}
+                    onClose={() => setIsCreateUserModalOpen(false)}
+                    onSuccess={fetchEmployees}
                 />
             )}
         </div>
