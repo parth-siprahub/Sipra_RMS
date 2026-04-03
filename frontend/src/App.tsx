@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { Login } from './pages/Login';
 import { DashboardLayout } from './layouts/DashboardLayout';
@@ -17,8 +17,17 @@ import { Employees } from './pages/Employees';
 import { Timesheets } from './pages/Timesheets';
 import { Clients } from './pages/Clients';
 import { Reports } from './pages/Reports';
+import { BillingConfig } from './pages/BillingConfig';
+import { TimesheetJiraDrillDown } from './pages/TimesheetJiraDrillDown';
+import { TimesheetAwsDrillDown } from './pages/TimesheetAwsDrillDown';
 
-const NotFound = () => <div className="p-10 text-center text-2xl">404 - Page Not Found</div>;
+const NotFound = () => <div className="p-10 text-center text-2xl text-text-muted font-medium">404 - Page Not Found</div>;
+
+function RoleRedirect({ role, to, defaultElement }: { role: string; to: string; defaultElement: React.ReactNode }) {
+  const { user } = useAuth();
+  if (user?.role === role) return <Navigate to={to} replace />;
+  return <>{defaultElement}</>;
+}
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -31,8 +40,8 @@ class ErrorBoundary extends React.Component<
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('ErrorBoundary caught:', error, info);
+  componentDidCatch(_error: Error, _info: React.ErrorInfo) {
+    // Errors captured by boundary — integrate telemetry/logging service here if needed
   }
   render() {
     if (this.state.hasError) {
@@ -72,45 +81,25 @@ function App() {
                 <DashboardLayout />
               </ProtectedRoute>
             }>
-              <Route index element={<Dashboard />} />
+              <Route index element={
+                <ProtectedRoute>
+                  {/* Redirect SUPER_ADMIN role from Dashboard to Employees/User Creation */}
+                  <RoleRedirect role="SUPER_ADMIN" to="/employees" defaultElement={<Dashboard />} />
+                </ProtectedRoute>
+              } />
               <Route path="resource-requests" element={<ResourceRequests />} />
               <Route path="candidates" element={<Candidates />} />
-              <Route path="job-profiles" element={
-                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'RECRUITER']}>
-                  <JobProfiles />
-                </ProtectedRoute>
-              } />
-              <Route path="sows" element={
-                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN']}>
-                  <Sows />
-                </ProtectedRoute>
-              } />
+              <Route path="job-profiles" element={<JobProfiles />} />
+              <Route path="sows" element={<Sows />} />
               <Route path="communication-logs" element={<CommunicationLogs />} />
-              <Route path="vendors" element={
-                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER']}>
-                  <Vendors />
-                </ProtectedRoute>
-              } />
-              <Route path="employees" element={
-                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER']}>
-                  <Employees />
-                </ProtectedRoute>
-              } />
-              <Route path="timesheets" element={
-                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER']}>
-                  <Timesheets />
-                </ProtectedRoute>
-              } />
-              <Route path="clients" element={
-                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN']}>
-                  <Clients />
-                </ProtectedRoute>
-              } />
-              <Route path="reports" element={
-                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER']}>
-                  <Reports />
-                </ProtectedRoute>
-              } />
+              <Route path="vendors" element={<Vendors />} />
+              <Route path="employees" element={<Employees />} />
+              <Route path="timesheets" element={<Timesheets />} />
+              <Route path="clients" element={<Clients />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="billing-config" element={<BillingConfig />} />
+              <Route path="timesheets/drill-down/jira" element={<TimesheetJiraDrillDown />} />
+              <Route path="timesheets/drill-down/aws" element={<TimesheetAwsDrillDown />} />
             </Route>
 
               {/* Dashboard alias – direct nav to /dashboard redirects to root */}
