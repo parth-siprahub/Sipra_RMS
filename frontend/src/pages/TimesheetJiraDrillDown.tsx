@@ -44,7 +44,7 @@ export function TimesheetJiraDrillDown() {
     const hasPrev = currentIndex > 0;
     const hasNext = currentIndex < users.length - 1;
 
-    const handleBack = useCallback(() => navigate('/timesheets'), [navigate]);
+    const handleBack = useCallback(() => navigate(-1), [navigate]);
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
