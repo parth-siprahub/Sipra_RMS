@@ -355,7 +355,7 @@ export function Employees() {
     const fetchEmployees = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await employeesApi.list({});
+            const data = await employeesApi.list({ page_size: 500 });
             setAllEmployees(data || []);
         } catch {
             toast.error('Failed to load employees');
