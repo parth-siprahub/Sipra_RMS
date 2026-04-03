@@ -31,7 +31,7 @@ const navItems = [
     { to: '/job-profiles', icon: FileText, label: 'Job Profiles' },
     { to: '/resource-requests', icon: Briefcase, label: 'Resource Requests' },
     { to: '/candidates', icon: Users, label: 'Candidates' },
-    { to: '/employees', icon: UserPlus, label: 'Create User' },
+    { to: '/employees', icon: UserPlus, label: 'Employees' },
     { to: '/timesheets', icon: Clock, label: 'Timesheets' },
     { to: '/reports', icon: BarChart3, label: 'Reports' },
     { to: '/clients', icon: Landmark, label: 'Clients' },
