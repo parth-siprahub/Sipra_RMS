@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
     timesheetsApi,
     type JiraRawEntry,
@@ -33,6 +33,7 @@ import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
 import { exportTimesheets } from '../api/exports';
 import { billingApi } from '../api/billing';
+
 
 type Tab = 'jira' | 'aws';
 
@@ -87,12 +88,30 @@ const MONTH_OPTIONS = getMonthOptions();
 export function Timesheets() {
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
-    const [activeTab, setActiveTab] = useState<Tab>('jira');
+    const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
 
-    const [selectedMonth, setSelectedMonth] = useState(() => {
+    // URL-driven state: month and tab persist across navigation
+    const defaultMonth = useMemo(() => {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    });
+    }, []);
+    const selectedMonth = searchParams.get('month') || defaultMonth;
+    const activeTab: Tab = (searchParams.get('tab') as Tab) || 'jira';
+
+    const setSelectedMonth = useCallback((m: string) => {
+        setSearchParams(prev => {
+            prev.set('month', m);
+            return prev;
+        }, { replace: true });
+    }, [setSearchParams]);
+
+    const setActiveTab = useCallback((t: Tab) => {
+        setSearchParams(prev => {
+            prev.set('tab', t);
+            return prev;
+        }, { replace: true });
+    }, [setSearchParams]);
 
     // Jira raw state
     const [jiraEntries, setJiraEntries] = useState<JiraRawEntry[]>([]);
@@ -108,6 +127,7 @@ export function Timesheets() {
 
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [calculating, setCalculating] = useState(false);
+    const [unmatchedCounts, setUnmatchedCounts] = useState<{ jira: number; aws: number; total: number }>({ jira: 0, aws: 0, total: 0 });
 
     // Unmatched records modal state
     const [isUnmatchedModalOpen, setIsUnmatchedModalOpen] = useState(false);
@@ -118,13 +138,15 @@ export function Timesheets() {
         setJiraLoading(true);
         setAwsLoading(true);
         try {
-            const [jiraRaw, awsRaw, empData] = await Promise.all([
+            const [jiraRaw, awsRaw, empData, counts] = await Promise.all([
                 timesheetsApi.listJiraRaw(month),
                 timesheetsApi.listAwsV2(month),
                 employees.length ? Promise.resolve(employees) : employeesApi.list({ page_size: 200 }),
+                timesheetsApi.getUnmatchedCount(month),
             ]);
             setJiraEntries(jiraRaw || []);
             setAwsEntries(awsRaw || []);
+            setUnmatchedCounts(counts);
             if (!employees.length) setEmployees(empData || []);
         } catch {
             toast.error('Failed to load dashboard data');
@@ -172,6 +194,8 @@ export function Timesheets() {
         }
     };
 
+
+
     return (
         <div className="space-y-6 animate-fade-in">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -179,6 +203,28 @@ export function Timesheets() {
                     <p className="text-text-muted">Import Jira/Tempo reports, AWS ActiveTrack data, and manage billing</p>
                 </div>
                 <div className="flex gap-3">
+                    {isAdmin && (
+                        <button 
+                            onClick={() => {
+                                setUnmatchedModalSource(activeTab === 'jira' ? 'JIRA' : 'AWS');
+                                setIsUnmatchedModalOpen(true);
+                            }} 
+                            className={cn(
+                                "btn flex items-center gap-2 relative",
+                                (activeTab === 'jira' ? unmatchedCounts.jira : unmatchedCounts.aws) > 0
+                                    ? "btn-secondary text-amber-600 border-amber-200 bg-amber-50"
+                                    : "btn-secondary opacity-60"
+                            )}
+                        >
+                            <AlertTriangle size={18} />
+                            Resolve Unmatched
+                            {(activeTab === 'jira' ? unmatchedCounts.jira : unmatchedCounts.aws) > 0 && (
+                                <span className="absolute -top-2 -right-2 bg-amber-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center shadow-sm">
+                                    {activeTab === 'jira' ? unmatchedCounts.jira : unmatchedCounts.aws}
+                                </span>
+                            )}
+                        </button>
+                    )}
                     {isAdmin && activeTab === 'jira' && (
                         <>
                             <button onClick={() => exportTimesheets(selectedMonth)} className="btn btn-secondary flex items-center gap-2">
@@ -239,15 +285,20 @@ export function Timesheets() {
             </div>
 
             {activeTab === 'jira' ? (
-                <JiraRawTab
-                    entries={jiraEntries}
-                    jiraEmpMap={jiraEmpMap}
-                    loading={jiraLoading}
+                <JiraTab
+                    jiraEntries={jiraEntries}
+                    jiraLoading={jiraLoading}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     importResult={jiraImportResult}
                     isAdmin={isAdmin}
                     onImport={() => setIsJiraImportOpen(true)}
+                    jiraEmpMap={jiraEmpMap}
+                    navigateToDrillDown={(users, idx, month) => {
+                        navigate('/timesheets/drill-down/jira', {
+                            state: { users, currentIndex: idx, month },
+                        });
+                    }}
                     setUnmatchedModalOpen={setIsUnmatchedModalOpen}
                     setUnmatchedModalSource={setUnmatchedModalSource}
                     setUnmatchedDetails={setUnmatchedDetails}
@@ -263,11 +314,18 @@ export function Timesheets() {
                     importResult={awsImportResult}
                     isAdmin={isAdmin}
                     onImport={() => setIsAwsImportOpen(true)}
+                    navigateToDrillDown={(entries, idx, empMap) => {
+                        navigate('/timesheets/drill-down/aws', {
+                            state: { entries, currentIndex: idx, empMap },
+                        });
+                    }}
                     setUnmatchedModalOpen={setIsUnmatchedModalOpen}
                     setUnmatchedModalSource={setUnmatchedModalSource}
                     setUnmatchedDetails={setUnmatchedDetails}
                 />
             )}
+
+
 
             {/* Unmatched Records Resolution Modal */}
             <UnmatchedRecordsModal
@@ -325,23 +383,23 @@ interface UserSummary {
     issueCount: number;
 }
 
-function JiraRawTab({
-    entries, jiraEmpMap, loading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport,
-    setUnmatchedModalOpen, setUnmatchedModalSource, setUnmatchedDetails
+function JiraTab({
+    jiraEntries, jiraLoading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport, jiraEmpMap,
+    navigateToDrillDown, setUnmatchedModalOpen, setUnmatchedModalSource, setUnmatchedDetails
 }: {
-    entries: JiraRawEntry[];
-    jiraEmpMap: Record<string, Employee>;
-    loading: boolean;
+    jiraEntries: JiraRawEntry[];
+    jiraLoading: boolean;
     selectedMonth: string;
     setSelectedMonth: (m: string) => void;
     importResult: JiraRawImportResult | null;
     isAdmin: boolean;
     onImport: () => void;
+    jiraEmpMap: Record<string, Employee>;
+    navigateToDrillDown: (users: UserSummary[], idx: number, month: string) => void;
     setUnmatchedModalOpen: (open: boolean) => void;
     setUnmatchedModalSource: (source: 'JIRA' | 'AWS') => void;
     setUnmatchedDetails: (details: UnmatchedDetail[]) => void;
 }) {
-    const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -349,7 +407,7 @@ function JiraRawTab({
     // Build user summaries from raw entries
     const userSummaries = useMemo(() => {
         const groupMap = new Map<string, JiraRawEntry[]>();
-        for (const entry of entries) {
+        for (const entry of jiraEntries) {
             const existing = groupMap.get(entry.jira_user);
             if (existing) {
                 existing.push(entry);
@@ -373,7 +431,7 @@ function JiraRawTab({
             });
         }
         return summaries;
-    }, [entries]);
+    }, [jiraEntries]);
 
     // Filter and sort
     const filteredSummaries = useMemo(() => {
@@ -430,7 +488,7 @@ function JiraRawTab({
                 </div>
 
                 <span className="text-sm text-text-muted sm:ml-auto">
-                    {filteredSummaries.length} of {userSummaries.length} users · {entries.length} rows
+                    {filteredSummaries.length} of {userSummaries.length} users · {jiraEntries.length} rows
                 </span>
             </div>
 
@@ -467,7 +525,7 @@ function JiraRawTab({
 
             {/* Summary list */}
             <div className="card overflow-hidden">
-                {loading ? (
+                {jiraLoading ? (
                     <div className="py-20 flex flex-col items-center justify-center gap-4">
                         <div className="spinner w-8 h-8 border-cta" />
                         <p className="text-text-muted text-sm animate-pulse">Loading timesheets...</p>
@@ -506,7 +564,7 @@ function JiraRawTab({
                             {filteredSummaries.map((summary, idx) => (
                                 <button
                                     key={summary.user}
-                                    onClick={() => navigate('/timesheets/drill-down/jira', { state: { users: filteredSummaries, currentIndex: idx, month: selectedMonth } })}
+                                    onClick={() => navigateToDrillDown(filteredSummaries, idx, selectedMonth)}
                                     className="grid grid-cols-[1fr_90px_80px_80px_44px] sm:grid-cols-[1fr_100px_90px_90px_48px] items-center w-full px-4 py-3 text-left hover:bg-surface-hover/40 transition-colors cursor-pointer group"
                                 >
                                     {/* Name */}
@@ -592,7 +650,7 @@ const AWS_DISPLAY_COLS: { label: string; hmsKey: keyof AwsTimesheetV2Entry; secs
 
 function AwsV2Tab({
     entries, empMap, awsEmpMap, loading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport,
-    setUnmatchedModalOpen, setUnmatchedModalSource, setUnmatchedDetails
+    navigateToDrillDown, setUnmatchedModalOpen, setUnmatchedModalSource, setUnmatchedDetails
 }: {
     entries: AwsTimesheetV2Entry[];
     empMap: Record<number, Employee>;
@@ -603,28 +661,65 @@ function AwsV2Tab({
     importResult: AwsImportV2Result | null;
     isAdmin: boolean;
     onImport: () => void;
+    navigateToDrillDown: (entries: AwsTimesheetV2Entry[], idx: number, empMap: Record<number, Employee>) => void;
     setUnmatchedModalOpen: (open: boolean) => void;
     setUnmatchedModalSource: (source: 'JIRA' | 'AWS') => void;
     setUnmatchedDetails: (details: UnmatchedDetail[]) => void;
 }) {
-    const navigate = useNavigate();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+    const filteredEntries = useMemo(() => {
+        const query = searchQuery.toLowerCase().trim();
+        let result = entries;
+        if (query) {
+            result = entries.filter(e => {
+                const emp = e.employee_id ? empMap[e.employee_id] : null;
+                return (emp?.rms_name || '').toLowerCase().includes(query) ||
+                       (e.aws_email || '').toLowerCase().includes(query);
+            });
+        }
+        return [...result].sort((a, b) => {
+            const dir = sortDir === 'asc' ? 1 : -1;
+            const empA = a.employee_id ? empMap[a.employee_id] : null;
+            const empB = b.employee_id ? empMap[b.employee_id] : null;
+            const nameA = (empA?.rms_name || a.aws_email || '').toLowerCase();
+            const nameB = (empB?.rms_name || b.aws_email || '').toLowerCase();
+            return nameA.localeCompare(nameB) * dir;
+        });
+    }, [entries, searchQuery, sortDir, empMap]);
 
     return (
         <>
-            <div className="card flex items-center gap-4 py-3 px-4">
-                <label className="text-sm font-medium text-text-muted" htmlFor="aws-month-select">Month</label>
-                <select
-                    id="aws-month-select"
-                    className="input-field w-48"
-                    value={selectedMonth}
-                    onChange={e => setSelectedMonth(e.target.value)}
-                >
-                    {MONTH_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                </select>
-                <span className="text-sm text-text-muted ml-auto">
-                    {entries.length} employees
+            <div className="card flex flex-col sm:flex-row items-start sm:items-center gap-3 py-3 px-4">
+                <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-text-muted" htmlFor="aws-month-select">Month</label>
+                    <select
+                        id="aws-month-select"
+                        className="input-field w-48"
+                        value={selectedMonth}
+                        onChange={e => setSelectedMonth(e.target.value)}
+                    >
+                        {MONTH_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Search */}
+                <div className="relative flex-1 max-w-xs">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+                    <input
+                        type="text"
+                        placeholder="Search by name or email..."
+                        className="input-field pl-9 w-full text-sm"
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                    />
+                </div>
+
+                <span className="text-sm text-text-muted sm:ml-auto">
+                    {filteredEntries.length} of {entries.length} employees
                 </span>
             </div>
 
@@ -664,7 +759,7 @@ function AwsV2Tab({
                         <div className="spinner w-8 h-8 border-cta" />
                         <p className="text-text-muted text-sm animate-pulse">Loading AWS data...</p>
                     </div>
-                ) : entries.length > 0 ? (
+                ) : filteredEntries.length > 0 ? (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-sm">
                             <thead>
@@ -678,10 +773,10 @@ function AwsV2Tab({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {entries.map(entry => {
+                                {filteredEntries.map((entry, idx) => {
                                     const emp = entry.employee_id ? empMap[entry.employee_id] : null;
                                     return (
-                                        <tr key={entry.id} className="hover:bg-surface-hover/30 transition-colors cursor-pointer" onClick={() => navigate('/timesheets/drill-down/aws', { state: { entries, currentIndex: entries.indexOf(entry), empMap } })}>
+                                        <tr key={entry.id} className="hover:bg-surface-hover/30 transition-colors cursor-pointer" onClick={() => navigateToDrillDown(filteredEntries, idx, empMap)}>
                                             <td className="sticky left-0 z-10 bg-surface px-4 py-2.5 min-w-[200px]">
                                                 <p className="font-medium text-text">{emp?.rms_name || entry.aws_email}</p>
                                                 {emp && <p className="text-xs text-text-muted">{entry.aws_email}</p>}
@@ -708,8 +803,11 @@ function AwsV2Tab({
                     </div>
                 ) : (
                     <EmptyState
-                        message={`No AWS ActiveTrack data for ${selectedMonth}`}
-                        action={isAdmin ? (
+                        message={searchQuery
+                            ? `No users matching "${searchQuery}"`
+                            : `No AWS ActiveTrack data for ${selectedMonth}`
+                        }
+                        action={!searchQuery && isAdmin ? (
                             <button onClick={onImport} className="btn btn-secondary btn-sm">
                                 <Upload size={14} /> Import AWS CSV
                             </button>
@@ -717,8 +815,6 @@ function AwsV2Tab({
                     />
                 )}
             </div>
-
-
         </>
     );
 }
