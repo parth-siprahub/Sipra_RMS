@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { Sun, Moon, Bell } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const ROUTE_LABELS: Record<string, string> = {
     '/': 'Dashboard Overview',
@@ -10,17 +11,26 @@ const ROUTE_LABELS: Record<string, string> = {
     '/sows': 'Statement of Work',
     '/communication-logs': 'Interaction History',
     '/vendors': 'Partner Vendors',
-    '/employees': 'Employee Directory',
+    '/employees': 'Employees',
     '/timesheets': 'Timesheets',
+    '/timesheets/drill-down/jira': 'Jira Timesheet Detail',
+    '/timesheets/drill-down/aws': 'AWS Timesheet Detail',
     '/clients': 'Clients',
     '/reports': 'Reports & Analytics',
+    '/billing-config': 'Billing Config',
 };
 
 export function Header() {
     const { theme, setTheme } = useTheme();
+    const { user } = useAuth();
     const location = useLocation();
 
-    const pageTitle = ROUTE_LABELS[location.pathname] ?? 'Management Console';
+    let pageTitle = ROUTE_LABELS[location.pathname] ?? 'Management Console';
+    if (user?.role === 'SUPER_ADMIN' && location.pathname === '/employees') {
+        pageTitle = 'Create User';
+    } else if (location.pathname === '/employees') {
+        pageTitle = 'Employee Directory';
+    }
     const toggleTheme = () => setTheme(theme === 'light' ? 'dark' : 'light');
 
     return (
@@ -28,7 +38,7 @@ export function Header() {
             className="sticky top-0 z-[50] flex items-center justify-between px-6 backdrop-blur-md transition-all duration-200"
             style={{
                 height: 'var(--header-height)',
-                backgroundColor: theme === 'dark' ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                backgroundColor: 'var(--color-header-bg)',
                 borderBottom: '1px solid var(--color-border)',
                 backdropFilter: 'blur(8px)',
                 WebkitBackdropFilter: 'blur(8px)',

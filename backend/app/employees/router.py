@@ -1,10 +1,14 @@
 """Employees CRUD + Onboarding Transition — aligned with public.employees table."""
+import re
 import logging
+from datetime import date
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
 from app.employees.schemas import EmployeeCreate, EmployeeUpdate, EmployeeResponse, EmployeeStatus
 from app.utils.cache import api_cache
+
+_SEARCH_SAFE_RE = re.compile(r'^[\w\s@.\-]+$')
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +51,15 @@ async def list_employees(
     employee_status: str | None = None,
     search: str | None = Query(None, description="Search by name, email, or username"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(1000, ge=1, le=1000),
+    page_size: int = Query(50, ge=1, le=1000),
     current_user: dict = Depends(get_current_user),
 ):
-    cache_key = f"employees_list_{employee_status}_{search}_{page}_{page_size}"
+    if search:
+        search = search.strip()
+        if not _SEARCH_SAFE_RE.match(search):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid characters in search query")
+
+    cache_key = f"employees_list_{employee_status}_{(search or '').lower()}_{page}_{page_size}"
     cached = api_cache.get(cache_key)
     if cached:
         return cached
@@ -69,8 +78,35 @@ async def list_employees(
         )
     offset = (page - 1) * page_size
     result = await query.order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
-    api_cache.set(cache_key, result.data)
-    return result.data
+    employees = result.data or []
+
+    # Batch-fetch job profile names via candidate -> resource_request -> job_profile
+    candidate_ids = [e["candidate_id"] for e in employees if e.get("candidate_id")]
+    job_profile_map: dict[int, str] = {}
+    if candidate_ids:
+        cands = await client.table("candidates").select("id,request_id").in_("id", candidate_ids).execute()
+        request_ids = [c["request_id"] for c in (cands.data or []) if c.get("request_id")]
+        # map candidate_id -> request_id
+        cand_to_req = {c["id"]: c["request_id"] for c in (cands.data or []) if c.get("request_id")}
+        if request_ids:
+            rrs = await client.table("resource_requests").select("id,job_profile_id").in_("id", request_ids).execute()
+            jp_ids = [r["job_profile_id"] for r in (rrs.data or []) if r.get("job_profile_id")]
+            req_to_jp = {r["id"]: r["job_profile_id"] for r in (rrs.data or []) if r.get("job_profile_id")}
+            if jp_ids:
+                jps = await client.table("job_profiles").select("id,role_name").in_("id", jp_ids).execute()
+                jp_to_name = {j["id"]: j["role_name"] for j in (jps.data or [])}
+                # Build final map: candidate_id -> job_profile_name
+                for cid, rid in cand_to_req.items():
+                    jpid = req_to_jp.get(rid)
+                    if jpid and jpid in jp_to_name:
+                        job_profile_map[cid] = jp_to_name[jpid]
+
+    enriched = [
+        {**e, "job_profile_name": job_profile_map.get(e["candidate_id"])}
+        for e in employees
+    ]
+    api_cache.set(cache_key, enriched)
+    return enriched
 
 
 @router.post("/", response_model=EmployeeResponse, status_code=status.HTTP_201_CREATED)
@@ -150,6 +186,14 @@ async def create_employee_from_candidate(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Operation failed. Please check input and try again.")
 
 
+@router.get("/profiles/list", tags=["Employees"])
+async def list_profiles(current_user: dict = Depends(require_admin)):
+    """Return all user profiles with their current employee link."""
+    client = await get_supabase_admin_async()
+    result = await client.table("profiles").select("id, full_name, email, role, employee_id").order("full_name").execute()
+    return result.data or []
+
+
 @router.get("/{employee_id}", response_model=EmployeeResponse)
 async def get_employee(employee_id: int, current_user: dict = Depends(get_current_user)):
     client = await get_supabase_admin_async()
@@ -183,14 +227,14 @@ async def update_employee(
 @router.patch("/{employee_id}/exit", response_model=EmployeeResponse)
 async def exit_employee(
     employee_id: int,
-    exit_date: str,
+    exit_date: date,
     current_user: dict = Depends(require_admin),
 ):
     """Mark employee as exited — immediately stops billing calculations."""
     client = await get_supabase_admin_async()
     update_data = {
         "status": EmployeeStatus.EXITED.value,
-        "exit_date": exit_date,
+        "exit_date": exit_date.isoformat(),
     }
     result = await client.table("employees").update(update_data).eq("id", employee_id).execute()
     if not result.data:
@@ -199,3 +243,48 @@ async def exit_employee(
     api_cache.clear_prefix("dashboard_")
     api_cache.clear_prefix("billing_")
     return result.data[0]
+
+
+# ──────────────────────────────────────────────
+# Profile ↔ Employee linking
+# ──────────────────────────────────────────────
+
+@router.post("/{employee_id}/link-profile", tags=["Employees"])
+async def link_profile(
+    employee_id: int,
+    profile_id: str,
+    current_user: dict = Depends(require_admin),
+):
+    """Link a user profile to this employee record."""
+    client = await get_supabase_admin_async()
+
+    # Verify employee exists
+    emp = await client.table("employees").select("id").eq("id", employee_id).execute()
+    if not emp.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Employee not found")
+
+    # Verify profile exists
+    prof = await client.table("profiles").select("id").eq("id", profile_id).execute()
+    if not prof.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found")
+
+    # Detach any existing profile linked to this employee first
+    await client.table("profiles").update({"employee_id": None}).eq("employee_id", employee_id).execute()
+
+    # Link the chosen profile
+    await client.table("profiles").update({"employee_id": employee_id}).eq("id", profile_id).execute()
+
+    api_cache.clear_prefix("employees_")
+    return {"employee_id": employee_id, "profile_id": profile_id}
+
+
+@router.delete("/{employee_id}/link-profile", tags=["Employees"])
+async def unlink_profile(
+    employee_id: int,
+    current_user: dict = Depends(require_admin),
+):
+    """Remove the profile link from this employee."""
+    client = await get_supabase_admin_async()
+    await client.table("profiles").update({"employee_id": None}).eq("employee_id", employee_id).execute()
+    api_cache.clear_prefix("employees_")
+    return {"employee_id": employee_id, "profile_id": None}

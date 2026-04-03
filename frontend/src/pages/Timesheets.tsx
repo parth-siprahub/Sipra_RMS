@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     timesheetsApi,
     type JiraRawEntry,
@@ -11,8 +12,6 @@ import { employeesApi, type Employee } from '../api/employees';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useAuth, isAdminRole } from '../context/AuthContext';
-import { JiraTimesheetDrillDown } from '../components/timesheets/JiraTimesheetDrillDown';
-import { AwsTimesheetDrillDown } from '../components/timesheets/AwsTimesheetDrillDown';
 import { UnmatchedRecordsModal } from '../components/timesheets/UnmatchedRecordsModal';
 
 import {
@@ -342,10 +341,10 @@ function JiraRawTab({
     setUnmatchedModalSource: (source: 'JIRA' | 'AWS') => void;
     setUnmatchedDetails: (details: UnmatchedDetail[]) => void;
 }) {
+    const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortDir, setSortDir] = useState<SortDir>('asc');
-    const [drillDownIndex, setDrillDownIndex] = useState<number | null>(null);
 
     // Build user summaries from raw entries
     const userSummaries = useMemo(() => {
@@ -507,7 +506,7 @@ function JiraRawTab({
                             {filteredSummaries.map((summary, idx) => (
                                 <button
                                     key={summary.user}
-                                    onClick={() => setDrillDownIndex(idx)}
+                                    onClick={() => navigate('/timesheets/drill-down/jira', { state: { users: filteredSummaries, currentIndex: idx, month: selectedMonth } })}
                                     className="grid grid-cols-[1fr_90px_80px_80px_44px] sm:grid-cols-[1fr_100px_90px_90px_48px] items-center w-full px-4 py-3 text-left hover:bg-surface-hover/40 transition-colors cursor-pointer group"
                                 >
                                     {/* Name */}
@@ -572,16 +571,6 @@ function JiraRawTab({
                 )}
             </div>
 
-            {/* Drill-down modal */}
-            {drillDownIndex !== null && (
-                <JiraTimesheetDrillDown
-                    users={filteredSummaries}
-                    currentIndex={drillDownIndex}
-                    month={selectedMonth}
-                    onClose={() => setDrillDownIndex(null)}
-                    onNavigate={(idx) => setDrillDownIndex(idx)}
-                />
-            )}
         </>
     );
 }
@@ -618,7 +607,7 @@ function AwsV2Tab({
     setUnmatchedModalSource: (source: 'JIRA' | 'AWS') => void;
     setUnmatchedDetails: (details: UnmatchedDetail[]) => void;
 }) {
-    const [awsDrillDownIndex, setAwsDrillDownIndex] = useState<number | null>(null);
+    const navigate = useNavigate();
 
     return (
         <>
@@ -692,7 +681,7 @@ function AwsV2Tab({
                                 {entries.map(entry => {
                                     const emp = entry.employee_id ? empMap[entry.employee_id] : null;
                                     return (
-                                        <tr key={entry.id} className="hover:bg-surface-hover/30 transition-colors cursor-pointer" onClick={() => setAwsDrillDownIndex(entries.indexOf(entry))}>
+                                        <tr key={entry.id} className="hover:bg-surface-hover/30 transition-colors cursor-pointer" onClick={() => navigate('/timesheets/drill-down/aws', { state: { entries, currentIndex: entries.indexOf(entry), empMap } })}>
                                             <td className="sticky left-0 z-10 bg-surface px-4 py-2.5 min-w-[200px]">
                                                 <p className="font-medium text-text">{emp?.rms_name || entry.aws_email}</p>
                                                 {emp && <p className="text-xs text-text-muted">{entry.aws_email}</p>}
@@ -729,15 +718,6 @@ function AwsV2Tab({
                 )}
             </div>
 
-            {awsDrillDownIndex !== null && (
-                <AwsTimesheetDrillDown
-                    entries={entries}
-                    currentIndex={awsDrillDownIndex}
-                    onClose={() => setAwsDrillDownIndex(null)}
-                    onNavigate={(idx) => setAwsDrillDownIndex(idx)}
-                    empMap={empMap}
-                />
-            )}
 
         </>
     );

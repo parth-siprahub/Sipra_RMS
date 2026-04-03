@@ -10,10 +10,11 @@ import {
     ChevronLeft,
     ChevronRight,
     LogOut,
-    UserCheck,
+    UserPlus,
     Clock,
     Landmark,
     BarChart3,
+    Settings2,
 } from 'lucide-react';
 
 import { cn } from '../lib/utils';
@@ -30,17 +31,21 @@ const navItems = [
     { to: '/job-profiles', icon: FileText, label: 'Job Profiles' },
     { to: '/resource-requests', icon: Briefcase, label: 'Resource Requests' },
     { to: '/candidates', icon: Users, label: 'Candidates' },
-    { to: '/employees', icon: UserCheck, label: 'Employees' },
+    { to: '/employees', icon: UserPlus, label: 'Create User' },
     { to: '/timesheets', icon: Clock, label: 'Timesheets' },
     { to: '/reports', icon: BarChart3, label: 'Reports' },
     { to: '/clients', icon: Landmark, label: 'Clients' },
     { to: '/communication-logs', icon: MessageSquare, label: 'Comm. Logs' },
     { to: '/vendors', icon: Building2, label: 'Vendors' },
+    { to: '/billing-config', icon: Settings2, label: 'Billing Config' },
 ];
 
 function getInitials(name: string) {
+    if (!name?.trim()) return '?';
     return name
-        .split(' ')
+        .trim()
+        .split(/\s+/)
+        .filter(n => n.length > 0)
         .map((n) => n[0])
         .slice(0, 2)
         .join('')
@@ -49,13 +54,13 @@ function getInitials(name: string) {
 
 function getRoleBadge(role: string) {
     const map: Record<string, { label: string; color: string }> = {
-        SUPER_ADMIN: { label: 'Super Admin', color: '#EF4444' },
-        ADMIN: { label: 'Admin', color: '#22C55E' },
-        MANAGER: { label: 'Manager', color: '#A855F7' },
-        RECRUITER: { label: 'Recruiter', color: '#38BDF8' },
-        VENDOR: { label: 'Vendor', color: '#F59E0B' },
+        SUPER_ADMIN: { label: 'Super Admin', color: 'var(--color-danger)' },
+        ADMIN: { label: 'Admin', color: 'var(--color-success)' },
+        MANAGER: { label: 'Manager', color: 'var(--brand-purple)' },
+        RECRUITER: { label: 'Recruiter', color: 'var(--color-info)' },
+        VENDOR: { label: 'Vendor', color: 'var(--color-warning)' },
     };
-    return map[role] ?? { label: role, color: '#94A3B8' };
+    return map[role] ?? { label: role, color: 'var(--color-text-muted)' };
 }
 
 export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
@@ -122,40 +127,34 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                         Navigation
                     </div>
                 )}
-                {navItems.map((item) => {
-                    const active = isActive(item.to, item.exact);
+                {navItems
+                    .filter(item => {
+                        if (!user) return false;
+                        if (user.role === 'SUPER_ADMIN') {
+                            return item.to === '/employees';
+                        }
+                        // All other roles see all pages
+                        return true;
+                    })
+                    .map((item) => {
+                        const label = (user?.role === 'SUPER_ADMIN' && item.to === '/employees') ? 'Create User' : item.label;
+                        const active = isActive(item.to, item.exact);
                     return (
                         <NavLink
                             key={item.to}
                             to={item.to}
-                            title={collapsed ? item.label : undefined}
+                            title={collapsed ? label : undefined}
                             className={cn(
                                 'flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 group relative',
-                                collapsed ? 'justify-center' : ''
+                                collapsed ? 'justify-center' : '',
+                                active
+                                    ? ''
+                                    : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-item-hover)] hover:text-[var(--sidebar-text-active)]'
                             )}
-                            style={{
-                                backgroundColor: active
-                                    ? 'var(--sidebar-item-active)'
-                                    : 'transparent',
-                                color: active
-                                    ? 'var(--sidebar-text-active)'
-                                    : 'var(--sidebar-text)',
-                            }}
-                            onMouseEnter={(e) => {
-                                if (!active) {
-                                    (e.currentTarget as HTMLElement).style.backgroundColor =
-                                        'var(--sidebar-item-hover)';
-                                    (e.currentTarget as HTMLElement).style.color =
-                                        'var(--sidebar-text-active)';
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                if (!active) {
-                                    (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-                                    (e.currentTarget as HTMLElement).style.color =
-                                        'var(--sidebar-text)';
-                                }
-                            }}
+                            style={active ? {
+                                backgroundColor: 'var(--sidebar-item-active)',
+                                color: 'var(--sidebar-text-active)',
+                            } : undefined}
                         >
                             {/* Active left border accent */}
                             {active && (
@@ -177,7 +176,7 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                                     collapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-auto opacity-100'
                                 )}
                             >
-                                {item.label}
+                                {label}
                             </span>
                         </NavLink>
                     );
@@ -219,18 +218,9 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                 <button
                     onClick={() => setCollapsed(!collapsed)}
                     className={cn(
-                        'w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 text-sm',
+                        'w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 text-sm text-[var(--sidebar-text)] hover:bg-[var(--sidebar-item-hover)] hover:text-[var(--sidebar-text-active)]',
                         collapsed ? 'justify-center' : ''
                     )}
-                    style={{ color: 'var(--sidebar-text)' }}
-                    onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--sidebar-item-hover)';
-                        (e.currentTarget as HTMLElement).style.color = 'var(--sidebar-text-active)';
-                    }}
-                    onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-                        (e.currentTarget as HTMLElement).style.color = 'var(--sidebar-text)';
-                    }}
                     title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
                     aria-label={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
                 >
@@ -248,16 +238,9 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                 <button
                     onClick={logout}
                     className={cn(
-                        'w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 text-sm',
+                        'w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 text-sm text-[var(--color-danger)] hover:bg-[rgba(239,68,68,0.1)]',
                         collapsed ? 'justify-center' : ''
                     )}
-                    style={{ color: '#F87171' }}
-                    onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-                    }}
                     title={collapsed ? 'Logout' : undefined}
                     aria-label="Logout"
                 >
