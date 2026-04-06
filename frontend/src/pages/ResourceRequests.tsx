@@ -461,6 +461,16 @@ export function ResourceRequests() {
     // Filters
     const [statusFilter, setStatusFilter] = useState('');
     const [priorityFilter, setPriorityFilter] = useState('');
+    const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [search]);
 
     const fetchRequests = useCallback(async () => {
         setLoading(true);
@@ -469,6 +479,7 @@ export function ResourceRequests() {
                 resourceRequestsApi.list({
                     ...(statusFilter ? { status: statusFilter } : {}),
                     ...(priorityFilter ? { priority: priorityFilter } : {}),
+                    ...(debouncedSearch ? { search: debouncedSearch } : {}),
                 }),
                 jobProfileApi.list(),
                 sowApi.list()
@@ -481,7 +492,7 @@ export function ResourceRequests() {
         } finally {
             setLoading(false);
         }
-    }, [statusFilter, priorityFilter]);
+    }, [statusFilter, priorityFilter, debouncedSearch]);
 
     useEffect(() => {
         fetchRequests();
@@ -518,6 +529,21 @@ export function ResourceRequests() {
 
             {/* Filter Bar */}
             <div className="card flex flex-wrap gap-3 items-end">
+                <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+                    <label className="text-xs font-medium text-text-muted">Search</label>
+                    <div className="relative">
+                        <input
+                            type="text"
+                            className="input-field pl-9"
+                            placeholder="Search by ID, SOW, Client, Role..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
+                            <span className="text-sm">🔍</span>
+                        </div>
+                    </div>
+                </div>
                 <div className="flex flex-col gap-1">
                     <label className="text-xs font-medium text-text-muted">Status</label>
                     <select

@@ -4,6 +4,7 @@ import io
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
+from app.utils.person_names import format_person_name
 from app.auth.dependencies import require_admin
 from app.database import get_supabase_admin_async
 
@@ -123,7 +124,10 @@ async def export_timesheets(
             .in_("id", employee_ids)
             .execute()
         )
-        emp_map = {e["id"]: e.get("rms_name", "") for e in (emp_result.data or [])}
+        emp_map = {
+            e["id"]: (format_person_name(e.get("rms_name") or "") or e.get("rms_name") or "")
+            for e in (emp_result.data or [])
+        }
 
     # Enrich rows with employee_name
     enriched: list[dict] = []

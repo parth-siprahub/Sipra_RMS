@@ -44,6 +44,7 @@ class EmployeeResponse(BaseModel):
     jira_username: str | None = None
     start_date: date | None = None
     exit_date: date | None = None
-    status: str | None = None
+    status: EmployeeStatus | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    job_profile_name: str | None = None

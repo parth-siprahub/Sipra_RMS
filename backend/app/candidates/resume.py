@@ -80,8 +80,8 @@ async def upload_resume(
             "Resume upload failed. Please try again or contact support.",
         )
 
-    # Get public URL
-    public_url = client.storage.from_("resumes").get_public_url(storage_path)
+    # Get public URL (storage3 AsyncBucket: get_public_url is async)
+    public_url = await client.storage.from_("resumes").get_public_url(storage_path)
 
     # Update candidate record
     await client.table("candidates").update({"resume_url": public_url}).eq("id", candidate_id).execute()

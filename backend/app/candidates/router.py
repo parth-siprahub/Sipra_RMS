@@ -1,4 +1,5 @@
 """Candidates CRUD + Admin Review + Exit — aligned with public.candidates table."""
+from datetime import date
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
@@ -12,12 +13,29 @@ from app.candidates.schemas import (
     RehireWarning,
 )
 from app.utils.cache import api_cache
+from app.utils.person_names import format_person_name
+from app.utils.employee_text import normalize_employee_text
 from app.audit.service import log_audit
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
+
+
+def _normalize_candidate_names_dict(data: dict) -> dict:
+    """Apply title-style formatting to name fields before persist."""
+    out = dict(data)
+    for key in ("first_name", "last_name"):
+        if key in out and out[key]:
+            out[key] = format_person_name(str(out[key])) or ""
+    return out
+
+
+def _candidate_api_row(row: dict | None) -> dict | None:
+    if not row:
+        return row
+    return _normalize_candidate_names_dict(row)
 
 
 def _enforce_vendor_isolation(record: dict, current_user: dict) -> None:
@@ -98,11 +116,12 @@ ADMIN_REVIEW_TRANSITIONS = {
 async def list_candidates(
     request_id: int | None = None,
     candidate_status: str | None = Query(None, alias="status"),
+    search: str | None = Query(None, description="Search by name, email, or phone"),
     page: int = Query(1, ge=1),
     page_size: int = Query(2000, ge=1, le=5000),
     current_user: dict = Depends(get_current_user),
 ):
-    cache_key = f"candidates_list_{request_id}_{candidate_status}_{page}_{page_size}"
+    cache_key = f"candidates_list_{request_id}_{candidate_status}_{search}_{page}_{page_size}"
     cached = api_cache.get(cache_key)
     if cached:
         return cached
@@ -119,10 +138,23 @@ async def list_candidates(
         query = query.eq("request_id", request_id)
     if candidate_status:
         query = query.eq("status", candidate_status)
+    
+    if search:
+        search = search.strip()
+        # OR filter on key fields (first_name, last_name, email, phone)
+        query = query.or_(
+            f"first_name.ilike.%{search}%,"
+            f"last_name.ilike.%{search}%,"
+            f"email.ilike.%{search}%,"
+            f"phone.ilike.%{search}%"
+        )
+
     offset = (page - 1) * page_size
     result = await query.order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
-    api_cache.set(cache_key, result.data)
-    return result.data
+
+    rows = [_candidate_api_row(r) for r in (result.data or [])]
+    api_cache.set(cache_key, rows)
+    return rows
 
 
 @router.post("/", response_model=CandidateResponse, status_code=status.HTTP_201_CREATED)
@@ -142,10 +174,17 @@ async def create_candidate(
     dup_result = await dup_query.execute()
     if dup_result.data:
         d = dup_result.data[0]
+        full_name = f"{d['first_name']} {d['last_name']}".strip()
         raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            f"Duplicate candidate found: {d['first_name']} {d['last_name']} ({d['email']}). ID: {d['id']}",
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": f"A candidate with the email '{payload.email}' already exists in the system.",
+                "candidate_name": full_name,
+                "candidate_id": d['id'],
+                "suggestion": "Please search for the existing candidate profile or use a different email address."
+            }
         )
+
 
     # Also check by name + phone if phone is provided
     if payload.phone:
@@ -181,9 +220,10 @@ async def create_candidate(
         )
         if emp_check.data:
             emp = emp_check.data[0]
+            pn = emp.get("rms_name")
             rehire_warning = {
                 "previous_employee_id": emp["id"],
-                "previous_employee_name": emp.get("rms_name", "Unknown"),
+                "previous_employee_name": (format_person_name(pn) or pn or "Unknown"),
                 "exit_date": emp.get("exit_date"),
                 "status": emp["status"],
                 "message": "This candidate was previously employed. Review before proceeding.",
@@ -192,13 +232,14 @@ async def create_candidate(
         logger.warning("Rehire check failed (non-blocking): %s", e)
 
     data = payload.model_dump(exclude_none=True, mode="json")
+    data = _normalize_candidate_names_dict(data)
     data["owner_id"] = current_user["id"]
     data["status"] = CandidateStatus.NEW.value
     result = await client.table("candidates").insert(data).execute()
     api_cache.clear_prefix("candidates_")
     api_cache.clear_prefix("dashboard_")
 
-    response_data = result.data[0]
+    response_data = _candidate_api_row(result.data[0])
     if rehire_warning:
         response_data["rehire_warning"] = rehire_warning
     return response_data
@@ -211,7 +252,7 @@ async def get_candidate(candidate_id: int, current_user: dict = Depends(get_curr
     if not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found")
     _enforce_vendor_isolation(result.data, current_user)
-    return result.data
+    return _candidate_api_row(result.data)
 
 
 @router.patch("/{candidate_id}", response_model=CandidateResponse)
@@ -222,7 +263,7 @@ async def update_candidate(
 ):
     client = await get_supabase_admin_async()
     # Vendor isolation: check before allowing update
-    existing = await client.table("candidates").select("id, vendor_id").eq("id", candidate_id).single().execute()
+    existing = await client.table("candidates").select("id, vendor_id, status, onboarding_date").eq("id", candidate_id).single().execute()
     if not existing.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found")
     _enforce_vendor_isolation(existing.data, current_user)
@@ -230,6 +271,13 @@ async def update_candidate(
     data = payload.model_dump(exclude_none=True, mode="json")
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
+    data = _normalize_candidate_names_dict(data)
+    ns = data.get("status")
+    if ns is not None:
+        ns_val = ns if isinstance(ns, str) else getattr(ns, "value", str(ns))
+        if ns_val == CandidateStatus.ONBOARDED.value and existing.data.get("status") != CandidateStatus.ONBOARDED.value:
+            if not existing.data.get("onboarding_date") and not data.get("onboarding_date"):
+                data["onboarding_date"] = date.today().isoformat()
     try:
         await client.table("candidates").update(data).eq("id", candidate_id).execute()
     except Exception as e:
@@ -248,7 +296,7 @@ async def update_candidate(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found")
     api_cache.clear_prefix("candidates_")
     api_cache.clear_prefix("dashboard_")
-    return refreshed.data
+    return _candidate_api_row(refreshed.data)
 
 
 @router.patch("/{candidate_id}/review", response_model=CandidateResponse)
@@ -322,15 +370,17 @@ async def admin_review_candidate(
         # Only create if no employee record exists yet
         existing_emp = await client.table("employees").select("id").eq("candidate_id", candidate_id).execute()
         if not existing_emp.data:
+            start = c.get("onboarding_date") or date.today().isoformat()
             employee_data = {
                 "candidate_id": candidate_id,
                 "rms_name": f"{c.get('first_name', '')} {c.get('last_name', '')}".strip(),
                 "client_name": c.get("client_email", "").split("@")[0] if c.get("client_email") else None,
                 "jira_username": c.get("client_jira_id"),
-                "start_date": c.get("onboarding_date"),
+                "start_date": start,
                 "status": "ACTIVE",
             }
             employee_data = {k: v for k, v in employee_data.items() if v is not None}
+            employee_data = normalize_employee_text(employee_data)
             try:
                 await client.table("employees").insert(employee_data).execute()
                 api_cache.clear_prefix("employees_")
@@ -356,7 +406,7 @@ async def admin_review_candidate(
 
     api_cache.clear_prefix("candidates_")
     api_cache.clear_prefix("dashboard_")
-    return refreshed.data
+    return _candidate_api_row(refreshed.data)
 
 
 @router.patch("/{candidate_id}/exit", response_model=CandidateResponse)
@@ -419,4 +469,4 @@ async def process_exit(
 
     api_cache.clear_prefix("candidates_")
     api_cache.clear_prefix("dashboard_")
-    return result.data[0]
+    return _candidate_api_row(result.data[0])

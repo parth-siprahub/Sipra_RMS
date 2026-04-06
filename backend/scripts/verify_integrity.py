@@ -43,20 +43,32 @@ async def main():
     target_df = df[df["Status"].str.upper().str.strip().isin(targets)]
     print(f"Excel Target Rows: {len(target_df)}")
 
+    # Group Excel by name to match migration logic
+    excel_consolidated = {}
     for _, row in target_df.iterrows():
         name = str(row["Name"]).strip()
         name_l = name.lower()
         excel_status = row["Status"].upper().strip()
+        
+        if name_l not in excel_consolidated:
+            excel_consolidated[name_l] = {"name": name, "statuses": set()}
+        excel_consolidated[name_l]["statuses"].add(excel_status)
+
+    for name_l, data in excel_consolidated.items():
+        name = data["name"]
+        statuses = data["statuses"]
+        
+        # Priority: EXIT > ONBOARDED
+        final_excel_status = "EXIT" if "EXIT" in statuses else next(iter(statuses))
         
         # Check Employee
         if name_l not in db_employees:
             missing_employees.append(name)
         else:
             db_status = db_employees[name_l]
-            # Mapping ONBOARDED/WITH CLIENT -> ACTIVE, EXIT -> EXITED
-            expected_db_status = "ACTIVE" if excel_status in ["ONBOARDED", "WITH CLIENT"] else "EXITED"
+            expected_db_status = "ACTIVE" if final_excel_status in ["ONBOARDED", "WITH CLIENT"] else "EXITED"
             if db_status != expected_db_status:
-                status_mismatch.append((name, excel_status, db_status))
+                status_mismatch.append((name, final_excel_status, db_status))
 
     print("\n--- Integrity Report ---")
     print(f"Missing Employees: {len(missing_employees)}")

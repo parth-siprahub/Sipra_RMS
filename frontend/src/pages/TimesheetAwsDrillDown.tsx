@@ -1,14 +1,13 @@
-import { useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, Monitor } from 'lucide-react';
-import { cn } from '../../lib/utils';
-import { formatPersonName } from '../../lib/personNames';
-import type { AwsTimesheetV2Entry } from '../../api/timesheets';
+import { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, ChevronLeft, ChevronRight, Monitor } from 'lucide-react';
+import { cn } from '../lib/utils';
+import { formatPersonName } from '../lib/personNames';
+import type { AwsTimesheetV2Entry } from '../api/timesheets';
 
-interface Props {
+interface PageState {
     entries: AwsTimesheetV2Entry[];
     currentIndex: number;
-    onClose: () => void;
-    onNavigate: (index: number) => void;
     empMap: Record<number, { rms_name: string }>;
 }
 
@@ -23,38 +22,61 @@ const METRIC_COLS: { label: string; hmsKey: keyof AwsTimesheetV2Entry; secsKey: 
     { label: 'Offline Meetings', hmsKey: 'offline_meetings_hms', secsKey: 'offline_meetings_secs' },
 ];
 
-export function AwsTimesheetDrillDown({ entries, currentIndex, onClose, onNavigate, empMap }: Props) {
+export function TimesheetAwsDrillDown() {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const state = location.state as PageState | null;
+
+    const [currentIndex, setCurrentIndex] = useState(state?.currentIndex ?? 0);
+
+    const entries = state?.entries ?? [];
+    const empMap = state?.empMap ?? {};
     const current = entries[currentIndex];
     const hasPrev = currentIndex > 0;
     const hasNext = currentIndex < entries.length - 1;
 
+    const handleBack = useCallback(() => navigate(-1), [navigate]);
+
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
-            if (e.key === 'ArrowLeft' && hasPrev) onNavigate(currentIndex - 1);
-            if (e.key === 'ArrowRight' && hasNext) onNavigate(currentIndex + 1);
+            if (e.key === 'ArrowLeft' && hasPrev) setCurrentIndex(i => i - 1);
+            if (e.key === 'ArrowRight' && hasNext) setCurrentIndex(i => i + 1);
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
-    }, [onClose, onNavigate, currentIndex, hasPrev, hasNext]);
+    }, [hasPrev, hasNext]);
 
-    if (!current) return null;
+    if (!state || !current) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                <p className="text-text-muted">No drill-down data available.</p>
+                <button onClick={handleBack} className="btn btn-secondary flex items-center gap-2">
+                    <ArrowLeft size={16} /> Back to Timesheets
+                </button>
+            </div>
+        );
+    }
 
     const emp = current.employee_id ? empMap[current.employee_id] : null;
     const displayName = formatPersonName(emp?.rms_name || '') || current.aws_email || 'Unknown';
 
     return (
-        <>
-        {/* Backdrop */}
-        <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={onClose} />
-        <div className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-3xl bg-surface shadow-xl flex flex-col animate-slide-in-right" role="dialog" aria-modal="true">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-surface-hover/20 shrink-0">
+        <div className="flex flex-col h-full animate-fade-in">
+            {/* Page header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-surface shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
                     <button
-                        onClick={() => { if (hasPrev) onNavigate(currentIndex - 1); }}
+                        onClick={handleBack}
+                        className="p-2 rounded-lg hover:bg-surface-hover transition-colors shrink-0 text-text-muted"
+                        title="Back to Timesheets"
+                    >
+                        <ArrowLeft size={20} />
+                    </button>
+                    <button
+                        onClick={() => { if (hasPrev) setCurrentIndex(i => i - 1); }}
                         disabled={!hasPrev}
                         className={cn("p-2 rounded-lg transition-colors shrink-0", hasPrev ? "hover:bg-surface-hover text-text cursor-pointer" : "text-text-muted/30 cursor-not-allowed")}
+                        title="Previous employee (← arrow)"
                     >
                         <ChevronLeft size={20} />
                     </button>
@@ -63,23 +85,20 @@ export function AwsTimesheetDrillDown({ entries, currentIndex, onClose, onNaviga
                         <p className="text-sm text-text-muted">{currentIndex + 1} of {entries.length} · {current.aws_email}</p>
                     </div>
                     <button
-                        onClick={() => { if (hasNext) onNavigate(currentIndex + 1); }}
+                        onClick={() => { if (hasNext) setCurrentIndex(i => i + 1); }}
                         disabled={!hasNext}
                         className={cn("p-2 rounded-lg transition-colors shrink-0", hasNext ? "hover:bg-surface-hover text-text cursor-pointer" : "text-text-muted/30 cursor-not-allowed")}
+                        title="Next employee (→ arrow)"
                     >
                         <ChevronRight size={20} />
                     </button>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cta/10 text-cta text-sm font-semibold">
-                        <Monitor size={14} /> {current.work_time_hms || '0:00:00'}
-                    </span>
-                    <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-hover transition-colors" title="Close (Escape)">
-                        <X size={20} className="text-text-muted" />
-                    </button>
-                </div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cta/10 text-cta text-sm font-semibold shrink-0">
+                    <Monitor size={14} /> {current.work_time_hms || '0:00:00'}
+                </span>
             </div>
 
+            {/* Content */}
             <div className="flex-1 overflow-auto p-6">
                 {/* Details table */}
                 <div className="card overflow-hidden">
@@ -110,6 +129,5 @@ export function AwsTimesheetDrillDown({ entries, currentIndex, onClose, onNaviga
                 </div>
             </div>
         </div>
-        </>
     );
 }

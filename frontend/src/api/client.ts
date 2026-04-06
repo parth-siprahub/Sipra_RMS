@@ -1,4 +1,5 @@
 import toast from 'react-hot-toast';
+import { getAccessTokenExpiryMs } from '../lib/jwt';
 
 const API_URL = (() => {
     const url = import.meta.env.VITE_API_URL;
@@ -9,10 +10,40 @@ const API_URL = (() => {
 })();
 
 interface RequestOptions extends RequestInit {
-    params?: Record<string, string | number | undefined>;
+    params?: Record<string, string | number | boolean | undefined>;
 }
 
+/** Align with AuthContext: log out slightly before JWT exp */
+const EXPIRY_BUFFER_MS = 3 * 60 * 1000;
+
 class ApiClient {
+    /** Supabase refresh: get new access token without full-page login */
+    private async tryRefreshSession(): Promise<boolean> {
+        const rt = localStorage.getItem('rms_refresh_token');
+        if (!rt) return false;
+        try {
+            const response = await fetch(`${API_URL}/auth/refresh`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: rt }),
+            });
+            if (!response.ok) return false;
+            const data = (await response.json()) as { access_token: string; refresh_token?: string };
+            if (!data.access_token) return false;
+            localStorage.setItem('rms_access_token', data.access_token);
+            if (data.refresh_token) {
+                localStorage.setItem('rms_refresh_token', data.refresh_token);
+            }
+            const jwtExpMs = getAccessTokenExpiryMs(data.access_token);
+            if (jwtExpMs != null) {
+                localStorage.setItem('rms_token_expiry', String(jwtExpMs - EXPIRY_BUFFER_MS));
+            }
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     private getAuthHeaders(): HeadersInit {
         const headers: HeadersInit = {};
         const token = localStorage.getItem('rms_access_token');
@@ -29,7 +60,7 @@ class ApiClient {
         };
     }
 
-    private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+    private async request<T>(endpoint: string, options: RequestOptions = {}, isAfterRefresh = false): Promise<T> {
         const { params, ...init } = options;
 
         let url = `${API_URL}${endpoint}`;
@@ -53,11 +84,12 @@ class ApiClient {
         // For FormData uploads, do NOT set Content-Type — let the browser
         // auto-set multipart/form-data with the correct boundary.
         const isFormData = init.body instanceof FormData;
+        // Put auth headers last so retries after refresh always send the new Bearer token
         const config: RequestInit = {
             ...init,
             headers: {
+                ...(init.headers as Record<string, string> | undefined),
                 ...(isFormData ? this.getAuthHeaders() : this.getJsonHeaders()),
-                ...init.headers,
             },
             signal: controller.signal,
         };
@@ -66,11 +98,19 @@ class ApiClient {
             const response = await fetch(url, config);
             clearTimeout(timeoutId);
 
-            // Handle 401 Unauthorized globally
+            // 401: refresh Supabase session once, then retry (fixes expiry on heavy pages e.g. Timesheets)
+            if (response.status === 401 && !isAfterRefresh) {
+                const refreshed = await this.tryRefreshSession();
+                if (refreshed) {
+                    return this.request<T>(endpoint, options, true);
+                }
+            }
+
             if (response.status === 401) {
                 localStorage.removeItem('rms_access_token');
                 localStorage.removeItem('rms_user_profile');
                 localStorage.removeItem('rms_token_expiry');
+                localStorage.removeItem('rms_refresh_token');
                 if (!window.location.pathname.includes('/login')) {
                     window.location.href = '/login';
                     toast.error('Session expired. Please login again.');
@@ -142,7 +182,7 @@ class ApiClient {
      * Download a file from the API as a blob and trigger a browser download.
      * Uses the same Bearer token auth as get().
      */
-    async download(endpoint: string, filename: string): Promise<void> {
+    async download(endpoint: string, filename: string, isAfterRefresh = false): Promise<void> {
         const url = `${API_URL}${endpoint}`;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000);
@@ -155,10 +195,18 @@ class ApiClient {
             });
             clearTimeout(timeoutId);
 
+            if (response.status === 401 && !isAfterRefresh) {
+                const refreshed = await this.tryRefreshSession();
+                if (refreshed) {
+                    return this.download(endpoint, filename, true);
+                }
+            }
+
             if (response.status === 401) {
                 localStorage.removeItem('rms_access_token');
                 localStorage.removeItem('rms_user_profile');
                 localStorage.removeItem('rms_token_expiry');
+                localStorage.removeItem('rms_refresh_token');
                 if (!window.location.pathname.includes('/login')) {
                     window.location.href = '/login';
                     toast.error('Session expired. Please login again.');
@@ -210,7 +258,7 @@ class ApiClient {
         return this.request<T>(endpoint, {
             method: 'POST',
             body: formData,
-            headers: this.getAuthHeaders(),  // Auth only, NO Content-Type
+            headers: this.getAuthHeaders(), // Auth only, NO Content-Type
         });
     }
 }

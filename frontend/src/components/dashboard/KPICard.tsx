@@ -6,12 +6,14 @@ export interface KPICardProps {
     accent: string;
     sub: string;
     subColor?: string;
+    subClassName?: string;
     icon: React.ComponentType<{ size?: number; className?: string }>;
     gradient?: string;
 }
 
 /** Brand-styled KPI card with a colored gradient top-border accent */
-export function KPICard({ label, value, accent, sub, subColor, icon: Icon, gradient }: KPICardProps) {
+export function KPICard({ label, value, accent, sub, subColor, subClassName, icon: Icon, gradient }: KPICardProps) {
+    const subCls = subClassName || subColor;
     return (
         <div className="bg-surface rounded-xl border border-border relative overflow-hidden p-5 transition-all hover:-translate-y-0.5 cursor-default group">
             {/* Gradient accent bar at top */}
@@ -20,23 +22,24 @@ export function KPICard({ label, value, accent, sub, subColor, icon: Icon, gradi
                 style={{ background: gradient || accent }}
             />
             <div className="flex items-start justify-between">
-                <div>
+                <div className="min-w-0">
                     <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">{label}</p>
-                    <h3
-                        className="text-3xl font-extrabold mt-1.5"
+                    {/* Use div/Counter not h3 so global heading color (--color-text) never hides the metric */}
+                    <div
+                        className="font-heading text-3xl font-extrabold mt-1.5 tabular-nums leading-tight"
                         style={{ color: accent }}
                     >
                         {value}
-                    </h3>
+                    </div>
                 </div>
                 <div
-                    className="p-2.5 rounded-xl transition-colors"
+                    className="p-2.5 rounded-xl transition-colors shrink-0"
                     style={{ backgroundColor: `${accent}10` }}
                 >
                     <Icon size={22} style={{ color: accent }} />
                 </div>
             </div>
-            <p className={cn('text-[10px] font-semibold mt-3 uppercase tracking-wider', subColor || 'text-text-muted')}>
+            <p className={cn('text-[10px] font-semibold mt-3 uppercase tracking-wider', subCls || 'text-text-muted')}>
                 {sub}
             </p>
         </div>

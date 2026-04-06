@@ -1,29 +1,20 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     reportsApi,
     type ComparisonReport,
-    type ComplianceReport,
-    type TimesheetComparison,
     type ComputedReport,
 } from '../api/reports';
 import { EmptyState } from '../components/ui/EmptyState';
-import { EmployeeDrillDownModal } from '../components/reports/EmployeeDrillDownModal';
 import { useAuth, isAdminRole } from '../context/AuthContext';
 import {
-    BarChart3,
-    ClipboardCheck,
     Download,
-    AlertTriangle,
-    CheckCircle,
-    XCircle,
-    MinusCircle,
     Calculator,
     ExternalLink,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
-
-type Tab = 'comparison' | 'compliance';
+import { formatPersonName } from '../lib/personNames';
 
 function getMonthOptions(): { value: string; label: string }[] {
     const options: { value: string; label: string }[] = [];
@@ -45,109 +36,111 @@ function getMonthOptions(): { value: string; label: string }[] {
 
 const MONTH_OPTIONS = getMonthOptions();
 
+type ReportsLocationState = { selectedMonth?: string };
+
 export function Reports() {
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
-    const [activeTab, setActiveTab] = useState<Tab>('comparison');
+    const location = useLocation();
     const [selectedMonth, setSelectedMonth] = useState(() => {
+        const fromNav = (location.state as ReportsLocationState | null)?.selectedMonth;
+        if (fromNav && /^\d{4}-(0[1-9]|1[0-2])$/.test(fromNav)) {
+            return fromNav;
+        }
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     });
 
-    // Drill-down modal state
-    const [drillDown, setDrillDown] = useState<{ employeeId: number; name: string } | null>(null);
-
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <p className="text-text-muted">Timesheet comparison, compliance tracking, and exports</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <select
-                        className="input-field w-48"
-                        value={selectedMonth}
-                        onChange={e => setSelectedMonth(e.target.value)}
-                    >
-                        {MONTH_OPTIONS.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                    </select>
-                    {isAdmin && activeTab === 'comparison' && (
+        <div className="animate-fade-in">
+            <ComparisonTab
+                month={selectedMonth}
+                onMonthChange={setSelectedMonth}
+                monthOptions={MONTH_OPTIONS}
+                isAdmin={isAdmin}
+            />
+        </div>
+    );
+}
+
+function ReportsToolbar({
+    month,
+    onMonthChange,
+    monthOptions,
+    isAdmin,
+    onExport,
+    onCalculate,
+    calculating,
+}: {
+    month: string;
+    onMonthChange: (value: string) => void;
+    monthOptions: { value: string; label: string }[];
+    isAdmin: boolean;
+    onExport: () => void;
+    onCalculate: () => void;
+    calculating: boolean;
+}) {
+    return (
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-3">
+            <p className="text-sm text-text-muted leading-snug">
+                Jira vs AWS timesheet comparison and exports
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+                <select
+                    className="input-field w-[11rem] text-sm py-1.5 min-h-0"
+                    value={month}
+                    onChange={e => onMonthChange(e.target.value)}
+                >
+                    {monthOptions.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </select>
+                {isAdmin && (
+                    <>
                         <button
-                            onClick={() => reportsApi.exportComparison(selectedMonth)}
-                            className="btn btn-secondary flex items-center gap-2"
+                            type="button"
+                            className="btn btn-secondary btn-sm inline-flex items-center gap-1.5 shrink-0"
+                            onClick={onExport}
                         >
-                            <Download size={16} />
+                            <Download size={14} />
                             Export CSV
                         </button>
-                    )}
-                </div>
+                        <button
+                            type="button"
+                            className="btn btn-primary btn-sm inline-flex items-center gap-1.5 shrink-0"
+                            onClick={onCalculate}
+                            disabled={calculating}
+                        >
+                            <Calculator size={14} />
+                            {calculating ? 'Calculating...' : 'Calculate Billing'}
+                        </button>
+                    </>
+                )}
             </div>
-
-            {/* Tabs */}
-            <div className="flex gap-1 border-b border-border">
-                <button
-                    onClick={() => setActiveTab('comparison')}
-                    className={cn(
-                        "px-4 py-2.5 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors",
-                        activeTab === 'comparison'
-                            ? "border-cta text-cta"
-                            : "border-transparent text-text-muted hover:text-text"
-                    )}
-                >
-                    <BarChart3 size={16} />
-                    Jira vs AWS Comparison
-                </button>
-                <button
-                    onClick={() => setActiveTab('compliance')}
-                    className={cn(
-                        "px-4 py-2.5 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors",
-                        activeTab === 'compliance'
-                            ? "border-cta text-cta"
-                            : "border-transparent text-text-muted hover:text-text"
-                    )}
-                >
-                    <ClipboardCheck size={16} />
-                    Compliance
-                </button>
-            </div>
-
-            {activeTab === 'comparison' ? (
-                <ComparisonTab
-                    month={selectedMonth}
-                    isAdmin={isAdmin}
-                    onDrillDown={(id, name) => setDrillDown({ employeeId: id, name })}
-                />
-            ) : (
-                <ComplianceTab month={selectedMonth} />
-            )}
-
-            {drillDown && (
-                <EmployeeDrillDownModal
-                    employeeId={drillDown.employeeId}
-                    employeeName={drillDown.name}
-                    month={selectedMonth}
-                    onClose={() => setDrillDown(null)}
-                />
-            )}
         </div>
     );
 }
 
 // ──────────────────────────────────────────────
-// Comparison Tab
+// Comparison "tab" — main reports body
 // ──────────────────────────────────────────────
 
 function ComparisonTab({
     month,
+    onMonthChange,
+    monthOptions,
     isAdmin,
-    onDrillDown,
 }: {
     month: string;
+    onMonthChange: (value: string) => void;
+    monthOptions: { value: string; label: string }[];
     isAdmin: boolean;
-    onDrillDown: (employeeId: number, name: string) => void;
 }) {
+    const navigate = useNavigate();
+
+    const goEmployeeDrillDown = (employeeId: number, name: string) => {
+        navigate(`/reports/employee/${employeeId}?month=${encodeURIComponent(month)}`, { state: { name } });
+    };
     const [report, setReport] = useState<ComparisonReport | null>(null);
     const [computed, setComputed] = useState<ComputedReport[] | null>(null);
     const [loading, setLoading] = useState(true);
@@ -193,9 +186,20 @@ function ComparisonTab({
 
     if (loading) {
         return (
-            <div className="card py-20 flex flex-col items-center justify-center gap-4">
-                <div className="spinner w-8 h-8 border-cta" />
-                <p className="text-text-muted text-sm animate-pulse">Loading comparison...</p>
+            <div className="space-y-3">
+                <ReportsToolbar
+                    month={month}
+                    onMonthChange={onMonthChange}
+                    monthOptions={monthOptions}
+                    isAdmin={isAdmin}
+                    onExport={() => reportsApi.exportComparison(month)}
+                    onCalculate={handleCalculate}
+                    calculating={calculating}
+                />
+                <div className="card py-12 flex flex-col items-center justify-center gap-3">
+                    <div className="spinner w-7 h-7 border-cta" />
+                    <p className="text-text-muted text-sm animate-pulse">Loading comparison...</p>
+                </div>
             </div>
         );
     }
@@ -231,95 +235,97 @@ function ComparisonTab({
 
     if (rows.length === 0) {
         return (
-            <>
-                {isAdmin && (
-                    <div className="flex justify-end">
-                        <button onClick={handleCalculate} className="btn btn-primary flex items-center gap-2" disabled={calculating}>
-                            <Calculator size={16} />
-                            {calculating ? 'Calculating...' : 'Calculate Billing'}
-                        </button>
-                    </div>
-                )}
+            <div className="space-y-3">
+                <ReportsToolbar
+                    month={month}
+                    onMonthChange={onMonthChange}
+                    monthOptions={monthOptions}
+                    isAdmin={isAdmin}
+                    onExport={() => reportsApi.exportComparison(month)}
+                    onCalculate={handleCalculate}
+                    calculating={calculating}
+                />
                 <EmptyState message={`No comparison data for ${month}. Import data and run Calculate Billing.`} />
-            </>
+            </div>
         );
     }
 
-    const filtered = (flagFilter === 'all' ? rows : rows.filter(c => c.flag === flagFilter))
+    const isNonCompliantFlag = (f: string) => f === 'red' || f === 'no_aws';
+
+    const filtered = rows
+        .filter(c => {
+            if (flagFilter === 'all') return true;
+            if (flagFilter === 'red') return isNonCompliantFlag(c.flag);
+            return c.flag === flagFilter;
+        })
         .slice()
         .sort((a, b) => (FLAG_ORDER[a.flag] ?? 9) - (FLAG_ORDER[b.flag] ?? 9) || a.rms_name.localeCompare(b.rms_name));
 
-    const redCount = rows.filter(c => c.flag === 'red').length;
+    const redCount = rows.filter(c => isNonCompliantFlag(c.flag)).length;
     const amberCount = rows.filter(c => c.flag === 'amber').length;
     const greenCount = rows.filter(c => c.flag === 'green').length;
-    const noAwsCount = rows.filter(c => c.flag === 'no_aws').length;
 
     return (
-        <>
-            {/* Calculate button */}
-            {isAdmin && (
-                <div className="flex justify-end">
-                    <button onClick={handleCalculate} className="btn btn-primary flex items-center gap-2" disabled={calculating}>
-                        <Calculator size={16} />
-                        {calculating ? 'Calculating...' : 'Calculate Billing'}
-                    </button>
-                </div>
-            )}
+        <div className="space-y-3">
+            <ReportsToolbar
+                month={month}
+                onMonthChange={onMonthChange}
+                monthOptions={monthOptions}
+                isAdmin={isAdmin}
+                onExport={() => reportsApi.exportComparison(month)}
+                onCalculate={handleCalculate}
+                calculating={calculating}
+            />
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                 <SummaryCard
                     label="Total"
                     value={rows.length}
-                    color="text-cta"
+                    valueClassName="text-cta"
+                    activeBorderCssVar="--color-cta"
                     onClick={() => setFlagFilter('all')}
                     active={flagFilter === 'all'}
                 />
                 <SummaryCard
-                    label="Red"
+                    label="Non-compliant"
                     value={redCount}
-                    color="text-danger"
+                    valueClassName="text-danger"
+                    activeBorderCssVar="--color-danger"
                     onClick={() => setFlagFilter(f => f === 'red' ? 'all' : 'red')}
                     active={flagFilter === 'red'}
                 />
                 <SummaryCard
-                    label="Amber"
+                    label="Needs review"
                     value={amberCount}
-                    color="text-warning"
+                    valueClassName="text-warning"
+                    activeBorderCssVar="--color-warning"
                     onClick={() => setFlagFilter(f => f === 'amber' ? 'all' : 'amber')}
                     active={flagFilter === 'amber'}
                 />
                 <SummaryCard
-                    label="Green"
+                    label="Compliant"
                     value={greenCount}
-                    color="text-success"
+                    valueClassName="text-success"
+                    activeBorderCssVar="--color-success"
                     onClick={() => setFlagFilter(f => f === 'green' ? 'all' : 'green')}
                     active={flagFilter === 'green'}
                 />
-                <SummaryCard
-                    label="No AWS"
-                    value={noAwsCount}
-                    color="text-text-muted"
-                    onClick={() => setFlagFilter(f => f === 'no_aws' ? 'all' : 'no_aws')}
-                    active={flagFilter === 'no_aws'}
-                />
             </div>
 
-            {/* Comparison Table */}
-            <div className="card overflow-hidden">
+            <div className="card overflow-hidden p-0">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse text-sm">
                         <thead>
                             <tr className="bg-surface-hover/50 border-b border-border">
-                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase">Employee</th>
-                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-right">Billable Target</th>
-                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-right">Jira Hrs</th>
-                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-right">AWS Hrs</th>
-                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-center">OOO</th>
-                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-right">Diff</th>
-                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-right">%</th>
-                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-center">Flag</th>
-                                <th className="px-4 py-3 w-10"></th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase tracking-wide">Employee</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">Billable Target</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">Jira Hrs</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">AWS Hrs</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-center">OOO</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">Diff</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">%</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-center">Flag</th>
+                                <th className="px-2 py-2 w-9"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -327,29 +333,29 @@ function ComparisonTab({
                                 <tr
                                     key={row.employee_id}
                                     className="hover:bg-surface-hover/30 transition-colors cursor-pointer"
-                                    onClick={() => onDrillDown(row.employee_id, row.rms_name)}
+                                    onClick={() => goEmployeeDrillDown(row.employee_id, formatPersonName(row.rms_name))}
                                 >
-                                    <td className="px-4 py-3">
-                                        <p className="font-medium text-text">{row.rms_name}</p>
-                                        <p className="text-xs text-text-muted">{row.jira_username || row.aws_email || '—'}</p>
+                                    <td className="px-3 py-2">
+                                        <p className="font-medium text-text leading-tight">{formatPersonName(row.rms_name)}</p>
+                                        <p className="text-xs text-text-muted leading-tight mt-0.5">{row.jira_username || row.aws_email || '—'}</p>
                                     </td>
-                                    <td className="px-4 py-3 text-right text-text-muted">
+                                    <td className="px-3 py-2 text-right text-text-muted tabular-nums">
                                         {row.billable_hours != null ? `${row.billable_hours}h` : '—'}
                                     </td>
-                                    <td className="px-4 py-3 text-right font-bold text-text">{row.jira_hours.toFixed(1)}</td>
-                                    <td className="px-4 py-3 text-right">
+                                    <td className="px-3 py-2 text-right font-bold text-text tabular-nums">{row.jira_hours.toFixed(1)}</td>
+                                    <td className="px-3 py-2 text-right tabular-nums">
                                         {row.aws_hours != null ? (
                                             <span className="font-medium">{row.aws_hours.toFixed(1)}</span>
                                         ) : (
                                             <span className="text-text-muted text-xs">N/A</span>
                                         )}
                                     </td>
-                                    <td className="px-4 py-3 text-center">
+                                    <td className="px-3 py-2 text-center tabular-nums">
                                         <span className={cn("font-medium", row.ooo_days > 0 ? "text-warning" : "text-text-muted")}>
                                             {row.ooo_days}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 text-right">
+                                    <td className="px-3 py-2 text-right tabular-nums">
                                         {row.difference != null ? (
                                             <span className={cn("font-medium", row.difference > 0 ? "text-success" : row.difference < -10 ? "text-danger" : "text-text")}>
                                                 {row.difference > 0 ? '+' : ''}{row.difference.toFixed(1)}
@@ -358,17 +364,17 @@ function ComparisonTab({
                                             <span className="text-text-muted">—</span>
                                         )}
                                     </td>
-                                    <td className="px-4 py-3 text-right">
+                                    <td className="px-3 py-2 text-right tabular-nums">
                                         {row.difference_pct != null ? (
-                                            <span className="text-sm text-text-muted">{row.difference_pct.toFixed(1)}%</span>
+                                            <span className="text-text-muted">{row.difference_pct.toFixed(1)}%</span>
                                         ) : (
                                             <span className="text-text-muted">—</span>
                                         )}
                                     </td>
-                                    <td className="px-4 py-3 text-center">
-                                        <FlagBadge flag={row.flag} />
+                                    <td className="px-3 py-2 text-center">
+                                        <FlagBadge flag={row.flag === 'no_aws' ? 'red' : row.flag} />
                                     </td>
-                                    <td className="px-2 py-3 text-center">
+                                    <td className="px-1.5 py-2 text-center">
                                         <ExternalLink size={14} className="text-text-muted" />
                                     </td>
                                 </tr>
@@ -377,12 +383,12 @@ function ComparisonTab({
                     </table>
                 </div>
                 {filtered.length === 0 && (
-                    <div className="py-8 text-center text-text-muted text-sm">
+                    <div className="py-6 text-center text-text-muted text-sm">
                         No entries match the selected filter
                     </div>
                 )}
             </div>
-        </>
+        </div>
     );
 }
 
@@ -400,154 +406,35 @@ interface RowData {
     flag: string;
 }
 
-const FLAG_ORDER: Record<string, number> = { red: 0, amber: 1, no_aws: 2, green: 3 };
+/** Sort: non-compliant first (red + legacy no_aws), then amber, then green */
+const FLAG_ORDER: Record<string, number> = { red: 0, no_aws: 0, amber: 1, green: 2 };
 
 function FlagBadge({ flag }: { flag: string }) {
     if (flag === 'red') {
         return (
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-danger/15" title="Red — Non-compliant">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-danger/15" title="Non-compliant">
                 <span className="w-3 h-3 rounded-full bg-danger shadow-[0_0_6px_var(--color-danger)]" />
             </span>
         );
     }
     if (flag === 'amber') {
         return (
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-warning/15" title="Amber — Needs attention">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-warning/15" title="Needs review (30–50% discrepancy)">
                 <span className="w-3 h-3 rounded-full bg-warning shadow-[0_0_6px_var(--color-warning)]" />
             </span>
         );
     }
     if (flag === 'green') {
         return (
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-success/15" title="Green — Compliant">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-success/15" title="Compliant (≤30% discrepancy)">
                 <span className="w-3 h-3 rounded-full bg-success shadow-[0_0_6px_var(--color-success)]" />
             </span>
         );
     }
     return (
-        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-surface-hover" title="No AWS data">
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-surface-hover" title="Unknown status">
             <span className="w-3 h-3 rounded-full bg-text-muted/40" />
         </span>
-    );
-}
-
-// ──────────────────────────────────────────────
-// Compliance Tab
-// ──────────────────────────────────────────────
-
-function ComplianceTab({ month }: { month: string }) {
-    const [report, setReport] = useState<ComplianceReport | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [statusFilter, setStatusFilter] = useState<string>('all');
-
-    useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                const data = await reportsApi.getCompliance(month);
-                setReport(data);
-            } catch {
-                toast.error('Failed to load compliance data');
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, [month]);
-
-    if (loading) {
-        return (
-            <div className="card py-20 flex flex-col items-center justify-center gap-4">
-                <div className="spinner w-8 h-8 border-cta" />
-                <p className="text-text-muted text-sm animate-pulse">Loading compliance...</p>
-            </div>
-        );
-    }
-
-    if (!report) {
-        return <EmptyState message={`No compliance data for ${month}`} />;
-    }
-
-    const filtered = statusFilter === 'all'
-        ? report.entries
-        : report.entries.filter(e => e.status === statusFilter);
-
-    return (
-        <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <SummaryCard label="Active Employees" value={report.total_active} />
-                <SummaryCard
-                    label="Complete"
-                    value={report.complete}
-                    color="text-success"
-                    onClick={() => setStatusFilter(f => f === 'complete' ? 'all' : 'complete')}
-                    active={statusFilter === 'complete'}
-                />
-                <SummaryCard
-                    label="Partial"
-                    value={report.partial}
-                    color="text-warning"
-                    onClick={() => setStatusFilter(f => f === 'partial' ? 'all' : 'partial')}
-                    active={statusFilter === 'partial'}
-                />
-                <SummaryCard
-                    label="Missing"
-                    value={report.missing}
-                    color="text-danger"
-                    onClick={() => setStatusFilter(f => f === 'missing' ? 'all' : 'missing')}
-                    active={statusFilter === 'missing'}
-                />
-            </div>
-
-            <div className="card overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-surface-hover/50 border-b border-border">
-                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase">Employee</th>
-                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-center">Days Logged</th>
-                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-right">Total Hours</th>
-                                <th className="px-4 py-3 text-xs font-bold text-text-muted uppercase text-center">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {filtered.map(entry => (
-                                <tr key={entry.employee_id} className="hover:bg-surface-hover/30 transition-colors">
-                                    <td className="px-4 py-3">
-                                        <p className="font-medium text-text">{entry.rms_name}</p>
-                                        <p className="text-xs text-text-muted">{entry.jira_username || '—'}</p>
-                                    </td>
-                                    <td className="px-4 py-3 text-center font-medium">{entry.days_logged}</td>
-                                    <td className="px-4 py-3 text-right font-medium">{entry.total_hours.toFixed(1)}h</td>
-                                    <td className="px-4 py-3 text-center">
-                                        {entry.status === 'complete' && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/10 text-success text-xs font-medium">
-                                                <CheckCircle size={12} /> Complete
-                                            </span>
-                                        )}
-                                        {entry.status === 'partial' && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/10 text-warning text-xs font-medium">
-                                                <AlertTriangle size={12} /> Partial
-                                            </span>
-                                        )}
-                                        {entry.status === 'missing' && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-danger/10 text-danger text-xs font-medium">
-                                                <XCircle size={12} /> Missing
-                                            </span>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-                {filtered.length === 0 && (
-                    <div className="py-8 text-center text-text-muted text-sm">
-                        No entries match the selected filter
-                    </div>
-                )}
-            </div>
-        </>
     );
 }
 
@@ -556,31 +443,51 @@ function ComplianceTab({ month }: { month: string }) {
 // ──────────────────────────────────────────────
 
 function SummaryCard({
-    label, value, color, onClick, active,
+    label,
+    value,
+    valueClassName,
+    activeBorderCssVar,
+    onClick,
+    active,
 }: {
     label: string;
     value: number;
-    color?: string;
+    valueClassName?: string;
+    /** When active, border uses this design-token variable, e.g. `--color-danger` */
+    activeBorderCssVar?: string;
     onClick?: () => void;
     active?: boolean;
 }) {
+    const showAccentBorder = Boolean(active && activeBorderCssVar);
+
     return (
         <div
             className={cn(
-                "card py-4 px-5 text-center transition-all",
-                onClick && "cursor-pointer hover:shadow-md",
-                active && "ring-2 ring-offset-2",
-                active && color === "text-danger" && "ring-danger",
-                active && color === "text-warning" && "ring-warning",
-                active && color === "text-success" && "ring-success",
-                active && color === "text-cta" && "ring-cta",
-                active && color === "text-text-muted" && "ring-text-muted",
-                active && !color && "ring-cta",
+                'card py-2.5 px-3 text-center transition-[border-color,box-shadow] duration-200',
+                onClick && 'cursor-pointer hover:shadow-md',
+                showAccentBorder && 'border-2',
             )}
+            style={
+                showAccentBorder
+                    ? { borderColor: `var(${activeBorderCssVar})` }
+                    : undefined
+            }
             onClick={onClick}
+            onKeyDown={
+                onClick
+                    ? e => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              onClick();
+                          }
+                      }
+                    : undefined
+            }
+            role={onClick ? 'button' : undefined}
+            tabIndex={onClick ? 0 : undefined}
         >
-            <p className={cn("text-2xl font-bold", color || "text-text")}>{value}</p>
-            <p className="text-xs text-text-muted mt-1">{label}</p>
+            <p className={cn('text-xl font-bold tabular-nums leading-none', valueClassName || 'text-text')}>{value}</p>
+            <p className="text-[11px] text-text-muted mt-1.5 leading-tight">{label}</p>
         </div>
     );
 }

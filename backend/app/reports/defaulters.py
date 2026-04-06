@@ -4,8 +4,15 @@ from datetime import date, datetime, timedelta
 from calendar import monthrange
 
 from app.reports.schemas import DefaulterEntry
+from app.utils.person_names import format_person_name
 
 logger = logging.getLogger(__name__)
+
+
+def _display_rms(raw: str | None) -> str:
+    if not raw or not str(raw).strip():
+        return "Unknown"
+    return format_person_name(str(raw)) or str(raw)
 
 
 def _count_working_days(start: date, end: date) -> int:
@@ -152,7 +159,7 @@ def detect_defaulters(
 
         results.append(DefaulterEntry(
             employee_id=emp_id,
-            rms_name=emp.get("rms_name", "Unknown"),
+            rms_name=_display_rms(emp.get("rms_name")),
             jira_username=emp.get("jira_username"),
             expected_hours=round(expected_hours, 2),
             actual_hours=round(actual_hours, 2),

@@ -14,12 +14,17 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user_id: str
     role: UserRole
     full_name: str | None = None
+    refresh_token: str | None = None
 
 
 class UserProfile(BaseModel):
@@ -28,3 +33,10 @@ class UserProfile(BaseModel):
     role: UserRole
     full_name: str | None = None
     avatar_url: str | None = None
+
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    role: UserRole

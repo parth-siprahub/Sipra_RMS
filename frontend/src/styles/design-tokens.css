@@ -170,6 +170,9 @@
   --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 
+  /* === HEADER === */
+  --color-header-bg: rgba(255, 255, 255, 0.8);
+
   /* === SIDEBAR (Dark) === */
   --sidebar-bg: #0F172A;
   --sidebar-border: rgba(255, 255, 255, 0.06);
@@ -224,6 +227,9 @@
   --color-text-muted: #94A3B8;
   /* Slate 400 */
   --color-text-inverse: #020617;
+
+  /* Header */
+  --color-header-bg: rgba(15, 23, 42, 0.8);
 
   /* Shadows - subtler on dark */
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);

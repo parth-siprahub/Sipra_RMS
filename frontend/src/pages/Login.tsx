@@ -64,7 +64,7 @@ export function Login() {
                 full_name: data.full_name || email.split('@')[0],
             };
 
-            login(data.access_token, userData);
+            login(data.access_token, userData, data.refresh_token ?? null);
             toast.success('Welcome back!');
             navigate(from, { replace: true });
         } catch (err: unknown) {
