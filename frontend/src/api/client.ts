@@ -9,7 +9,7 @@ const API_URL = (() => {
 })();
 
 interface RequestOptions extends RequestInit {
-    params?: Record<string, string | number | undefined>;
+    params?: Record<string, string | number | boolean | undefined>;
 }
 
 class ApiClient {

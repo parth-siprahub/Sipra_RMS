@@ -50,6 +50,7 @@ def normalize_employee_text(data: dict) -> dict:
 async def list_employees(
     employee_status: str | None = None,
     search: str | None = Query(None, description="Search by name, email, or username"),
+    exclude_system: str | None = Query(None, description="Exclude employees already linked to a system (e.g., 'JIRA', 'AWS')"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=1000),
     current_user: dict = Depends(get_current_user),
@@ -59,7 +60,7 @@ async def list_employees(
         if not _SEARCH_SAFE_RE.match(search):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid characters in search query")
 
-    cache_key = f"employees_list_{employee_status}_{(search or '').lower()}_{page}_{page_size}"
+    cache_key = f"employees_list_{employee_status}_{(search or '').lower()}_{exclude_system}_{page}_{page_size}"
     cached = api_cache.get(cache_key)
     if cached:
         return cached
@@ -76,6 +77,18 @@ async def list_employees(
             f"jira_username.ilike.%{search}%,"
             f"siprahub_email.ilike.%{search}%"
         )
+
+    if exclude_system:
+        # Fetch IDs already mapped to this system
+        exclude_result = await client.table("employee_system_mappings")\
+            .select("employee_id")\
+            .eq("system_name", exclude_system.upper())\
+            .execute()
+        
+        mapped_ids = [r["employee_id"] for r in (exclude_result.data or []) if r.get("employee_id")]
+        if mapped_ids:
+            query = query.not_.in_("id", mapped_ids)
+
     offset = (page - 1) * page_size
     result = await query.order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
     employees = result.data or []
@@ -187,10 +200,22 @@ async def create_employee_from_candidate(
 
 
 @router.get("/profiles/list", tags=["Employees"])
-async def list_profiles(current_user: dict = Depends(require_admin)):
+async def list_profiles(
+    search: str | None = Query(None, description="Search by name or email"),
+    exclude_linked: bool = Query(False, description="Exclude profiles already linked to an employee"),
+    current_user: dict = Depends(require_admin)
+):
     """Return all user profiles with their current employee link."""
     client = await get_supabase_admin_async()
-    result = await client.table("profiles").select("id, full_name, email, role, employee_id").order("full_name").execute()
+    query = client.table("profiles").select("id, full_name, email, role, employee_id")
+    
+    if search:
+        query = query.or_(f"full_name.ilike.%{search}%,email.ilike.%{search}%")
+    
+    if exclude_linked:
+        query = query.is_("employee_id", "null")
+        
+    result = await query.order("full_name").execute()
     return result.data or []
 
 

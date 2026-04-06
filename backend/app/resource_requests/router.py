@@ -29,11 +29,12 @@ REQUEST_STATUS_TRANSITIONS = {
 async def list_requests(
     request_status: str | None = Query(None, alias="status"),
     priority: str | None = None,
+    search: str | None = Query(None, description="Search by ID, client, or job profile"),
     page: int = Query(1, ge=1),
     page_size: int = Query(1000, ge=1, le=1000),
     current_user: dict = Depends(get_current_user),
 ):
-    cache_key = f"requests_list_{request_status}_{priority}_{page}_{page_size}"
+    cache_key = f"requests_list_{request_status}_{priority}_{search}_{page}_{page_size}"
     cached = api_cache.get(cache_key)
     if cached:
         return cached
@@ -44,10 +45,21 @@ async def list_requests(
         query = query.eq("status", request_status)
     if priority:
         query = query.eq("priority", priority)
+    if search:
+        search = search.strip()
+        # OR filter on key fields (client_name, job_profile, request_display_id, location)
+        query = query.or_(
+            f"client_name.ilike.%{search}%,"
+            f"job_profile.ilike.%{search}%,"
+            f"request_display_id.ilike.%{search}%,"
+            f"location.ilike.%{search}%"
+        )
+
     offset = (page - 1) * page_size
     result = await query.order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
     api_cache.set(cache_key, result.data)
     return result.data
+
 
 
 @router.post("/", response_model=ResourceRequestResponse, status_code=status.HTTP_201_CREATED)

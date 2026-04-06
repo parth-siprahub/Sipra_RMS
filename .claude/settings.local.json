@@ -3,7 +3,13 @@
     "allow": [
       "Bash(railway whoami:*)",
       "Bash(railway status:*)",
-      "Bash(railway list:*)"
+      "Bash(railway list:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(grep -l APIRouter /d/RMS_Siprahub/backend/app/*/router.py)",
+      "Bash(xargs basename:*)",
+      "Bash(grep -h \"^@router\\\\.\" /d/RMS_Siprahub/backend/app/*/router.py)",
+      "Bash(xargs grep:*)",
+      "Bash(xargs head:*)"
     ]
   }
 }

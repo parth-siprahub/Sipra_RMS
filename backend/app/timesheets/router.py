@@ -733,7 +733,42 @@ async def link_bulk(
     }
 
 
+@router.get("/unmatched-count")
+async def get_unmatched_count(
+    billing_month: str = Query(..., description="YYYY-MM-DD or YYYY-MM format"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Return count of unique unmatched usernames/emails for a given month."""
+    client = await get_supabase_admin_async()
+    
+    # Normalize month to YYYY-MM if YYYY-MM-DD
+    month_query = billing_month[:7]
+    
+    # Unique Jira users who are unmatched
+    jira_res = await client.table("jira_timesheet_raw")\
+        .select("jira_user")\
+        .eq("billing_month", month_query)\
+        .is_("employee_id", "null")\
+        .execute()
+    jira_users = {r["jira_user"] for r in (jira_res.data or []) if r.get("jira_user")}
+    
+    # Unique AWS emails who are unmatched
+    aws_res = await client.table("aws_timesheet_logs_v2")\
+        .select("aws_email")\
+        .eq("billing_month", month_query)\
+        .is_("employee_id", "null")\
+        .execute()
+    aws_emails = {r["aws_email"] for r in (aws_res.data or []) if r.get("aws_email")}
+    
+    return {
+        "jira": len(jira_users),
+        "aws": len(aws_emails),
+        "total": len(jira_users) + len(aws_emails)
+    }
+
+
 @router.get("/unmatched")
+
 async def get_unmatched(
     billing_month: str = Query(..., description="YYYY-MM format"),
     source_type: str = Query(..., description="JIRA or AWS"),

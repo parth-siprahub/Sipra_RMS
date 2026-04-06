@@ -95,7 +95,11 @@ export function UnmatchedRecordsModal({
         }
         updateRow(sourceName, { searching: true });
         try {
-            const results = await employeesApi.list({ search: query, page_size: 10 });
+            const results = await employeesApi.list({ 
+                search: query, 
+                page_size: 10,
+                exclude_system: sourceType
+            });
             updateRow(sourceName, { searchResults: results || [], searching: false, showDropdown: true });
         } catch {
             updateRow(sourceName, { searchResults: [], searching: false });
@@ -104,7 +108,7 @@ export function UnmatchedRecordsModal({
 
     // Search with debounce
     useEffect(() => {
-        const timers: Record<string, NodeJS.Timeout> = {};
+        const timers: Record<string, any> = {};
         for (const [sourceName, state] of Object.entries(rowStates)) {
             if (state.searchQuery.length >= 2) {
                 timers[sourceName] = setTimeout(() => {

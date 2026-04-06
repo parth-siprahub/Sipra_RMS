@@ -507,7 +507,7 @@ Jaicind Santhibhavan
 Raja, I'm dropping Raja. I'm getting a call.  
 0:11:56.16 \--\> 0:12:12.576  
 Raja PV  
-OK, Jay, carry on, carry on. Yeah. So one more column will be there as a UID. OK, there we will have Sachin at ciprahub.com and we'll have another record user 001, right? And one more column a system where we will say.  
+OK, Jay, carry on, carry on. Yeah. So one more column will be there as a UID. OK, there we will have Sachin@siprahub.com and we'll have another record user 001, right? And one more column a system where we will say.  
 0:12:2.376 \--\> 0:12:2.416  
 Senthil Natarajan  
 Oh.  
