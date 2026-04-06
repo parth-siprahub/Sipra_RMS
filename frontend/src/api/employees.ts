@@ -49,7 +49,7 @@ export interface UserProfile {
 }
 
 export const employeesApi = {
-    list: (filters?: { employee_status?: string; page_size?: number; search?: string }) =>
+    list: (filters?: { employee_status?: string; page_size?: number; search?: string; exclude_system?: string }) =>
         api.get<Employee[]>('/employees/', filters),
 
     get: (id: number) =>
@@ -64,8 +64,8 @@ export const employeesApi = {
     update: (id: number, payload: EmployeeUpdate) =>
         api.patch<Employee>(`/employees/${id}/`, payload),
 
-    listProfiles: () =>
-        api.get<UserProfile[]>('/employees/profiles/list'),
+    listProfiles: (filters?: { search?: string; exclude_linked?: boolean }) =>
+        api.get<UserProfile[]>('/employees/profiles/list', filters),
 
     linkProfile: (employeeId: number, profileId: string) =>
         api.post(`/employees/${employeeId}/link-profile?profile_id=${encodeURIComponent(profileId)}`, {}),

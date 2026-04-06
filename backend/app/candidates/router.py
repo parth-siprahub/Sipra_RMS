@@ -98,11 +98,12 @@ ADMIN_REVIEW_TRANSITIONS = {
 async def list_candidates(
     request_id: int | None = None,
     candidate_status: str | None = Query(None, alias="status"),
+    search: str | None = Query(None, description="Search by name, email, or phone"),
     page: int = Query(1, ge=1),
     page_size: int = Query(2000, ge=1, le=5000),
     current_user: dict = Depends(get_current_user),
 ):
-    cache_key = f"candidates_list_{request_id}_{candidate_status}_{page}_{page_size}"
+    cache_key = f"candidates_list_{request_id}_{candidate_status}_{search}_{page}_{page_size}"
     cached = api_cache.get(cache_key)
     if cached:
         return cached
@@ -119,8 +120,20 @@ async def list_candidates(
         query = query.eq("request_id", request_id)
     if candidate_status:
         query = query.eq("status", candidate_status)
+    
+    if search:
+        search = search.strip()
+        # OR filter on key fields (first_name, last_name, email, phone)
+        query = query.or_(
+            f"first_name.ilike.%{search}%,"
+            f"last_name.ilike.%{search}%,"
+            f"email.ilike.%{search}%,"
+            f"phone.ilike.%{search}%"
+        )
+
     offset = (page - 1) * page_size
     result = await query.order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
+
     api_cache.set(cache_key, result.data)
     return result.data
 
@@ -142,10 +155,17 @@ async def create_candidate(
     dup_result = await dup_query.execute()
     if dup_result.data:
         d = dup_result.data[0]
+        full_name = f"{d['first_name']} {d['last_name']}".strip()
         raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            f"Duplicate candidate found: {d['first_name']} {d['last_name']} ({d['email']}). ID: {d['id']}",
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": f"A candidate with the email '{payload.email}' already exists in the system.",
+                "candidate_name": full_name,
+                "candidate_id": d['id'],
+                "suggestion": "Please search for the existing candidate profile or use a different email address."
+            }
         )
+
 
     # Also check by name + phone if phone is provided
     if payload.phone:

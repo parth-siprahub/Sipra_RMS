@@ -1224,6 +1224,8 @@ export function Candidates() {
     const [candidates, setCandidates] = useState<Candidate[]>([]);
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<ViewMode>('kanban'); // Default to kanban for better viz
+    const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -1233,15 +1235,23 @@ export function Candidates() {
     const [sows, setSows] = useState<SOW[]>([]);
     const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
 
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [search]);
+
     const fetchCandidates = useCallback(async () => {
         setLoading(true);
         try {
             const [cData, rData, vData, sowData, jpData] = await Promise.all([
-                candidatesApi.list(
-                    statusFilter && viewMode === 'table'
-                        ? { status: statusFilter, page_size: 2000 }
-                        : { page_size: 2000 }
-                ),
+                candidatesApi.list({
+                    ...(statusFilter && viewMode === 'table' ? { status: statusFilter } : {}),
+                    ...(debouncedSearch ? { search: debouncedSearch } : {}),
+                    page_size: 2000
+                }),
                 resourceRequestsApi.list(),
                 vendorsApi.list(),
                 sowApi.list(),
@@ -1257,7 +1267,7 @@ export function Candidates() {
         } finally {
             setLoading(false);
         }
-    }, [statusFilter, viewMode]);
+    }, [statusFilter, viewMode, debouncedSearch]);
 
     useEffect(() => {
         fetchCandidates();
@@ -1314,7 +1324,7 @@ export function Candidates() {
             </div>
 
             {/* Controls Bar */}
-            <div className="card flex flex-wrap gap-3 items-end">
+            <div className="card flex flex-wrap gap-4 items-center">
                 {/* View Toggle */}
                 <div className="flex rounded-lg border border-border overflow-hidden">
                     <button
@@ -1343,12 +1353,26 @@ export function Candidates() {
                     </button>
                 </div>
 
+                {/* Search Bar */}
+                <div className="flex-1 min-w-[250px] relative">
+                    <input
+                        type="text"
+                        className="input-field pl-9"
+                        placeholder="Search candidates..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        aria-label="Search candidates"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
+                        <Search size={14} />
+                    </div>
+                </div>
+
                 {/* Status filter (table view only) */}
                 {viewMode === 'table' && (
                     <div className="flex flex-col gap-1">
-                        <label className="text-xs font-medium text-text-muted">Status</label>
                         <select
-                            className="input-field w-48"
+                            className="input-field w-40"
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
                             id="candidate-filter-status"

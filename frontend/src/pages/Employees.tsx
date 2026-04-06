@@ -236,7 +236,7 @@ function LinkProfileModal({
     useEffect(() => {
         if (!isOpen) return;
         setLoading(true);
-        employeesApi.listProfiles()
+        employeesApi.listProfiles({ exclude_linked: true })
             .then(data => setProfiles(data || []))
             .catch(() => toast.error('Failed to load profiles'))
             .finally(() => setLoading(false));

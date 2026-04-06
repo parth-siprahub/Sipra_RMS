@@ -188,6 +188,11 @@ export const timesheetsApi = {
             source_type: sourceType,
         }),
 
+    getUnmatchedCount: (billingMonth: string) =>
+        api.get<{ jira: number; aws: number; total: number }>('/timesheets/unmatched-count', {
+            billing_month: billingMonth,
+        }),
+
     linkBulk: (sourceType: 'JIRA' | 'AWS', sourceIdentifier: string, employeeId: number, billingMonth: string) =>
         api.post<{ updated_count: number; mapping_created: boolean }>(
             '/timesheets/link-bulk',

@@ -16,13 +16,18 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 @limiter.limit("5/minute")
 async def login(request: Request, body: LoginRequest):
     """Authenticate user via Supabase Auth and return JWT."""
-    client = get_supabase_admin()
+    from supabase import create_client, ClientOptions
+    
+    # Create a fresh, scoped client ONLY for login to avoid mutating the global singleton with session tokens
+    opts = ClientOptions(postgrest_client_timeout=15)
+    temp_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY, options=opts)
+    
     loop = asyncio.get_event_loop()
 
     try:
         result = await loop.run_in_executor(
             None,
-            lambda: client.auth.sign_in_with_password({"email": body.email, "password": body.password})
+            lambda: temp_client.auth.sign_in_with_password({"email": body.email, "password": body.password})
         )
     except Exception as e:
         # Log email (not password) for audit trail
@@ -43,7 +48,7 @@ async def login(request: Request, body: LoginRequest):
     # Fetch role and profile info from profiles table
     profile = await loop.run_in_executor(
         None,
-        lambda: client.table("profiles").select("role, full_name").eq("id", user_id).single().execute()
+        lambda: get_supabase_admin().table("profiles").select("role, full_name").eq("id", user_id).single().execute()
     )
 
     if not profile.data:
@@ -71,6 +76,18 @@ async def me(current_user: dict = Depends(get_current_user)):
         avatar_url=current_user.get("avatar_url"),
     )
 
+from app.config import settings
+@router.get("/debug-keys")
+async def debug_keys():
+    """Temporary endpoint to debug loaded env keys."""
+    anon = settings.SUPABASE_ANON_KEY
+    service = settings.SUPABASE_SERVICE_ROLE_KEY
+    return {
+        "anon_start": anon[:15] if anon else None,
+        "service_start": service[:15] if service else None,
+        "are_equal": anon == service
+    }
+
 
 @router.post("/create-user", status_code=status.HTTP_201_CREATED)
 async def create_user(
@@ -80,34 +97,49 @@ async def create_user(
     """
     Super Admin only: Create a new user in Supabase Auth and Profiles table.
     Bypasses email verification for manual account creation.
+    Implementation is idempotent: if user already exists in Auth, it ensures profile exists.
     """
     client = get_supabase_admin()
     loop = asyncio.get_event_loop()
+    user_id = None
 
     try:
-        # 1. Create user in Supabase Auth (admin client is required for bypass_email_verification)
-        # Note: supabase-py admin usage: client.auth.admin.create_user({...})
-        auth_params = {
-            "email": body.email,
-            "password": body.password,
-            "user_metadata": {"full_name": body.full_name},
-            "email_confirm": True
-        }
-        
-        result = await loop.run_in_executor(
+        # 1. Check if user already exists in Auth to ensure idempotency
+        # Note: GoTrue admin doesn't have direct get_user_by_email, so we list and filter
+        logger.info(f"Checking if user {body.email} already exists in Auth...")
+        users_result = await loop.run_in_executor(
             None,
-            lambda: client.auth.admin.create_user(auth_params)
+            lambda: client.auth.admin.list_users()
         )
         
-        if not result or not result.user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to create auth user"
+        existing_user = next((u for u in users_result if u.email == body.email), None)
+        
+        if existing_user:
+            logger.info(f"User {body.email} already exists with ID {existing_user.id}. Proceeding to profile check.")
+            user_id = existing_user.id
+        else:
+            # 2. Create user in Supabase Auth
+            logger.info(f"Creating new Auth user: {body.email}")
+            auth_params = {
+                "email": body.email,
+                "password": body.password,
+                "user_metadata": {"full_name": body.full_name},
+                "email_confirm": True
+            }
+            
+            # Using dict as attributes positional argument (SyncAuthAdminApi.create_user(attributes))
+            result = await loop.run_in_executor(
+                None,
+                lambda: client.auth.admin.create_user(auth_params)
             )
             
-        user_id = result.user.id
+            if not result or not result.user:
+                raise Exception("Auth creation succeeded but no user returned")
+            
+            user_id = result.user.id
+            logger.info(f"Auth user created successfully: {user_id}")
 
-        # 2. Create profile entry
+        # 3. Create or update profile entry (Upsert)
         profile_params = {
             "id": user_id,
             "email": body.email,
@@ -115,16 +147,24 @@ async def create_user(
             "role": body.role
         }
         
+        logger.info(f"Syncing profile for {body.email} (ID: {user_id})")
         await loop.run_in_executor(
             None,
-            lambda: client.table("profiles").insert(profile_params).execute()
+            lambda: client.table("profiles").upsert(profile_params).execute()
         )
         
-        return {"message": "User created successfully", "user_id": user_id}
+        return {"message": "User synchronized successfully", "user_id": user_id}
 
     except Exception as e:
-        logger.error("User creation failed: %s", str(e))
+        error_msg = str(e)
+        # Catch specific "User not allowed" string to provide more context
+        if "User not allowed" in error_msg:
+            logger.error(f"Supabase Auth rejected creation for {body.email}: User not allowed. "
+                         "This usually means 'Invite' only mode is on or signup is restricted, "
+                         "but Admin API should bypass this if the SERVICE_ROLE_KEY is valid.")
+        
+        logger.error("User creation/sync failed: %s", error_msg, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"User creation failed: {str(e)}"
+            detail=f"User management error: {error_msg}"
         )

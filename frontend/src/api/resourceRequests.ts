@@ -27,7 +27,7 @@ export interface CreateResourceRequestPayload {
 }
 
 export const resourceRequestsApi = {
-    list: (filters?: { status?: string; priority?: string }) =>
+    list: (filters?: { status?: string; priority?: string; search?: string }) =>
         api.get<ResourceRequest[]>('/requests/', filters),
 
     create: (payload: CreateResourceRequestPayload) =>
