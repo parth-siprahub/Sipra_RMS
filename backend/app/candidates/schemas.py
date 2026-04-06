@@ -6,12 +6,19 @@ from enum import Enum
 
 
 def _validate_phone_10_digit(v: str | None) -> str | None:
-    """Strip non-digits and enforce exactly 10 digits."""
+    """Strip non-digits; keep the last 10 digits (national number) when a country code is included."""
     if v is None:
-        return v
-    digits = re.sub(r"\D", "", v)
-    if len(digits) != 10:
+        return None
+    s = str(v).strip()
+    if not s:
+        return None
+    digits = re.sub(r"\D", "", s)
+    if not digits:
+        return None
+    if len(digits) < 10:
         raise ValueError("Phone must be exactly 10 digits")
+    if len(digits) > 10:
+        digits = digits[-10:]
     return digits
 
 

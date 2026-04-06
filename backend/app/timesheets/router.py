@@ -20,9 +20,16 @@ from app.timesheets.jira_raw_parser import parse_jira_raw
 from app.timesheets.aws_parser import parse_aws_csv
 from app.timesheets.matching import EmployeeMatcher, Confidence
 from app.utils.cache import api_cache
+from app.utils.person_names import format_person_name
 from app.audit.service import log_audit
 
 logger = logging.getLogger(__name__)
+
+
+def _display_rms(raw: str | None) -> str | None:
+    if raw is None or not str(raw).strip():
+        return raw
+    return format_person_name(str(raw)) or str(raw)
 
 MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024  # 50MB
 
@@ -182,7 +189,12 @@ async def import_jira_raw(
                         "source_name": username,
                         "source_type": "JIRA",
                         "suggestions": [
-                            {"employee_id": s.employee_id, "rms_name": s.rms_name, "score": s.score, "match_type": s.match_type}
+                            {
+                                "employee_id": s.employee_id,
+                                "rms_name": _display_rms(s.rms_name),
+                                "score": s.score,
+                                "match_type": s.match_type,
+                            }
                             for s in suggestions
                         ],
                     })
@@ -552,7 +564,12 @@ async def import_aws_timesheet(
                     "source_name": email,
                     "source_type": "AWS",
                     "suggestions": [
-                        {"employee_id": s.employee_id, "rms_name": s.rms_name, "score": s.score, "match_type": s.match_type}
+                        {
+                            "employee_id": s.employee_id,
+                            "rms_name": _display_rms(s.rms_name),
+                            "score": s.score,
+                            "match_type": s.match_type,
+                        }
                         for s in suggestions
                     ],
                 })
@@ -728,7 +745,7 @@ async def link_bulk(
         "source_type": source_upper,
         "source_identifier": source_identifier,
         "employee_id": employee_id,
-        "employee_name": emp.data.get("rms_name"),
+        "employee_name": _display_rms(emp.data.get("rms_name")),
         "rows_updated": updated_count,
     }
 
@@ -798,7 +815,12 @@ async def get_unmatched(
                 "source_name": user,
                 "source_type": "JIRA",
                 "suggestions": [
-                    {"employee_id": s.employee_id, "rms_name": s.rms_name, "score": s.score, "match_type": s.match_type}
+                    {
+                        "employee_id": s.employee_id,
+                        "rms_name": _display_rms(s.rms_name),
+                        "score": s.score,
+                        "match_type": s.match_type,
+                    }
                     for s in suggestions
                 ],
             })
@@ -818,7 +840,12 @@ async def get_unmatched(
                 "source_name": email,
                 "source_type": "AWS",
                 "suggestions": [
-                    {"employee_id": s.employee_id, "rms_name": s.rms_name, "score": s.score, "match_type": s.match_type}
+                    {
+                        "employee_id": s.employee_id,
+                        "rms_name": _display_rms(s.rms_name),
+                        "score": s.score,
+                        "match_type": s.match_type,
+                    }
                     for s in suggestions
                 ],
             })

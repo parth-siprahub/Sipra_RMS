@@ -4,6 +4,7 @@ import { timesheetsApi, type UnmatchedDetail, type UnmatchedSuggestion } from '.
 import { employeesApi, type Employee } from '../../api/employees';
 import { Search, Link2, CheckCircle, AlertTriangle, User } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { formatPersonName } from '../../lib/personNames';
 
 interface UnmatchedRecordsModalProps {
     isOpen: boolean;
@@ -295,7 +296,7 @@ export function UnmatchedRecordsModal({
                                                             }`}
                                                         >
                                                             <CheckCircle size={10} />
-                                                            {record.suggestions![0].rms_name}
+                                                            {formatPersonName(record.suggestions![0].rms_name)}
                                                             <span className="opacity-60">
                                                                 ({Math.round(record.suggestions![0].score * 100)}%)
                                                             </span>
@@ -341,7 +342,7 @@ export function UnmatchedRecordsModal({
                                                                     }`}
                                                                 >
                                                                     <div>
-                                                                        <span className="font-medium">{emp.rms_name}</span>
+                                                                        <span className="font-medium">{formatPersonName(emp.rms_name)}</span>
                                                                         {emp.jira_username && (
                                                                             <span className="text-text-muted text-xs ml-2">
                                                                                 ({emp.jira_username})

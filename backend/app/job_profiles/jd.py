@@ -76,8 +76,8 @@ async def upload_jd(
             f"JD upload failed: {str(e)[:200]}",
         )
 
-    # Get public URL
-    public_url = client.storage.from_("jds").get_public_url(storage_path)
+    # Get public URL (storage3 AsyncBucket: get_public_url is async)
+    public_url = await client.storage.from_("jds").get_public_url(storage_path)
 
     # Update job profile record
     await client.table("job_profiles").update({"jd_file_url": public_url}).eq("id", profile_id).execute()

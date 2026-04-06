@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight, Monitor, Download } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { formatPersonName } from '../../lib/personNames';
 import type { AwsTimesheetV2Entry } from '../../api/timesheets';
 
 interface Props {
@@ -40,7 +41,7 @@ export function AwsTimesheetDrillDown({ entries, currentIndex, onClose, onNaviga
     if (!current) return null;
 
     const emp = current.employee_id ? empMap[current.employee_id] : null;
-    const displayName = emp?.rms_name || current.aws_email || 'Unknown';
+    const displayName = formatPersonName(emp?.rms_name || '') || current.aws_email || 'Unknown';
 
     return (
         <>

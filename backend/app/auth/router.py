@@ -4,6 +4,7 @@ from app.auth.schemas import LoginRequest, TokenResponse, UserProfile, UserCreat
 from app.auth.dependencies import get_current_user, require_super_admin
 from app.database import get_supabase_admin
 from app.limiter import limiter
+from app.utils.person_names import format_person_name
 import logging
 import asyncio
 
@@ -57,11 +58,13 @@ async def login(request: Request, body: LoginRequest):
             detail="User profile not found. Contact admin.",
         )
 
+    raw_name = profile.data.get("full_name")
+    display_name = (format_person_name(raw_name) or raw_name) if raw_name else None
     return TokenResponse(
         access_token=result.session.access_token,
         user_id=user_id,
         role=profile.data["role"],
-        full_name=profile.data.get("full_name"),
+        full_name=display_name,
     )
 
 
@@ -120,10 +123,11 @@ async def create_user(
         else:
             # 2. Create user in Supabase Auth
             logger.info(f"Creating new Auth user: {body.email}")
+            meta_name = (format_person_name(body.full_name.strip()) or body.full_name.strip()) if body.full_name else body.full_name
             auth_params = {
                 "email": body.email,
                 "password": body.password,
-                "user_metadata": {"full_name": body.full_name},
+                "user_metadata": {"full_name": meta_name},
                 "email_confirm": True
             }
             
@@ -140,10 +144,11 @@ async def create_user(
             logger.info(f"Auth user created successfully: {user_id}")
 
         # 3. Create or update profile entry (Upsert)
+        norm_name = (format_person_name(body.full_name.strip()) or body.full_name.strip()) if body.full_name else body.full_name
         profile_params = {
             "id": user_id,
             "email": body.email,
-            "full_name": body.full_name,
+            "full_name": norm_name,
             "role": body.role
         }
         

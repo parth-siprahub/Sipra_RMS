@@ -1,9 +1,19 @@
 import os
+import sys
+from pathlib import Path
 import pandas as pd
 import httpx
 import asyncio
 from datetime import datetime
 from dotenv import load_dotenv
+
+# Allow imports from app.* when run as a script
+_BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(_BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_ROOT))
+
+from app.utils.person_names import format_person_name
+from app.utils.employee_text import normalize_employee_text
 
 # Load environment variables from backend/.env
 load_dotenv(r"D:\RMS_Siprahub\backend\.env")
@@ -147,8 +157,10 @@ async def main():
                 # 6. UPSERT Candidate
                 cand_id = existing_candidates.get(email_l) if email_l else existing_candidates.get(name_l)
                 parts = name.strip().rsplit(" ", 1)
-                first_name = parts[0]
-                last_name = parts[1] if len(parts) > 1 else ""
+                raw_first = parts[0]
+                raw_last = parts[1] if len(parts) > 1 else ""
+                first_name = format_person_name(raw_first) or raw_first
+                last_name = (format_person_name(raw_last) or raw_last) if raw_last else ""
 
                 candidate_payload = {
                     "request_id": rr_id,
@@ -179,6 +191,7 @@ async def main():
                     "start_date": parse_date(main_row["Start Date"]),
                     "exit_date": parse_date(main_row["End Date"]) if final_status_excel == "EXIT" else None
                 }
+                emp_payload = normalize_employee_text(emp_payload)
 
                 if emp_id:
                     await client.patch(f"{SUPABASE_URL}/rest/v1/employees?id=eq.{emp_id}", headers=HEADERS, json=emp_payload)

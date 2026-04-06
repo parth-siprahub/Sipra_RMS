@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { Skeleton, CardSkeleton } from '../components/ui/Skeleton';
-import { DashboardTabs } from '../components/dashboard/DashboardTabs';
-import type { DashboardTab } from '../components/dashboard/DashboardTabs';
 import { OverviewTab } from '../components/dashboard/OverviewTab';
 import type { DashboardMetrics } from '../components/dashboard/types';
 
@@ -11,7 +9,6 @@ import type { DashboardMetrics } from '../components/dashboard/types';
 export function Dashboard() {
     const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
 
     useEffect(() => {
         const fetchMetrics = async () => {
@@ -54,43 +51,6 @@ export function Dashboard() {
         );
     }
 
-    // ── Tab content renderer ─────────────────────────────────────────────────
-
-    function renderTabContent() {
-        switch (activeTab) {
-            case 'overview':
-                return metrics ? <OverviewTab metrics={metrics} /> : null;
-            case 'skills':
-                return (
-                    <div className="card">
-                        <div className="flex items-center justify-center h-64 text-text-muted text-sm">
-                            Skills analytics coming soon
-                        </div>
-                    </div>
-                );
-            case 'vendors':
-                return (
-                    <div className="card">
-                        <div className="flex items-center justify-center h-64 text-text-muted text-sm">
-                            Vendor analytics coming soon
-                        </div>
-                    </div>
-                );
-            case 'risk':
-                return (
-                    <div className="card">
-                        <div className="flex items-center justify-center h-64 text-text-muted text-sm">
-                            Risk analytics coming soon
-                        </div>
-                    </div>
-                );
-            default:
-                return null;
-        }
-    }
-
-    // ── Render ────────────────────────────────────────────────────────────────
-
     return (
         <div className="space-y-6 animate-fade-in">
             {/* Header */}
@@ -104,11 +64,7 @@ export function Dashboard() {
                 </div>
             </div>
 
-            {/* Tab Navigation */}
-            <DashboardTabs activeTab={activeTab} onChange={setActiveTab} />
-
-            {/* Tab Content */}
-            {renderTabContent()}
+            {metrics ? <OverviewTab metrics={metrics} /> : null}
         </div>
     );
 }

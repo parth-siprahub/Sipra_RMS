@@ -7,6 +7,8 @@ from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
 from app.employees.schemas import EmployeeCreate, EmployeeUpdate, EmployeeResponse, EmployeeStatus
 from app.utils.cache import api_cache
+from app.utils.person_names import format_person_name
+from app.utils.employee_text import normalize_employee_text
 
 _SEARCH_SAFE_RE = re.compile(r'^[\w\s@.\-]+$')
 
@@ -15,35 +17,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
 
-def normalize_employee_text(data: dict) -> dict:
-    """Apply text normalization rules for employee data."""
-    normalized = dict(data)
-
-    # Title Case for names
-    for field in ("rms_name",):
-        if field in normalized and normalized[field]:
-            # Title Case, collapse whitespace
-            val = " ".join(normalized[field].split())  # collapse whitespace
-            normalized[field] = val.title()
-
-    # Uppercase for client_name (e.g., "DCLI")
-    if "client_name" in normalized and normalized["client_name"]:
-        val = " ".join(normalized["client_name"].split())
-        normalized["client_name"] = val.upper()
-
-    # Lowercase for emails
-    if "aws_email" in normalized and normalized["aws_email"]:
-        normalized["aws_email"] = normalized["aws_email"].strip().lower()
-
-    if "siprahub_email" in normalized and normalized["siprahub_email"]:
-        normalized["siprahub_email"] = normalized["siprahub_email"].strip().lower()
-
-    # Strip whitespace for other fields
-    for field in ("github_id", "jira_username"):
-        if field in normalized and normalized[field]:
-            normalized[field] = normalized[field].strip()
-
-    return normalized
+def _employee_api_row(row: dict) -> dict:
+    """Ensure rms_name is display-normalized in API responses (legacy rows)."""
+    if not row or not row.get("rms_name"):
+        return row
+    return {**row, "rms_name": format_person_name(row["rms_name"]) or row["rms_name"]}
 
 
 @router.get("/", response_model=list[EmployeeResponse])
@@ -96,9 +74,11 @@ async def list_employees(
     # Batch-fetch job profile names via candidate -> resource_request -> job_profile
     candidate_ids = [e["candidate_id"] for e in employees if e.get("candidate_id")]
     job_profile_map: dict[int, str] = {}
+    cand_onboarding: dict[int, object | None] = {}
     if candidate_ids:
-        cands = await client.table("candidates").select("id,request_id").in_("id", candidate_ids).execute()
+        cands = await client.table("candidates").select("id,request_id,onboarding_date").in_("id", candidate_ids).execute()
         request_ids = [c["request_id"] for c in (cands.data or []) if c.get("request_id")]
+        cand_onboarding = {c["id"]: c.get("onboarding_date") for c in (cands.data or []) if c.get("id")}
         # map candidate_id -> request_id
         cand_to_req = {c["id"]: c["request_id"] for c in (cands.data or []) if c.get("request_id")}
         if request_ids:
@@ -114,10 +94,15 @@ async def list_employees(
                     if jpid and jpid in jp_to_name:
                         job_profile_map[cid] = jp_to_name[jpid]
 
-    enriched = [
-        {**e, "job_profile_name": job_profile_map.get(e["candidate_id"])}
-        for e in employees
-    ]
+    enriched = []
+    for e in employees:
+        cid = e.get("candidate_id")
+        merged = {
+            **e,
+            "job_profile_name": job_profile_map.get(cid) if cid else None,
+            "start_date": e.get("start_date") or (cand_onboarding.get(cid) if cid else None),
+        }
+        enriched.append(_employee_api_row(merged))
     api_cache.set(cache_key, enriched)
     return enriched
 
@@ -145,7 +130,7 @@ async def create_employee(
             raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to create employee")
         api_cache.clear_prefix("employees_")
         api_cache.clear_prefix("dashboard_")
-        return result.data[0]
+        return _employee_api_row(result.data[0])
     except HTTPException:
         raise
     except Exception as e:
@@ -174,12 +159,15 @@ async def create_employee_from_candidate(
         raise HTTPException(status.HTTP_409_CONFLICT, "Employee record already exists for this candidate")
 
     c = candidate.data
+    effective_start = c.get("onboarding_date") or date.today().isoformat()
+    if not c.get("onboarding_date"):
+        await client.table("candidates").update({"onboarding_date": effective_start}).eq("id", candidate_id).execute()
     employee_data = {
         "candidate_id": candidate_id,
         "rms_name": f"{c.get('first_name', '')} {c.get('last_name', '')}".strip(),
         "client_name": c.get("client_email", "").split("@")[0] if c.get("client_email") else None,
         "jira_username": c.get("client_jira_id"),
-        "start_date": c.get("onboarding_date"),
+        "start_date": effective_start,
         "status": EmployeeStatus.ACTIVE.value,
     }
     employee_data = {k: v for k, v in employee_data.items() if v is not None}
@@ -191,7 +179,7 @@ async def create_employee_from_candidate(
             raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to create employee")
         api_cache.clear_prefix("employees_")
         api_cache.clear_prefix("dashboard_")
-        return result.data[0]
+        return _employee_api_row(result.data[0])
     except HTTPException:
         raise
     except Exception as e:
@@ -216,7 +204,14 @@ async def list_profiles(
         query = query.is_("employee_id", "null")
         
     result = await query.order("full_name").execute()
-    return result.data or []
+    rows = result.data or []
+    return [
+        {
+            **p,
+            "full_name": (format_person_name(p.get("full_name")) if p.get("full_name") else p.get("full_name")),
+        }
+        for p in rows
+    ]
 
 
 @router.get("/{employee_id}", response_model=EmployeeResponse)
@@ -225,7 +220,7 @@ async def get_employee(employee_id: int, current_user: dict = Depends(get_curren
     result = await client.table("employees").select("*").eq("id", employee_id).single().execute()
     if not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Employee not found")
-    return result.data
+    return _employee_api_row(result.data)
 
 
 @router.patch("/{employee_id}", response_model=EmployeeResponse)
@@ -246,7 +241,7 @@ async def update_employee(
     api_cache.clear_prefix("employees_")
     api_cache.clear_prefix("dashboard_")
     api_cache.clear_prefix("billing_")
-    return result.data[0]
+    return _employee_api_row(result.data[0])
 
 
 @router.patch("/{employee_id}/exit", response_model=EmployeeResponse)
@@ -267,7 +262,7 @@ async def exit_employee(
     api_cache.clear_prefix("employees_")
     api_cache.clear_prefix("dashboard_")
     api_cache.clear_prefix("billing_")
-    return result.data[0]
+    return _employee_api_row(result.data[0])
 
 
 # ──────────────────────────────────────────────

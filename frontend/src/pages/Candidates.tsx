@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Plus, RefreshCw, LayoutGrid, List, Download } from 'lucide-react';
+import { Plus, RefreshCw, LayoutGrid, List, Download, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { candidatesApi } from '../api/candidates';
 import { resourceRequestsApi } from '../api/resourceRequests';
@@ -21,6 +21,7 @@ import { Skeleton, KanbanColumnSkeleton, TableRowSkeleton } from '../components/
 import { communicationLogApi, type CommunicationLog } from '../api/communicationLogs';
 import { exportCandidates } from '../api/exports';
 import { cn } from '../lib/utils';
+import { formatCandidateFullName } from '../lib/personNames';
 import {
     User,
     Mail,
@@ -242,7 +243,7 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick }: 
                             )}
                         >
                             <p className="text-sm font-semibold text-text truncate">
-                                {c.first_name} {c.last_name}
+                                {formatCandidateFullName(c.first_name, c.last_name)}
                             </p>
                             <p className="text-xs text-text-muted truncate mt-0.5">{c.email}</p>
                             {c.current_company && (
@@ -389,7 +390,7 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title={`${candidate.first_name} ${candidate.last_name}`}
+            title={formatCandidateFullName(candidate.first_name, candidate.last_name)}
             maxWidth="max-w-2xl"
         >
             <div className="space-y-6">
@@ -819,7 +820,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, onViewDuplicate, req
         setValidationErrors({});
 
         if (duplicateCandidate) {
-            toast.error(`Duplicate candidate found: ${duplicateCandidate.first_name} ${duplicateCandidate.last_name} (${duplicateCandidate.email})`);
+            toast.error(`Duplicate candidate found: ${formatCandidateFullName(duplicateCandidate.first_name, duplicateCandidate.last_name)} (${duplicateCandidate.email})`);
             return;
         }
 
@@ -839,7 +840,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, onViewDuplicate, req
                     toast.error('Candidate added, but resume upload failed.');
                 }
             } else {
-                toast.success(`${form.first_name} ${form.last_name} added!`);
+                toast.success(`${formatCandidateFullName(form.first_name, form.last_name)} added!`);
             }
 
             onCreated();
@@ -1003,7 +1004,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, onViewDuplicate, req
                             <div className="p-3 bg-danger/10 border border-danger/30 rounded-lg">
                                 <p className="text-xs font-bold text-danger mb-1">Duplicate Candidate Found</p>
                                 <p className="text-[11px] text-text">
-                                    {duplicateCandidate.first_name} {duplicateCandidate.last_name} — {duplicateCandidate.email}
+                                    {formatCandidateFullName(duplicateCandidate.first_name, duplicateCandidate.last_name)} — {duplicateCandidate.email}
                                     {duplicateCandidate.phone && ` — ${duplicateCandidate.phone}`}
                                 </p>
                                 <p className="text-[10px] text-text-muted mt-1">
@@ -1466,7 +1467,7 @@ export function Candidates() {
                                         >
                                             <td>
                                                 <div className="font-semibold text-text">
-                                                    {c.first_name} {c.last_name}
+                                                    {formatCandidateFullName(c.first_name, c.last_name)}
                                                 </div>
                                                 {c.current_location && (
                                                     <div className="text-xs text-text-muted">{c.current_location}</div>
