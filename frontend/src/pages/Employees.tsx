@@ -411,19 +411,13 @@ export function Employees() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <p className="text-text-muted">Manage employee identifiers and the Verification Triad</p>
+            {user?.role === 'SUPER_ADMIN' && (
+                <div className="flex justify-end">
+                    <button onClick={() => exportEmployees()} className="btn btn-secondary flex items-center gap-2">
+                        <Download size={18} /> Export CSV
+                    </button>
                 </div>
-                <div className="flex items-center gap-3">
-                    {user?.role === 'SUPER_ADMIN' && (
-                        <button onClick={() => exportEmployees()} className="btn btn-secondary flex items-center gap-2">
-                            <Download size={18} /> Export CSV
-                        </button>
-                    )}
-
-                </div>
-            </div>
+            )}
 
             <div className="card flex flex-col md:flex-row items-center gap-4 py-3 px-4">
                 <div className="relative flex-1 w-full">

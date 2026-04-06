@@ -14,12 +14,17 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user_id: str
     role: UserRole
     full_name: str | None = None
+    refresh_token: str | None = None
 
 
 class UserProfile(BaseModel):

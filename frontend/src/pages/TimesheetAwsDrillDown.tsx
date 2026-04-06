@@ -100,22 +100,6 @@ export function TimesheetAwsDrillDown() {
 
             {/* Content */}
             <div className="flex-1 overflow-auto p-6">
-                {/* Metrics grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    {METRIC_COLS.map(col => {
-                        const hms = current[col.hmsKey] as string | null;
-                        const secs = current[col.secsKey] as number;
-                        const hrs = (secs / 3600).toFixed(1);
-                        return (
-                            <div key={col.label} className="card py-4 px-5 text-center">
-                                <p className="text-2xl font-bold text-text">{hms || '0:00:00'}</p>
-                                <p className="text-xs text-text-muted mt-1">{col.label}</p>
-                                <p className="text-xs text-text-muted">{hrs}h</p>
-                            </div>
-                        );
-                    })}
-                </div>
-
                 {/* Details table */}
                 <div className="card overflow-hidden">
                     <table className="w-full text-left border-collapse text-sm">

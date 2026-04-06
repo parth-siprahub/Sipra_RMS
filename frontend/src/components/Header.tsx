@@ -25,7 +25,10 @@ export function Header() {
     const { user } = useAuth();
     const location = useLocation();
 
-    let pageTitle = ROUTE_LABELS[location.pathname] ?? 'Management Console';
+    let pageTitle =
+        location.pathname.startsWith('/reports/employee/')
+            ? 'Report — Employee detail'
+            : ROUTE_LABELS[location.pathname] ?? 'Management Console';
     if (user?.role === 'SUPER_ADMIN' && location.pathname === '/employees') {
         pageTitle = 'Create User';
     } else if (location.pathname === '/employees') {

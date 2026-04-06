@@ -1,12 +1,16 @@
 """Auth router — login and profile endpoints."""
+import asyncio
+import logging
+
+import httpx
 from fastapi import APIRouter, HTTPException, status, Depends, Request
-from app.auth.schemas import LoginRequest, TokenResponse, UserProfile, UserCreate
+
+from app.auth.schemas import LoginRequest, RefreshRequest, TokenResponse, UserProfile, UserCreate
 from app.auth.dependencies import get_current_user, require_super_admin
+from app.config import settings
 from app.database import get_supabase_admin
 from app.limiter import limiter
 from app.utils.person_names import format_person_name
-import logging
-import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -60,11 +64,81 @@ async def login(request: Request, body: LoginRequest):
 
     raw_name = profile.data.get("full_name")
     display_name = (format_person_name(raw_name) or raw_name) if raw_name else None
+    refresh_token = getattr(result.session, "refresh_token", None)
     return TokenResponse(
         access_token=result.session.access_token,
-        user_id=user_id,
+        user_id=str(user_id),
         role=profile.data["role"],
         full_name=display_name,
+        refresh_token=refresh_token,
+    )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+@limiter.limit("30/minute")
+async def refresh_session(request: Request, body: RefreshRequest):
+    """Exchange a Supabase refresh token for new access (+ refresh) tokens."""
+    token_url = f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/token?grant_type=refresh_token"
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            r = await client.post(
+                token_url,
+                headers={
+                    "apikey": settings.SUPABASE_ANON_KEY,
+                    "Content-Type": "application/json",
+                },
+                json={"refresh_token": body.refresh_token},
+            )
+        except httpx.RequestError as e:
+            logger.warning("Refresh token request failed: %s", e)
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Auth service temporarily unavailable. Try again.",
+            )
+
+    if r.status_code != 200:
+        logger.warning("Refresh rejected: status=%s body=%s", r.status_code, (r.text or "")[:200])
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired. Please login again.",
+        )
+
+    payload = r.json()
+    access_token = payload.get("access_token")
+    new_refresh = payload.get("refresh_token") or body.refresh_token
+    user_obj = payload.get("user") or {}
+    user_id = user_obj.get("id")
+    if not access_token or not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired. Please login again.",
+        )
+
+    loop = asyncio.get_event_loop()
+    profile = await loop.run_in_executor(
+        None,
+        lambda: get_supabase_admin()
+        .table("profiles")
+        .select("role, full_name")
+        .eq("id", user_id)
+        .single()
+        .execute(),
+    )
+
+    if not profile.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="User profile not found. Contact admin.",
+        )
+
+    raw_name = profile.data.get("full_name")
+    display_name = (format_person_name(raw_name) or raw_name) if raw_name else None
+    return TokenResponse(
+        access_token=access_token,
+        user_id=str(user_id),
+        role=profile.data["role"],
+        full_name=display_name,
+        refresh_token=new_refresh,
     )
 
 
@@ -79,7 +153,6 @@ async def me(current_user: dict = Depends(get_current_user)):
         avatar_url=current_user.get("avatar_url"),
     )
 
-from app.config import settings
 @router.get("/debug-keys")
 async def debug_keys():
     """Temporary endpoint to debug loaded env keys."""

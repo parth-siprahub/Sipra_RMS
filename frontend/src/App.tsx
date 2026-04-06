@@ -17,6 +17,7 @@ import { Employees } from './pages/Employees';
 import { Timesheets } from './pages/Timesheets';
 import { Clients } from './pages/Clients';
 import { Reports } from './pages/Reports';
+import { ReportEmployeeDrillDown } from './pages/ReportEmployeeDrillDown';
 import { BillingConfig } from './pages/BillingConfig';
 import { TimesheetJiraDrillDown } from './pages/TimesheetJiraDrillDown';
 import { TimesheetAwsDrillDown } from './pages/TimesheetAwsDrillDown';
@@ -97,6 +98,7 @@ function App() {
               <Route path="timesheets" element={<Timesheets />} />
               <Route path="clients" element={<Clients />} />
               <Route path="reports" element={<Reports />} />
+              <Route path="reports/employee/:employeeId" element={<ReportEmployeeDrillDown />} />
               <Route path="billing-config" element={<BillingConfig />} />
               <Route path="timesheets/drill-down/jira" element={<TimesheetJiraDrillDown />} />
               <Route path="timesheets/drill-down/aws" element={<TimesheetAwsDrillDown />} />
