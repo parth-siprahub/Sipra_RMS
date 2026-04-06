@@ -14,7 +14,7 @@ class TimesheetComparison(BaseModel):
     aws_total_hours: float | None = None
     difference: float | None = None
     difference_pct: float | None = None
-    flag: str  # "green" | "amber" | "red" | "no_aws"
+    flag: str  # "green" | "amber" | "red" (legacy rows may still have "no_aws")
 
 
 class ComplianceEntry(BaseModel):

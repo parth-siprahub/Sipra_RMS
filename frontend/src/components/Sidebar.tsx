@@ -5,7 +5,6 @@ import {
     Briefcase,
     FileText,
     ScrollText,
-    MessageSquare,
     Building2,
     ChevronLeft,
     ChevronRight,
@@ -14,7 +13,6 @@ import {
     Clock,
     Landmark,
     BarChart3,
-    Settings2,
 } from 'lucide-react';
 
 import { cn } from '../lib/utils';
@@ -36,9 +34,7 @@ const navItems = [
     { to: '/timesheets', icon: Clock, label: 'Timesheets' },
     { to: '/reports', icon: BarChart3, label: 'Reports' },
     { to: '/clients', icon: Landmark, label: 'Clients' },
-    { to: '/communication-logs', icon: MessageSquare, label: 'Comm. Logs' },
     { to: '/vendors', icon: Building2, label: 'Vendors' },
-    { to: '/billing-config', icon: Settings2, label: 'Billing Config' },
 ];
 
 function getInitials(name: string) {

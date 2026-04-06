@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from fastapi.responses import StreamingResponse
 from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
-from app.reports.flag_classifier import classify_flag
+from app.reports.flag_classifier import compute_comparison_fields
 from app.reports.defaulters import detect_defaulters
 from app.utils.person_names import format_person_name
 from app.reports.schemas import (
@@ -26,6 +26,22 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
+
+def _display_rms(raw: str | None) -> str:
+    """Normalize employee display name for report rows (required string)."""
+    if raw is None or not str(raw).strip():
+        return ""
+    return format_person_name(str(raw)) or str(raw)
+
+
+def _display_rms_optional(raw: str | None) -> str | None:
+    """Normalize employee display name for optional / joined fields."""
+    if raw is None or not str(raw).strip():
+        return None
+    out = format_person_name(str(raw)) or str(raw)
+    return out if out else None
+
+
 DAILY_CAP = 8.0
 WEEKLY_CAP = 40.0
 
@@ -37,7 +53,7 @@ async def get_timesheet_comparison(
 ):
     """
     Compare Jira timesheet hours vs AWS ActiveTrack hours for a given month.
-    Returns per-employee comparison with flag (green/red/no_aws).
+    Returns per-employee comparison with flag (green/amber/red).
     """
     client = await get_supabase_admin_async()
 
@@ -138,25 +154,14 @@ async def get_timesheet_comparison(
             elif entry.get("work_time_hours") is not None:
                 aws_total = round(float(entry["work_time_hours"]), 2)
 
-        # Difference and flag
-        difference = None
-        difference_pct = None
-        flag = "no_aws"
-
         if jira_logs:
             employees_with_jira += 1
         if aws_logs:
             employees_with_aws += 1
 
-        if aws_total is not None and billable_hours > 0:
-            difference = round(billable_hours - aws_total, 2)
-            difference_pct = round((difference / billable_hours) * 100, 1) if billable_hours else 0
-
-        flag = classify_flag(
-            difference_pct=difference_pct,
-            any_week_low=False,  # v2 is monthly, no weekly threshold
-            has_aws_data=aws_total is not None,
-            billable_hours=billable_hours,
+        jira_billable = float(billable_hours or 0)
+        difference, difference_pct, flag = compute_comparison_fields(
+            jira_billable, aws_total, jira_billable
         )
 
         comparisons.append(TimesheetComparison(
@@ -174,8 +179,8 @@ async def get_timesheet_comparison(
             flag=flag,
         ))
 
-    # Sort: red flags first, then by name
-    comparisons.sort(key=lambda c: (0 if c.flag == "red" else 1, c.rms_name))
+    flag_rank = {"red": 0, "amber": 1, "green": 2, "no_aws": 0}
+    comparisons.sort(key=lambda c: (flag_rank.get(c.flag, 9), c.rms_name))
 
     return ComparisonReport(
         month=month,
@@ -467,19 +472,8 @@ async def calculate_billing(
         if aws_entry:
             aws_hours = round(float(aws_entry.get("work_time_secs", 0)) / 3600.0, 2)
 
-        difference = None
-        difference_pct = None
-        flag = "no_aws"
-
-        if aws_hours is not None and target_billable > 0:
-            difference = round(jira_hours - aws_hours, 2)
-            difference_pct = round((difference / target_billable) * 100, 1)
-
-        flag = classify_flag(
-            difference_pct=difference_pct,
-            any_week_low=False,  # v2 is monthly, no weekly threshold
-            has_aws_data=aws_hours is not None,
-            billable_hours=jira_hours,
+        difference, difference_pct, flag = compute_comparison_fields(
+            jira_hours, aws_hours, target_billable
         )
 
         reports.append({
@@ -524,8 +518,8 @@ async def calculate_billing(
             aws_email=emp.get("aws_email"),
         ))
 
-    # Sort: red first, then amber, then green, then no_aws
-    flag_order = {"red": 0, "amber": 1, "green": 2, "no_aws": 3}
+    # Sort: red first (includes legacy no_aws), then amber, then green
+    flag_order = {"red": 0, "no_aws": 0, "amber": 1, "green": 2}
     result_rows.sort(key=lambda r: (flag_order.get(r.flag, 4), r.rms_name or ""))
 
     logger.info("Computed %d reports for %s", len(result_rows), billing_month)
@@ -558,24 +552,30 @@ async def get_computed_reports(
     result = []
     for r in rows:
         emp = emp_map.get(r["employee_id"], {})
+        jh = float(r.get("jira_hours") or 0)
+        bh_raw = r.get("billable_hours")
+        bh = float(bh_raw) if bh_raw is not None else None
+        aws_raw = r.get("aws_hours")
+        aws_h = float(aws_raw) if aws_raw is not None else None
+        difference, difference_pct, flag = compute_comparison_fields(jh, aws_h, bh)
         result.append(ComputedReportRow(
             id=r.get("id"),
             employee_id=r["employee_id"],
             billing_month=r["billing_month"],
-            jira_hours=float(r.get("jira_hours") or 0),
+            jira_hours=jh,
             ooo_days=r.get("ooo_days", 0),
-            aws_hours=float(r["aws_hours"]) if r.get("aws_hours") is not None else None,
-            billable_hours=float(r["billable_hours"]) if r.get("billable_hours") is not None else None,
-            difference=float(r["difference"]) if r.get("difference") is not None else None,
-            difference_pct=float(r["difference_pct"]) if r.get("difference_pct") is not None else None,
-            flag=r.get("flag", "no_aws"),
+            aws_hours=aws_h,
+            billable_hours=bh,
+            difference=difference,
+            difference_pct=difference_pct,
+            flag=flag,
             computed_at=r.get("computed_at"),
             rms_name=_display_rms_optional(emp.get("rms_name")),
             jira_username=emp.get("jira_username"),
             aws_email=emp.get("aws_email"),
         ))
 
-    flag_order = {"red": 0, "amber": 1, "green": 2, "no_aws": 3}
+    flag_order = {"red": 0, "no_aws": 0, "amber": 1, "green": 2}
     result.sort(key=lambda r: (flag_order.get(r.flag, 4), r.rms_name or ""))
     return result
 
@@ -605,17 +605,23 @@ async def get_employee_detail(
     summary = None
     if summary_res.data:
         r = summary_res.data[0]
+        jh = float(r.get("jira_hours") or 0)
+        bh_raw = r.get("billable_hours")
+        bh = float(bh_raw) if bh_raw is not None else None
+        aws_raw = r.get("aws_hours")
+        aws_h = float(aws_raw) if aws_raw is not None else None
+        difference, difference_pct, flag = compute_comparison_fields(jh, aws_h, bh)
         summary = ComputedReportRow(
             id=r.get("id"),
             employee_id=r["employee_id"],
             billing_month=r["billing_month"],
-            jira_hours=float(r.get("jira_hours") or 0),
+            jira_hours=jh,
             ooo_days=r.get("ooo_days", 0),
-            aws_hours=float(r["aws_hours"]) if r.get("aws_hours") is not None else None,
-            billable_hours=float(r["billable_hours"]) if r.get("billable_hours") is not None else None,
-            difference=float(r["difference"]) if r.get("difference") is not None else None,
-            difference_pct=float(r["difference_pct"]) if r.get("difference_pct") is not None else None,
-            flag=r.get("flag", "no_aws"),
+            aws_hours=aws_h,
+            billable_hours=bh,
+            difference=difference,
+            difference_pct=difference_pct,
+            flag=flag,
             computed_at=r.get("computed_at"),
             rms_name=_display_rms_optional(emp.get("rms_name")),
             jira_username=emp.get("jira_username"),
