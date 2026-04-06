@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
+import { formatPersonName } from '../lib/personNames';
 import { exportTimesheets } from '../api/exports';
 import { billingApi } from '../api/billing';
 
@@ -571,7 +572,7 @@ function JiraTab({
                                     {/* Name */}
                                     <div className="min-w-0">
                                         <p className="font-semibold text-sm text-text truncate group-hover:text-cta transition-colors">
-                                            {jiraEmpMap[summary.user]?.rms_name || summary.user}
+                                            {formatPersonName(jiraEmpMap[summary.user]?.rms_name || '') || summary.user}
                                         </p>
                                         {jiraEmpMap[summary.user] && (
                                             <p className="text-xs text-text-muted truncate">{summary.user}</p>
@@ -779,10 +780,10 @@ function AwsV2Tab({
                                     return (
                                         <tr key={entry.id} className="hover:bg-surface-hover/30 transition-colors cursor-pointer" onClick={() => navigateToDrillDown(filteredEntries, idx, empMap)}>
                                             <td className="sticky left-0 z-10 bg-surface px-4 py-2.5 min-w-[200px]">
-                                                <p className="font-medium text-text">{emp?.rms_name || entry.aws_email}</p>
+                                                <p className="font-medium text-text">{formatPersonName(emp?.rms_name || '') || entry.aws_email}</p>
                                                 {emp && <p className="text-xs text-text-muted">{entry.aws_email}</p>}
                                                 {!emp && awsEmpMap[entry.aws_email?.toLowerCase() || ''] && (
-                                                    <p className="text-xs text-info italic">Matchable: {awsEmpMap[entry.aws_email?.toLowerCase() || '']?.rms_name}</p>
+                                                    <p className="text-xs text-info italic">Matchable: {formatPersonName(awsEmpMap[entry.aws_email?.toLowerCase() || '']?.rms_name || '')}</p>
                                                 )}
                                                 {!emp && !awsEmpMap[entry.aws_email?.toLowerCase() || ''] && <p className="text-xs text-warning font-medium">Unlinked</p>}
                                             </td>

@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import {
-    Briefcase, Users, FileText, CheckCircle, Clock,
+    Briefcase, Users, FileText, CheckCircle,
     Activity, UserCheck, XCircle, Pause, BarChart3, Table2
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { formatPersonName } from '../../lib/personNames';
 import { Link } from 'react-router-dom';
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
@@ -104,7 +105,7 @@ function ViewToggle({
                     className={cn(
                         'flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors',
                         active === opt.id
-                            ? 'bg-danger text-white'
+                            ? 'bg-cta text-cta-text'
                             : 'bg-surface text-text-muted hover:bg-surface-hover'
                     )}
                 >
@@ -185,7 +186,7 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
             {/* KPI Strip */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <KPICard label="Total Candidates" value={totalCandidates} accent={KPI_ACCENT_COLORS.red} gradient={KPI_GRADIENTS.red} sub="All vendors combined" icon={Users} />
-                <KPICard label="Selected / Onboarded" value={selectedOnboarded} accent={KPI_ACCENT_COLORS.green} gradient={KPI_GRADIENTS.green} sub="Cleared pipeline" subColor="text-success" icon={UserCheck} />
+                <KPICard label="Selected / Onboarded" value={selectedOnboarded} accent={KPI_ACCENT_COLORS.green} gradient={KPI_GRADIENTS.green} sub="Cleared pipeline" subClassName="text-[var(--color-success-text)]" icon={UserCheck} />
                 <KPICard label="Total Rejections" value={totalRejections} accent={KPI_ACCENT_COLORS.orange} gradient={KPI_GRADIENTS.orange} sub="Screen + L1 + L2" icon={XCircle} />
                 <KPICard label="On Hold" value={onHoldCount} accent={KPI_ACCENT_COLORS.purple} gradient={KPI_GRADIENTS.purple} sub="Pending decisions" icon={Pause} />
                 <KPICard label="Active Requests" value={metrics.total_requests || 0} accent={KPI_ACCENT_COLORS.blue} gradient={KPI_GRADIENTS.blue} sub="Inflow active" icon={Briefcase} />
@@ -477,57 +478,46 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
                 </div>
             </div>
 
-            {/* Verification Triad */}
-            {(metrics.total_employees !== undefined && metrics.total_employees > 0) && (
-                <div className="space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <KPICard label="Total Employees" value={metrics.total_employees || 0} accent={KPI_ACCENT_COLORS.blue} gradient={KPI_GRADIENTS.blue} sub="Registry count" icon={UserCheck} />
-                        <KPICard label="Active Employees" value={metrics.active_employees || 0} accent={KPI_ACCENT_COLORS.green} gradient={KPI_GRADIENTS.green} sub="Currently engaged" icon={UserCheck} />
-                        <KPICard label="Missing Identifiers" value={metrics.missing_identifiers?.length || 0} accent={KPI_ACCENT_COLORS.orange} gradient={KPI_GRADIENTS.orange} sub="Incomplete triad mapping" icon={XCircle} />
+            {metrics.triad_summary && metrics.triad_summary.length > 0 && (
+                <div className="card">
+                    <h2 className="text-base font-bold mb-4 flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-cta" />
+                        Verification Triad — {metrics.triad_billing_month || 'Latest'}
+                    </h2>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-border">
+                                    <th className="text-left py-2 text-xs text-text-muted uppercase">Employee</th>
+                                    <th className="text-center py-2 text-xs text-text-muted uppercase">Jira Hours</th>
+                                    <th className="text-center py-2 text-xs text-text-muted uppercase">Capped Hours</th>
+                                    <th className="text-center py-2 text-xs text-text-muted uppercase">AWS Hours</th>
+                                    <th className="text-center py-2 text-xs text-text-muted uppercase">75% Rule</th>
+                                    <th className="text-center py-2 text-xs text-text-muted uppercase">Billable</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {metrics.triad_summary.map(t => (
+                                    <tr key={t.employee_id} className="border-b border-border/50">
+                                        <td className="py-2 font-medium text-text">{formatPersonName(t.rms_name)}</td>
+                                        <td className="py-2 text-center">{t.jira_hours?.toFixed(1) ?? '—'}</td>
+                                        <td className="py-2 text-center font-bold">{t.capped_hours?.toFixed(1) ?? '—'}</td>
+                                        <td className="py-2 text-center">{t.aws_hours?.toFixed(1) ?? 'N/A'}</td>
+                                        <td className="py-2 text-center">
+                                            {t.compliance_75_pct === true && <CheckCircle size={16} className="text-success mx-auto" />}
+                                            {t.compliance_75_pct === false && <XCircle size={16} className="text-danger mx-auto" />}
+                                            {t.compliance_75_pct === null && <span className="text-text-muted">—</span>}
+                                        </td>
+                                        <td className="py-2 text-center">
+                                            <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", t.is_billable ? "bg-success/10 text-success" : "bg-danger/10 text-danger")}>
+                                                {t.is_billable ? 'YES' : 'NO'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
-
-                    {metrics.triad_summary && metrics.triad_summary.length > 0 && (
-                        <div className="card">
-                            <h2 className="text-base font-bold mb-4 flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 rounded-full bg-cta" />
-                                Verification Triad — {metrics.triad_billing_month || 'Latest'}
-                            </h2>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b border-border">
-                                            <th className="text-left py-2 text-xs text-text-muted uppercase">Employee</th>
-                                            <th className="text-center py-2 text-xs text-text-muted uppercase">Jira Hours</th>
-                                            <th className="text-center py-2 text-xs text-text-muted uppercase">Capped Hours</th>
-                                            <th className="text-center py-2 text-xs text-text-muted uppercase">AWS Hours</th>
-                                            <th className="text-center py-2 text-xs text-text-muted uppercase">75% Rule</th>
-                                            <th className="text-center py-2 text-xs text-text-muted uppercase">Billable</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {metrics.triad_summary.map(t => (
-                                            <tr key={t.employee_id} className="border-b border-border/50">
-                                                <td className="py-2 font-medium text-text">{t.rms_name}</td>
-                                                <td className="py-2 text-center">{t.jira_hours?.toFixed(1) ?? '—'}</td>
-                                                <td className="py-2 text-center font-bold">{t.capped_hours?.toFixed(1) ?? '—'}</td>
-                                                <td className="py-2 text-center">{t.aws_hours?.toFixed(1) ?? 'N/A'}</td>
-                                                <td className="py-2 text-center">
-                                                    {t.compliance_75_pct === true && <CheckCircle size={16} className="text-success mx-auto" />}
-                                                    {t.compliance_75_pct === false && <XCircle size={16} className="text-danger mx-auto" />}
-                                                    {t.compliance_75_pct === null && <span className="text-text-muted">—</span>}
-                                                </td>
-                                                <td className="py-2 text-center">
-                                                    <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", t.is_billable ? "bg-success/10 text-success" : "bg-danger/10 text-danger")}>
-                                                        {t.is_billable ? 'YES' : 'NO'}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
                 </div>
             )}
         </div>

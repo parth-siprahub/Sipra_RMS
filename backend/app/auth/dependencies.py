@@ -4,6 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from app.database import get_supabase_admin, get_supabase_admin_async
 from app.utils.cache import SimpleCache
+from app.utils.person_names import format_person_name
 import logging
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         if not result.data:
             raise credentials_exception
 
-        user_data = result.data
+        user_data = dict(result.data)
+        fn = user_data.get("full_name")
+        if fn:
+            user_data["full_name"] = format_person_name(fn) or fn
         # Cache by user_id so role changes take effect after TTL
         user_cache.set(user_id, user_data)
         return user_data

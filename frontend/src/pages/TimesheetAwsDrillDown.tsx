@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Monitor } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { formatPersonName } from '../lib/personNames';
 import type { AwsTimesheetV2Entry } from '../api/timesheets';
 
 interface PageState {
@@ -57,7 +58,7 @@ export function TimesheetAwsDrillDown() {
     }
 
     const emp = current.employee_id ? empMap[current.employee_id] : null;
-    const displayName = emp?.rms_name || current.aws_email || 'Unknown';
+    const displayName = formatPersonName(emp?.rms_name || '') || current.aws_email || 'Unknown';
 
     return (
         <div className="flex flex-col h-full animate-fade-in">

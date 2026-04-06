@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 import { cn } from '../lib/utils';
+import { formatPersonName } from '../lib/personNames';
 import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
@@ -195,11 +196,11 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                             className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white"
                             style={{ background: 'linear-gradient(135deg, #0369A1, #0EA5E9)' }}
                         >
-                            {getInitials(user.full_name)}
+                            {getInitials(formatPersonName(user.full_name))}
                         </div>
                         <div className="min-w-0 flex-1">
                             <div className="text-xs font-semibold text-white truncate leading-tight">
-                                {user.full_name}
+                                {formatPersonName(user.full_name)}
                             </div>
                             <div
                                 className="text-xs mt-0.5 font-medium"

@@ -10,7 +10,8 @@ class Settings(BaseSettings):
     # Auth
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # 1 hour (was 480 = 8h — too long for prod)
+    # Not used for login (Supabase issues JWTs); kept for future custom auth / docs parity with .env
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
     # Environment — set to "production" in hosting platform env vars
     ENVIRONMENT: str = "development"

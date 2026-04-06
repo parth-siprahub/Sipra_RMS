@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
+import { formatPersonName } from '../lib/personNames';
 
 type Tab = 'comparison' | 'compliance';
 
@@ -327,10 +328,10 @@ function ComparisonTab({
                                 <tr
                                     key={row.employee_id}
                                     className="hover:bg-surface-hover/30 transition-colors cursor-pointer"
-                                    onClick={() => onDrillDown(row.employee_id, row.rms_name)}
+                                    onClick={() => onDrillDown(row.employee_id, formatPersonName(row.rms_name))}
                                 >
                                     <td className="px-4 py-3">
-                                        <p className="font-medium text-text">{row.rms_name}</p>
+                                        <p className="font-medium text-text">{formatPersonName(row.rms_name)}</p>
                                         <p className="text-xs text-text-muted">{row.jira_username || row.aws_email || '—'}</p>
                                     </td>
                                     <td className="px-4 py-3 text-right text-text-muted">
@@ -514,7 +515,7 @@ function ComplianceTab({ month }: { month: string }) {
                             {filtered.map(entry => (
                                 <tr key={entry.employee_id} className="hover:bg-surface-hover/30 transition-colors">
                                     <td className="px-4 py-3">
-                                        <p className="font-medium text-text">{entry.rms_name}</p>
+                                        <p className="font-medium text-text">{formatPersonName(entry.rms_name)}</p>
                                         <p className="text-xs text-text-muted">{entry.jira_username || '—'}</p>
                                     </td>
                                     <td className="px-4 py-3 text-center font-medium">{entry.days_logged}</td>

@@ -1,7 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { formatPersonName } from '../lib/personNames';
+import { getAccessTokenExpiryMs } from '../lib/jwt';
 
-const TOKEN_EXPIRY_MINUTES = 55; // slightly less than backend's 60min to avoid boundary issues
+/** If JWT has no exp (should not happen with Supabase), cap client session hint — override via VITE_SESSION_FALLBACK_MINUTES */
+const FALLBACK_SESSION_MINUTES = Number(import.meta.env.VITE_SESSION_FALLBACK_MINUTES) || 480;
+
+/** Log out slightly before the real JWT exp to avoid 401s mid-request */
+const EXPIRY_BUFFER_MS = 3 * 60 * 1000;
 
 export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'RECRUITER' | 'VENDOR' | 'MANAGEMENT';
 
@@ -40,10 +46,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const token = localStorage.getItem('rms_access_token');
         const savedUser = localStorage.getItem('rms_user_profile');
-        const expiry = localStorage.getItem('rms_token_expiry');
 
-        // Token expiry check — force logout if token is expired
-        if (expiry && Date.now() > parseInt(expiry)) {
+        if (token) {
+            const jwtExpMs = getAccessTokenExpiryMs(token);
+            if (jwtExpMs != null) {
+                localStorage.setItem('rms_token_expiry', String(jwtExpMs - EXPIRY_BUFFER_MS));
+            }
+        }
+
+        const expiry = localStorage.getItem('rms_token_expiry');
+        if (expiry && Date.now() > parseInt(expiry, 10)) {
             clearAuthStorage();
             setIsLoading(false);
             return;
@@ -60,12 +72,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const login = (token: string, userData: UserProfile) => {
-        const expiresAt = Date.now() + TOKEN_EXPIRY_MINUTES * 60 * 1000;
+        const jwtExpMs = getAccessTokenExpiryMs(token);
+        const expiresAt =
+            jwtExpMs != null
+                ? Math.max(Date.now(), jwtExpMs - EXPIRY_BUFFER_MS)
+                : Date.now() + FALLBACK_SESSION_MINUTES * 60 * 1000;
+        const displayName = formatPersonName(userData.full_name) || userData.full_name;
+        const normalized: UserProfile = { ...userData, full_name: displayName };
         localStorage.setItem('rms_access_token', token);
-        localStorage.setItem('rms_user_profile', JSON.stringify(userData));
+        localStorage.setItem('rms_user_profile', JSON.stringify(normalized));
         localStorage.setItem('rms_token_expiry', expiresAt.toString());
-        setUser(userData);
-        toast.success(`Welcome back, ${userData.full_name}`);
+        setUser(normalized);
+        toast.success(`Welcome back, ${displayName}`);
     };
 
     const logout = () => {

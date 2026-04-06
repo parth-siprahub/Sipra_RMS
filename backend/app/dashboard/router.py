@@ -6,8 +6,15 @@ from fastapi import APIRouter, Depends
 from app.auth.dependencies import get_current_user
 from app.database import get_supabase_admin_async
 from app.utils.cache import api_cache
+from app.utils.person_names import format_person_name
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+
+
+def _display_employee_name(raw: str | None) -> str:
+    if not raw or not str(raw).strip():
+        return "Unknown"
+    return format_person_name(str(raw)) or str(raw)
 
 
 @router.get("/metrics")
@@ -205,7 +212,7 @@ async def get_metrics(current_user: dict = Depends(get_current_user)):
         if missing:
             missing_identifiers.append({
                 "employee_id": emp["id"],
-                "rms_name": emp.get("rms_name", "Unknown"),
+                "rms_name": _display_employee_name(emp.get("rms_name")),
                 "missing_fields": missing,
             })
 
@@ -221,7 +228,7 @@ async def get_metrics(current_user: dict = Depends(get_current_user)):
             emp = emp_map.get(br["employee_id"])
             triad_summary.append({
                 "employee_id": br["employee_id"],
-                "rms_name": emp.get("rms_name", "Unknown") if emp else "Unknown",
+                "rms_name": _display_employee_name(emp.get("rms_name")) if emp else "Unknown",
                 "jira_hours": br.get("total_logged_hours", 0),
                 "capped_hours": br.get("capped_hours", 0),
                 "aws_hours": br.get("aws_active_hours"),

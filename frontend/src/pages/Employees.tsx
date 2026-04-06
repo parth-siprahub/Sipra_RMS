@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
-import { employeesApi, type Employee, type EmployeeUpdate, type UserProfile } from '../api/employees';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { employeesApi, type Employee, type EmployeeUpdate } from '../api/employees';
 import { clientsApi, type Client } from '../api/clients';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { cn } from '../lib/utils';
+import { formatPersonName } from '../lib/personNames';
 import { useAuth, isAdminRole } from '../context/AuthContext';
 import { exportEmployees } from '../api/exports';
 import { authApi, type UserCreate } from '../api/auth';
@@ -12,11 +13,68 @@ import {
     Search,
     Edit2,
     Download,
-    Plus,
     UserPlus,
-    Link2,
-    Unlink,
+    ArrowUp,
+    ArrowDown,
+    ArrowUpDown,
 } from 'lucide-react';
+
+type EmployeeSortKey = 'rms_name' | 'job_profile_name' | 'client_name' | 'ids' | 'status' | 'start_date';
+type SortDir = 'asc' | 'desc';
+
+function sortValueForKey(emp: Employee, key: EmployeeSortKey): string {
+    switch (key) {
+        case 'rms_name':
+            return (emp.rms_name || '').toLowerCase();
+        case 'job_profile_name':
+            return (emp.job_profile_name || '').toLowerCase();
+        case 'client_name':
+            return (emp.client_name || '').toLowerCase();
+        case 'ids':
+            return `${emp.aws_email || ''} ${emp.siprahub_email || ''}`.toLowerCase();
+        case 'status':
+            return (emp.status || '').toLowerCase();
+        case 'start_date':
+            return emp.start_date || '';
+        default:
+            return '';
+    }
+}
+
+function EmployeeSortTh({
+    label,
+    columnKey,
+    sortKey,
+    sortDir,
+    onSort,
+    className,
+}: {
+    label: string;
+    columnKey: EmployeeSortKey;
+    sortKey: EmployeeSortKey;
+    sortDir: SortDir;
+    onSort: (k: EmployeeSortKey) => void;
+    className?: string;
+}) {
+    const active = sortKey === columnKey;
+    return (
+        <th className={cn('px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider', className)}>
+            <button
+                type="button"
+                onClick={() => onSort(columnKey)}
+                className="inline-flex items-center gap-1.5 hover:text-text transition-colors -ml-1 px-1 py-0.5 rounded-md hover:bg-surface-hover/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-cta/40"
+                aria-label={`Sort by ${label}`}
+            >
+                {label}
+                {active ? (
+                    sortDir === 'asc' ? <ArrowUp size={14} className="text-cta shrink-0" /> : <ArrowDown size={14} className="text-cta shrink-0" />
+                ) : (
+                    <ArrowUpDown size={14} className="text-text-muted opacity-50 shrink-0" />
+                )}
+            </button>
+        </th>
+    );
+}
 
 function EditEmployeeModal({
     isOpen,
@@ -217,130 +275,6 @@ function CreateUserModal({
     );
 }
 
-function LinkProfileModal({
-    isOpen,
-    onClose,
-    onSuccess,
-    employee,
-}: {
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
-    employee: Employee;
-}) {
-    const [profiles, setProfiles] = useState<UserProfile[]>([]);
-    const [selectedId, setSelectedId] = useState<string>('');
-    const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
-
-    useEffect(() => {
-        if (!isOpen) return;
-        setLoading(true);
-        employeesApi.listProfiles({ exclude_linked: true })
-            .then(data => setProfiles(data || []))
-            .catch(() => toast.error('Failed to load profiles'))
-            .finally(() => setLoading(false));
-    }, [isOpen]);
-
-    const linkedProfile = profiles.find(p => p.employee_id === employee.id);
-
-    const handleLink = async () => {
-        if (!selectedId) return;
-        setSubmitting(true);
-        try {
-            await employeesApi.linkProfile(employee.id, selectedId);
-            toast.success('Profile linked');
-            onSuccess();
-            onClose();
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to link profile');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleUnlink = async () => {
-        setSubmitting(true);
-        try {
-            await employeesApi.unlinkProfile(employee.id);
-            toast.success('Profile unlinked');
-            onSuccess();
-            onClose();
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to unlink profile');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const unlinkedProfiles = profiles.filter(p => !p.employee_id || p.employee_id === employee.id);
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`Link Profile — ${employee.rms_name}`} maxWidth="max-w-md">
-            <div className="space-y-4">
-                {loading ? (
-                    <div className="py-8 flex justify-center"><div className="spinner w-6 h-6 border-cta" /></div>
-                ) : (
-                    <>
-                        {linkedProfile && (
-                            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-surface-hover/30">
-                                <div>
-                                    <p className="text-sm font-medium text-text">{linkedProfile.full_name || linkedProfile.email}</p>
-                                    <p className="text-xs text-text-muted">{linkedProfile.email} · {linkedProfile.role}</p>
-                                </div>
-                                <button
-                                    onClick={handleUnlink}
-                                    disabled={submitting}
-                                    className="flex items-center gap-1.5 text-xs text-danger hover:text-danger/80 transition-colors"
-                                >
-                                    <Unlink size={14} /> Unlink
-                                </button>
-                            </div>
-                        )}
-
-                        {!linkedProfile && (
-                            <p className="text-sm text-text-muted">No profile currently linked to this employee.</p>
-                        )}
-
-                        <div>
-                            <label className="input-label" htmlFor="link-profile-select">
-                                {linkedProfile ? 'Change linked profile' : 'Select a profile to link'}
-                            </label>
-                            <select
-                                id="link-profile-select"
-                                className="input-field"
-                                value={selectedId}
-                                onChange={e => setSelectedId(e.target.value)}
-                            >
-                                <option value="">— Choose profile —</option>
-                                {unlinkedProfiles.map(p => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.full_name || p.email} ({p.role}) {p.employee_id === employee.id ? '← current' : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="flex gap-3 pt-2">
-                            <button type="button" onClick={onClose} className="btn btn-secondary flex-1" disabled={submitting}>
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleLink}
-                                className="btn btn-cta flex-1 flex items-center justify-center gap-2"
-                                disabled={submitting || !selectedId}
-                            >
-                                {submitting ? <span className="spinner w-4 h-4" /> : <><Link2 size={16} /> Link Profile</>}
-                            </button>
-                        </div>
-                    </>
-                )}
-            </div>
-        </Modal>
-    );
-}
-
 export function Employees() {
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
@@ -349,8 +283,9 @@ export function Employees() {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('ACTIVE');
     const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
-    const [linkEmployee, setLinkEmployee] = useState<Employee | null>(null);
     const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+    const [sortKey, setSortKey] = useState<EmployeeSortKey>('rms_name');
+    const [sortDir, setSortDir] = useState<SortDir>('asc');
 
     const fetchEmployees = useCallback(async () => {
         setLoading(true);
@@ -382,6 +317,28 @@ export function Employees() {
             || (emp.siprahub_email || '').toLowerCase().includes(q)
             || (emp.job_profile_name || '').toLowerCase().includes(q);
     });
+
+    const toggleSort = (key: EmployeeSortKey) => {
+        if (sortKey === key) {
+            setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setSortKey(key);
+            setSortDir('asc');
+        }
+    };
+
+    const sortedRows = useMemo(() => {
+        const rows = [...filtered];
+        const mul = sortDir === 'asc' ? 1 : -1;
+        rows.sort((a, b) => {
+            const va = sortValueForKey(a, sortKey);
+            const vb = sortValueForKey(b, sortKey);
+            if (va < vb) return -1 * mul;
+            if (va > vb) return 1 * mul;
+            return 0;
+        });
+        return rows;
+    }, [filtered, sortKey, sortDir]);
 
     if (user?.role === 'SUPER_ADMIN') {
         return (
@@ -459,14 +416,6 @@ export function Employees() {
                     <p className="text-text-muted">Manage employee identifiers and the Verification Triad</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {isAdmin && (
-                        <button
-                            onClick={() => setIsCreateUserModalOpen(true)}
-                            className="btn btn-cta flex items-center gap-2 px-5"
-                        >
-                            <Plus size={18} /> Add New User
-                        </button>
-                    )}
                     {user?.role === 'SUPER_ADMIN' && (
                         <button onClick={() => exportEmployees()} className="btn btn-secondary flex items-center gap-2">
                             <Download size={18} /> Export CSV
@@ -531,26 +480,26 @@ export function Employees() {
                         <div className="spinner w-8 h-8 border-cta" />
                         <p className="text-text-muted text-sm animate-pulse">Loading employees...</p>
                     </div>
-                ) : filtered.length > 0 ? (
+                ) : sortedRows.length > 0 ? (
                     <div className="overflow-auto max-h-[70vh] custom-scrollbar">
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-surface-hover/50 border-b border-border">
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Employee</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Job Profile</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Client Name</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">IDs</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Status</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Dates</th>
+                                    <EmployeeSortTh label="Employee" columnKey="rms_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                    <EmployeeSortTh label="Job Profile" columnKey="job_profile_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                    <EmployeeSortTh label="Client Name" columnKey="client_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                    <EmployeeSortTh label="IDs" columnKey="ids" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                    <EmployeeSortTh label="Status" columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                    <EmployeeSortTh label="Dates" columnKey="start_date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     {isAdmin && <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider text-right">Actions</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {filtered.map(emp => (
+                                {sortedRows.map(emp => (
                                     <tr key={emp.id} className="hover:bg-surface-hover/30 transition-colors">
                                         <td className="px-6 py-4">
                                             <div>
-                                                <p className="font-bold text-text">{emp.rms_name}</p>
+                                                <p className="font-bold text-text">{formatPersonName(emp.rms_name)}</p>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text">
@@ -592,13 +541,6 @@ export function Employees() {
                                             <td className="px-6 py-4">
                                                 <div className="flex justify-end gap-1">
                                                     <button
-                                                        onClick={() => setLinkEmployee(emp)}
-                                                        className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-info transition-colors"
-                                                        title="Link Profile"
-                                                    >
-                                                        <Link2 size={18} />
-                                                    </button>
-                                                    <button
                                                         onClick={() => setEditEmployee(emp)}
                                                         className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors"
                                                         title="Edit Employee"
@@ -624,21 +566,6 @@ export function Employees() {
                     onClose={() => setEditEmployee(null)}
                     onSuccess={fetchEmployees}
                     employee={editEmployee}
-                />
-            )}
-            {linkEmployee && (
-                <LinkProfileModal
-                    isOpen={!!linkEmployee}
-                    onClose={() => setLinkEmployee(null)}
-                    onSuccess={fetchEmployees}
-                    employee={linkEmployee}
-                />
-            )}
-            {isCreateUserModalOpen && (
-                <CreateUserModal
-                    isOpen={isCreateUserModalOpen}
-                    onClose={() => setIsCreateUserModalOpen(false)}
-                    onSuccess={fetchEmployees}
                 />
             )}
         </div>

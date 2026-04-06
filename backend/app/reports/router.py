@@ -10,6 +10,7 @@ from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
 from app.reports.flag_classifier import classify_flag
 from app.reports.defaulters import detect_defaulters
+from app.utils.person_names import format_person_name
 from app.reports.schemas import (
     TimesheetComparison,
     ComparisonReport,
@@ -160,7 +161,7 @@ async def get_timesheet_comparison(
 
         comparisons.append(TimesheetComparison(
             employee_id=emp_id,
-            rms_name=emp.get("rms_name", "Unknown"),
+            rms_name=_display_rms(emp.get("rms_name")),
             jira_username=emp.get("jira_username"),
             aws_email=emp.get("aws_email"),
             jira_total_hours=round(total_hours, 2),
@@ -271,7 +272,7 @@ async def get_compliance_report(
 
         entries.append(ComplianceEntry(
             employee_id=emp_id,
-            rms_name=emp.get("rms_name", "Unknown"),
+            rms_name=_display_rms(emp.get("rms_name")),
             jira_username=emp.get("jira_username"),
             status=status_val,
             days_logged=days_logged,
@@ -518,7 +519,7 @@ async def calculate_billing(
             difference=r["difference"],
             difference_pct=r["difference_pct"],
             flag=r["flag"],
-            rms_name=emp.get("rms_name"),
+            rms_name=_display_rms_optional(emp.get("rms_name")),
             jira_username=emp.get("jira_username"),
             aws_email=emp.get("aws_email"),
         ))
@@ -569,7 +570,7 @@ async def get_computed_reports(
             difference_pct=float(r["difference_pct"]) if r.get("difference_pct") is not None else None,
             flag=r.get("flag", "no_aws"),
             computed_at=r.get("computed_at"),
-            rms_name=emp.get("rms_name"),
+            rms_name=_display_rms_optional(emp.get("rms_name")),
             jira_username=emp.get("jira_username"),
             aws_email=emp.get("aws_email"),
         ))
@@ -616,7 +617,7 @@ async def get_employee_detail(
             difference_pct=float(r["difference_pct"]) if r.get("difference_pct") is not None else None,
             flag=r.get("flag", "no_aws"),
             computed_at=r.get("computed_at"),
-            rms_name=emp.get("rms_name"),
+            rms_name=_display_rms_optional(emp.get("rms_name")),
             jira_username=emp.get("jira_username"),
             aws_email=emp.get("aws_email"),
         )
