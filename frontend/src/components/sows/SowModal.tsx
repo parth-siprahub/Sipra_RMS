@@ -19,7 +19,7 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
     const [loading, setLoading] = useState(false);
     const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
-    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [errors, _setErrors] = useState<Record<string, string>>({});
     const [formData, setFormData] = useState({
         sow_number: '',
         client_name: '',

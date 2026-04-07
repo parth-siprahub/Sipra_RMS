@@ -1,10 +1,9 @@
 import { useState, useMemo } from 'react';
 import {
-    Briefcase, Users, FileText, CheckCircle,
-    Activity, UserCheck, XCircle, Pause, BarChart3, Table2
+    Briefcase, Users, FileText,
+    Activity, UserCheck, Pause, BarChart3, Table2
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { formatPersonName } from '../../lib/personNames';
 import { Link } from 'react-router-dom';
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
@@ -222,7 +221,8 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
                                             ))}
                                         </Pie>
                                         <Tooltip
-                                            formatter={(value: number | undefined, _name: string, props: { payload: { name: string } }) => [value, props.payload.name]}
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                            formatter={(value: number | undefined, _name: string | undefined, props: any) => [value, props?.payload?.name ?? ''] as any}
                                             contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
                                         />
                                     </PieChart>

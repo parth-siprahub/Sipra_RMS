@@ -401,7 +401,6 @@ function JiraTab({
     setUnmatchedModalSource: (source: 'JIRA' | 'AWS') => void;
     setUnmatchedDetails: (details: UnmatchedDetail[]) => void;
 }) {
-    const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -669,7 +668,7 @@ function AwsV2Tab({
     setUnmatchedDetails: (details: UnmatchedDetail[]) => void;
 }) {
     const [searchQuery, setSearchQuery] = useState('');
-    const [sortDir, setSortDir] = useState<SortDir>('asc');
+    const [sortDir, _setSortDir] = useState<SortDir>('asc');
 
     const filteredEntries = useMemo(() => {
         const query = searchQuery.toLowerCase().trim();
