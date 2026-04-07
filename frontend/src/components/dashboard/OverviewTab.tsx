@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import {
     Briefcase, Users, FileText,
-    Activity, UserCheck, Pause, BarChart3, Table2
+    Activity, UserCheck, XCircle, Pause, BarChart3, Table2
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Link } from 'react-router-dom';
