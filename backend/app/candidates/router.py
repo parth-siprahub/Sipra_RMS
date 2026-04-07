@@ -10,6 +10,7 @@ from app.candidates.schemas import (
     CandidateStatus,
     AdminReview,
     ExitRequest,
+    RevertExitRequest,
     RehireWarning,
 )
 from app.utils.cache import api_cache
@@ -428,12 +429,37 @@ async def process_exit(
         )
 
     # Update candidate to EXIT status
-    update_data = {
+    update_data: dict = {
         "status": CandidateStatus.EXIT.value,
-        "exit_reason": payload.exit_reason,
         "last_working_day": str(payload.last_working_day),
     }
+    if payload.exit_reason:
+        update_data["exit_reason"] = payload.exit_reason
+
     result = await client.table("candidates").update(update_data).eq("id", candidate_id).execute()
+
+    # Sync employee record: mark EXITED and set exit_date
+    try:
+        emp_result = await client.table("employees").select("id").eq("candidate_id", candidate_id).execute()
+        if emp_result.data:
+            emp_id = emp_result.data[0]["id"]
+            await client.table("employees").update({
+                "status": "EXITED",
+                "exit_date": str(payload.last_working_day),
+            }).eq("id", emp_id).execute()
+            api_cache.clear_prefix("employees_")
+            logger.info("Auto-updated employee %s to EXITED for candidate %s", emp_id, candidate_id)
+    except Exception as emp_err:
+        logger.warning("Employee exit sync failed for candidate %s: %s", candidate_id, emp_err)
+
+    await log_audit(
+        user=current_user,
+        action="STATUS_CHANGE",
+        entity_type="candidate",
+        entity_id=str(candidate_id),
+        old_values={"status": CandidateStatus.ONBOARDED.value},
+        new_values={"status": CandidateStatus.EXIT.value, "last_working_day": str(payload.last_working_day)},
+    )
 
     # Auto-create backfill request if requested
     if payload.create_backfill and existing.data[0].get("request_id"):
@@ -469,4 +495,62 @@ async def process_exit(
 
     api_cache.clear_prefix("candidates_")
     api_cache.clear_prefix("dashboard_")
-    return _candidate_api_row(result.data[0])
+    refreshed_exit = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
+    return _candidate_api_row(refreshed_exit.data)
+
+
+@router.patch("/{candidate_id}/revert-exit", response_model=CandidateResponse)
+async def revert_exit(
+    candidate_id: int,
+    payload: RevertExitRequest = RevertExitRequest(),
+    current_user: dict = Depends(get_current_user),
+):
+    """Revert an accidental exit — restore candidate to chosen pipeline status and employee to ACTIVE."""
+    client = await get_supabase_admin_async()
+    existing = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
+    if not existing.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Candidate not found")
+
+    if existing.data["status"] != CandidateStatus.EXIT.value:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Only exited candidates can be reverted",
+        )
+
+    target = payload.target_status.value if payload.target_status else CandidateStatus.ONBOARDED.value
+
+    # Restore candidate to target status, clear exit fields
+    await client.table("candidates").update({
+        "status": target,
+        "exit_reason": None,
+        "last_working_day": None,
+    }).eq("id", candidate_id).execute()
+
+    # Restore linked employee to ACTIVE, clear exit_date
+    try:
+        emp_result = await client.table("employees").select("id").eq("candidate_id", candidate_id).execute()
+        if emp_result.data:
+            emp_id = emp_result.data[0]["id"]
+            await client.table("employees").update({
+                "status": "ACTIVE",
+                "exit_date": None,
+            }).eq("id", emp_id).execute()
+            api_cache.clear_prefix("employees_")
+            logger.info("Reverted employee %s to ACTIVE for candidate %s", emp_id, candidate_id)
+    except Exception as emp_err:
+        logger.warning("Employee revert failed for candidate %s: %s", candidate_id, emp_err)
+
+    refreshed = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
+
+    await log_audit(
+        user=current_user,
+        action="EXIT_REVERTED",
+        entity_type="candidate",
+        entity_id=str(candidate_id),
+        old_values={"status": CandidateStatus.EXIT.value},
+        new_values={"status": target},
+    )
+
+    api_cache.clear_prefix("candidates_")
+    api_cache.clear_prefix("dashboard_")
+    return _candidate_api_row(refreshed.data)

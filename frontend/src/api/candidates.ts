@@ -82,6 +82,12 @@ export interface CreateCandidatePayload {
     l2_feedback_file_url?: string;
 }
 
+export interface ExitPayload {
+    last_working_day: string;  // ISO date string YYYY-MM-DD
+    exit_reason?: string;
+    create_backfill?: boolean;
+}
+
 export const candidatesApi = {
     list: (filters?: { status?: string; request_id?: number; page_size?: number; search?: string }) =>
         api.get<Candidate[]>('/candidates/', filters),
@@ -91,6 +97,12 @@ export const candidatesApi = {
 
     review: (id: number, status: CandidateStatus, remarks?: string) =>
         api.patch<Candidate>(`/candidates/${id}/review`, { status, remarks }),
+
+    exit: (id: number, payload: ExitPayload) =>
+        api.patch<Candidate>(`/candidates/${id}/exit`, payload),
+
+    revertExit: (id: number, targetStatus: CandidateStatus = 'ONBOARDED') =>
+        api.patch<Candidate>(`/candidates/${id}/revert-exit`, { target_status: targetStatus }),
 
     uploadResume: (id: number, file: File) => {
         const formData = new FormData();
