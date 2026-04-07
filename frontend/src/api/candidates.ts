@@ -101,8 +101,8 @@ export const candidatesApi = {
     exit: (id: number, payload: ExitPayload) =>
         api.patch<Candidate>(`/candidates/${id}/exit`, payload),
 
-    revertExit: (id: number) =>
-        api.patch<Candidate>(`/candidates/${id}/revert-exit`, {}),
+    revertExit: (id: number, targetStatus: CandidateStatus = 'ONBOARDED') =>
+        api.patch<Candidate>(`/candidates/${id}/revert-exit`, { target_status: targetStatus }),
 
     uploadResume: (id: number, file: File) => {
         const formData = new FormData();

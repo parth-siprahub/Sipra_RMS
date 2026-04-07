@@ -123,6 +123,11 @@ class ExitRequest(BaseModel):
     create_backfill: bool = True
 
 
+class RevertExitRequest(BaseModel):
+    """Revert an exited candidate back into the pipeline."""
+    target_status: CandidateStatus = CandidateStatus.ONBOARDED
+
+
 class RehireWarning(BaseModel):
     """Warning returned when a new candidate matches a previously exited/terminated employee."""
     previous_employee_id: int

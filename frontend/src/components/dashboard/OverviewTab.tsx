@@ -222,7 +222,7 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
                                             ))}
                                         </Pie>
                                         <Tooltip
-                                            formatter={(value: number, _name: string, props: { payload: { name: string } }) => [value, props.payload.name]}
+                                            formatter={(value: number | undefined, _name: string, props: { payload: { name: string } }) => [value, props.payload.name]}
                                             contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
                                         />
                                     </PieChart>
@@ -295,7 +295,7 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                                     <XAxis type="number" fontSize={11} tick={{ fill: '#64748B' }} axisLine={{ stroke: '#E2E8F0' }} />
                                     <YAxis dataKey="name" type="category" width={105} fontSize={12} fontWeight={500} tick={{ fill: '#334155' }} axisLine={false} tickLine={false} />
-                                    <Tooltip contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} formatter={(value: number) => [value, 'Candidates']} />
+                                    <Tooltip contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} formatter={(value: number | undefined) => [value, 'Candidates']} />
                                     <Bar dataKey="value" radius={[0, 4, 4, 0]} animationDuration={1000}>
                                         {funnelData.map((_, i) => (
                                             <Cell key={`fn-${i}`} fill={FUNNEL_COLORS[i].fill} stroke={FUNNEL_COLORS[i].border} strokeWidth={2} />
@@ -318,7 +318,7 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                                         <XAxis dataKey="date" fontSize={10} tick={{ fill: '#64748B' }} tickFormatter={(d: string) => { const dt = new Date(d); return `${dt.getDate()}/${dt.getMonth() + 1}`; }} />
                                         <YAxis fontSize={11} tick={{ fill: '#64748B' }} allowDecimals={false} />
-                                        <Tooltip contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} labelFormatter={(d: string) => new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} />
+                                        <Tooltip contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} labelFormatter={(d: unknown) => new Date(d as string).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} />
                                         <Area type="monotone" dataKey="count" stroke="#16A34A" strokeWidth={2} fill="url(#funnelGrad)" dot={{ r: 3, fill: '#16A34A', stroke: '#fff', strokeWidth: 2 }} name="New Submissions" />
                                         <Line type="monotone" dataKey="avg" stroke="#3B82F6" strokeWidth={2} strokeDasharray="6 3" dot={false} name="7-Day Avg" />
                                         <Legend />
@@ -387,7 +387,7 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                                 <XAxis type="number" domain={[0, 100]} fontSize={11} tick={{ fill: '#64748B' }} unit="%" />
                                 <YAxis dataKey="name" type="category" width={110} fontSize={11} tick={{ fill: '#64748B' }} />
-                                <Tooltip contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} formatter={(value: number) => [`${value}%`, 'Rejection Rate']} />
+                                <Tooltip contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} formatter={(value: number | undefined) => [`${value}%`, 'Rejection Rate']} />
                                 <Bar dataKey="rejection_rate" radius={[0, 4, 4, 0]} animationDuration={1000}>
                                     {vendorRejectionData.map((entry, i) => (
                                         <Cell key={`vr-${i}`} fill={entry.rejection_rate > 60 ? '#EF4444' : entry.rejection_rate > 30 ? '#F59E0B' : '#22C55E'} />
@@ -418,7 +418,7 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                                 <XAxis dataKey="date" fontSize={10} tick={{ fill: '#64748B' }} tickFormatter={(d: string) => { const dt = new Date(d); return `${dt.getDate()}/${dt.getMonth() + 1}`; }} />
                                 <YAxis fontSize={11} tick={{ fill: '#64748B' }} allowDecimals={false} />
-                                <Tooltip contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} labelFormatter={(d: string) => new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} />
+                                <Tooltip contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} labelFormatter={(d: unknown) => new Date(d as string).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} />
                                 <Area type="monotone" dataKey="count" stroke="#CC1A24" strokeWidth={2} fill="url(#fillGrad)" dot={{ r: 3, fill: '#CC1A24', stroke: '#fff', strokeWidth: 2 }} name="Submissions" />
                                 <Line type="monotone" dataKey="avg" stroke="#3B82F6" strokeWidth={2} strokeDasharray="6 3" dot={false} name="7-Day Avg" />
                                 <Legend />
@@ -478,48 +478,6 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
                 </div>
             </div>
 
-            {metrics.triad_summary && metrics.triad_summary.length > 0 && (
-                <div className="card">
-                    <h2 className="text-base font-bold mb-4 flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-cta" />
-                        Verification Triad — {metrics.triad_billing_month || 'Latest'}
-                    </h2>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border">
-                                    <th className="text-left py-2 text-xs text-text-muted uppercase">Employee</th>
-                                    <th className="text-center py-2 text-xs text-text-muted uppercase">Jira Hours</th>
-                                    <th className="text-center py-2 text-xs text-text-muted uppercase">Capped Hours</th>
-                                    <th className="text-center py-2 text-xs text-text-muted uppercase">AWS Hours</th>
-                                    <th className="text-center py-2 text-xs text-text-muted uppercase">75% Rule</th>
-                                    <th className="text-center py-2 text-xs text-text-muted uppercase">Billable</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {metrics.triad_summary.map(t => (
-                                    <tr key={t.employee_id} className="border-b border-border/50">
-                                        <td className="py-2 font-medium text-text">{formatPersonName(t.rms_name)}</td>
-                                        <td className="py-2 text-center">{t.jira_hours?.toFixed(1) ?? '—'}</td>
-                                        <td className="py-2 text-center font-bold">{t.capped_hours?.toFixed(1) ?? '—'}</td>
-                                        <td className="py-2 text-center">{t.aws_hours?.toFixed(1) ?? 'N/A'}</td>
-                                        <td className="py-2 text-center">
-                                            {t.compliance_75_pct === true && <CheckCircle size={16} className="text-success mx-auto" />}
-                                            {t.compliance_75_pct === false && <XCircle size={16} className="text-danger mx-auto" />}
-                                            {t.compliance_75_pct === null && <span className="text-text-muted">—</span>}
-                                        </td>
-                                        <td className="py-2 text-center">
-                                            <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", t.is_billable ? "bg-success/10 text-success" : "bg-danger/10 text-danger")}>
-                                                {t.is_billable ? 'YES' : 'NO'}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

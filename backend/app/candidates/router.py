@@ -10,6 +10,7 @@ from app.candidates.schemas import (
     CandidateStatus,
     AdminReview,
     ExitRequest,
+    RevertExitRequest,
     RehireWarning,
 )
 from app.utils.cache import api_cache
@@ -501,9 +502,10 @@ async def process_exit(
 @router.patch("/{candidate_id}/revert-exit", response_model=CandidateResponse)
 async def revert_exit(
     candidate_id: int,
+    payload: RevertExitRequest = RevertExitRequest(),
     current_user: dict = Depends(get_current_user),
 ):
-    """Revert an accidental exit — restore candidate to ONBOARDED and employee to ACTIVE."""
+    """Revert an accidental exit — restore candidate to chosen pipeline status and employee to ACTIVE."""
     client = await get_supabase_admin_async()
     existing = await client.table("candidates").select("*").eq("id", candidate_id).single().execute()
     if not existing.data:
@@ -515,9 +517,11 @@ async def revert_exit(
             "Only exited candidates can be reverted",
         )
 
-    # Restore candidate to ONBOARDED, clear exit fields
+    target = payload.target_status.value if payload.target_status else CandidateStatus.ONBOARDED.value
+
+    # Restore candidate to target status, clear exit fields
     await client.table("candidates").update({
-        "status": CandidateStatus.ONBOARDED.value,
+        "status": target,
         "exit_reason": None,
         "last_working_day": None,
     }).eq("id", candidate_id).execute()
@@ -544,7 +548,7 @@ async def revert_exit(
         entity_type="candidate",
         entity_id=str(candidate_id),
         old_values={"status": CandidateStatus.EXIT.value},
-        new_values={"status": CandidateStatus.ONBOARDED.value},
+        new_values={"status": target},
     )
 
     api_cache.clear_prefix("candidates_")

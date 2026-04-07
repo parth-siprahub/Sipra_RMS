@@ -17,6 +17,7 @@ import { jobProfileApi, type JobProfile } from '../api/jobProfiles';
 
 import { Modal } from '../components/ui/Modal';
 import { ExitConfirmModal } from '../components/ui/ExitConfirmModal';
+import { RevertExitModal } from '../components/ui/RevertExitModal';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton, KanbanColumnSkeleton, TableRowSkeleton } from '../components/ui/Skeleton';
@@ -1260,6 +1261,8 @@ export function Candidates() {
     const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
     const [exitPendingId, setExitPendingId] = useState<number | null>(null);
     const [isExitModalOpen, setIsExitModalOpen] = useState(false);
+    const [revertPendingId, setRevertPendingId] = useState<number | null>(null);
+    const [isRevertModalOpen, setIsRevertModalOpen] = useState(false);
 
     // Debounce search
     useEffect(() => {
@@ -1338,17 +1341,28 @@ export function Candidates() {
         }
     };
 
-    const handleRevertExit = async (id: number) => {
+    const handleRevertExit = (id: number) => {
+        setRevertPendingId(id);
+        setIsRevertModalOpen(true);
+    };
+
+    const handleRevertConfirm = async (targetStatus: CandidateStatus) => {
+        if (revertPendingId === null) return;
         try {
-            await candidatesApi.revertExit(id);
-            toast.success('Exit reverted — candidate restored to Onboarded');
+            await candidatesApi.revertExit(revertPendingId, targetStatus);
+            toast.success(`Exit reverted — candidate moved to ${STAGE_LABELS[targetStatus]}`);
             setSelectedCandidate(prev =>
-                prev && prev.id === id ? { ...prev, status: 'ONBOARDED', exit_reason: null, last_working_day: null } : prev
+                prev && prev.id === revertPendingId
+                    ? { ...prev, status: targetStatus, exit_reason: null, last_working_day: null }
+                    : prev
             );
             fetchCandidates();
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to revert exit';
             toast.error(msg);
+        } finally {
+            setIsRevertModalOpen(false);
+            setRevertPendingId(null);
         }
     };
 
@@ -1591,6 +1605,21 @@ export function Candidates() {
                 vendors={vendors}
                 requests={requests}
                 onStatusChange={handleStatusChange}
+            />
+
+            {/* Revert Exit Modal */}
+            <RevertExitModal
+                isOpen={isRevertModalOpen}
+                candidateName={
+                    revertPendingId
+                        ? (() => {
+                              const c = candidates.find(x => x.id === revertPendingId);
+                              return c ? formatCandidateFullName(c.first_name, c.last_name) : 'this candidate';
+                          })()
+                        : 'this candidate'
+                }
+                onConfirm={handleRevertConfirm}
+                onCancel={() => { setIsRevertModalOpen(false); setRevertPendingId(null); }}
             />
 
             {/* Exit Confirmation Modal */}
