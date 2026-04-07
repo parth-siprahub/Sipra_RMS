@@ -8,6 +8,7 @@ import type {
     CandidateStatus,
     CandidateSource,
     CreateCandidatePayload,
+    ExitPayload,
 } from '../api/candidates';
 import type { ResourceRequest } from '../api/resourceRequests';
 import { vendorsApi, type Vendor } from '../api/vendors';
@@ -15,6 +16,7 @@ import { sowApi, type SOW } from '../api/sows';
 import { jobProfileApi, type JobProfile } from '../api/jobProfiles';
 
 import { Modal } from '../components/ui/Modal';
+import { ExitConfirmModal } from '../components/ui/ExitConfirmModal';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton, KanbanColumnSkeleton, TableRowSkeleton } from '../components/ui/Skeleton';
@@ -117,9 +119,11 @@ interface KanbanBoardProps {
     vendors: Vendor[];
     onStatusChange: (id: number, status: CandidateStatus) => void;
     onCandidateClick: (candidate: Candidate) => void;
+    onExitRequest: (id: number) => void;
+    onRevertExit: (id: number) => void;
 }
 
-function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick }: KanbanBoardProps) {
+function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick, onExitRequest, onRevertExit }: KanbanBoardProps) {
     const draggingIdRef = useRef<number | null>(null);
     const [draggingId, setDraggingId] = useState<number | null>(null);
     const [dragOverStatus, setDragOverStatus] = useState<CandidateStatus | null>(null);
@@ -175,7 +179,12 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick }: 
             draggingIdRef.current = null;
             return;
         }
-        onStatusChange(id, targetStatus);
+        // EXIT requires a confirmation modal — do not commit immediately
+        if (targetStatus === 'EXIT') {
+            onExitRequest(id);
+        } else {
+            onStatusChange(id, targetStatus);
+        }
         setDraggingId(null);
         draggingIdRef.current = null;
     };
@@ -233,12 +242,13 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick }: 
                     {items.map((c) => (
                         <div
                             key={c.id}
-                            draggable
+                            draggable={status !== 'EXIT'}
                             onDragStart={(e) => handleDragStart(e, c.id)}
                             onDragEnd={handleDragEnd}
                             onClick={() => onCandidateClick(c)}
                             className={cn(
-                                'card p-3 cursor-grab active:cursor-grabbing select-none transition-all duration-150 hover:border-cta',
+                                'card p-3 select-none transition-all duration-150 hover:border-cta',
+                                status !== 'EXIT' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
                                 draggingId === c.id && 'opacity-40 scale-95 shadow-none'
                             )}
                         >
@@ -252,6 +262,22 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick }: 
                             <span className="badge badge-neutral mt-2 text-[10px]">
                                 {vendors.find(v => v.id === c.vendor_id)?.name || c.vendor || 'Internal'}
                             </span>
+                            {status === 'EXIT' && (
+                                <div className="mt-2 flex items-center justify-between">
+                                    {c.last_working_day && (
+                                        <span className="text-[10px] text-text-muted">
+                                            LWD: {new Date(c.last_working_day).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                        </span>
+                                    )}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onRevertExit(c.id); }}
+                                        className="text-[10px] font-semibold text-warning hover:text-warning/70 transition-colors ml-auto"
+                                        title="Revert exit — move back to Onboarded"
+                                    >
+                                        ↩ Revert
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -295,9 +321,6 @@ interface DetailsModalProps {
     requests: ResourceRequest[];
     onStatusChange: (id: number, status: CandidateStatus) => void;
 }
-
-// All valid statuses for the manual status dropdown
-const ALL_CANDIDATE_STATUSES: CandidateStatus[] = [...PIPELINE_STAGES, ...CLOSED_STAGES];
 
 // Allowed next-step transitions for pipeline enforcement
 // Correct sequence: NEW → SCREENING → L1_SCHEDULED → L1_COMPLETED → L1_SHORTLIST
@@ -1235,6 +1258,8 @@ export function Candidates() {
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [sows, setSows] = useState<SOW[]>([]);
     const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
+    const [exitPendingId, setExitPendingId] = useState<number | null>(null);
+    const [isExitModalOpen, setIsExitModalOpen] = useState(false);
 
     // Debounce search
     useEffect(() => {
@@ -1286,6 +1311,43 @@ export function Candidates() {
         } catch (err: unknown) {
             const msg =
                 err instanceof Error ? err.message : 'Status transition not allowed';
+            toast.error(msg);
+        }
+    };
+
+    const handleExitRequest = (id: number) => {
+        setExitPendingId(id);
+        setIsExitModalOpen(true);
+    };
+
+    const handleExitConfirm = async (payload: ExitPayload) => {
+        if (exitPendingId === null) return;
+        try {
+            await candidatesApi.exit(exitPendingId, payload);
+            toast.success('Candidate exited successfully');
+            setSelectedCandidate(prev =>
+                prev && prev.id === exitPendingId ? { ...prev, status: 'EXIT' } : prev
+            );
+            fetchCandidates();
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Failed to process exit';
+            toast.error(msg);
+        } finally {
+            setIsExitModalOpen(false);
+            setExitPendingId(null);
+        }
+    };
+
+    const handleRevertExit = async (id: number) => {
+        try {
+            await candidatesApi.revertExit(id);
+            toast.success('Exit reverted — candidate restored to Onboarded');
+            setSelectedCandidate(prev =>
+                prev && prev.id === id ? { ...prev, status: 'ONBOARDED', exit_reason: null, last_working_day: null } : prev
+            );
+            fetchCandidates();
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Failed to revert exit';
             toast.error(msg);
         }
     };
@@ -1503,6 +1565,8 @@ export function Candidates() {
                     vendors={vendors}
                     onStatusChange={handleStatusChange}
                     onCandidateClick={(c) => { setSelectedCandidate(c); setIsDetailsOpen(true); }}
+                    onExitRequest={handleExitRequest}
+                    onRevertExit={handleRevertExit}
                 />
             )}
 
@@ -1527,6 +1591,21 @@ export function Candidates() {
                 vendors={vendors}
                 requests={requests}
                 onStatusChange={handleStatusChange}
+            />
+
+            {/* Exit Confirmation Modal */}
+            <ExitConfirmModal
+                isOpen={isExitModalOpen}
+                candidateName={
+                    exitPendingId
+                        ? (() => {
+                              const c = candidates.find(x => x.id === exitPendingId);
+                              return c ? formatCandidateFullName(c.first_name, c.last_name) : 'this candidate';
+                          })()
+                        : 'this candidate'
+                }
+                onConfirm={handleExitConfirm}
+                onCancel={() => { setIsExitModalOpen(false); setExitPendingId(null); }}
             />
         </div>
     );

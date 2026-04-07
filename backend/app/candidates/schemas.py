@@ -118,7 +118,7 @@ class AdminReview(BaseModel):
 
 class ExitRequest(BaseModel):
     """Process candidate exit."""
-    exit_reason: str
+    exit_reason: str | None = None
     last_working_day: date
     create_backfill: bool = True
 
