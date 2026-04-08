@@ -16,7 +16,7 @@ interface TimesheetCalendarProps {
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function TimesheetCalendar({ entries, month, employeeName }: TimesheetCalendarProps) {
-    const { year, mo, daysInMonth, startDay, entryMap, totalHours, totalOoo, workingDays } = useMemo(() => {
+    const { daysInMonth, startDay, entryMap, totalHours, totalOoo, workingDays } = useMemo(() => {
         const [y, m] = month.split('-').map(Number);
         const dim = new Date(y, m, 0).getDate();
         const sd = new Date(y, m - 1, 1).getDay();

@@ -209,8 +209,8 @@ function ComparisonTab({
         ? computed.map(c => ({
             employee_id: c.employee_id,
             rms_name: c.rms_name || 'Unknown',
-            jira_username: c.jira_username,
-            aws_email: c.aws_email,
+            jira_username: c.jira_username ?? null,
+            aws_email: c.aws_email ?? null,
             jira_hours: c.jira_hours,
             billable_hours: c.billable_hours,
             ooo_days: c.ooo_days,
@@ -222,7 +222,7 @@ function ComparisonTab({
         : (report?.comparisons || []).map(c => ({
             employee_id: c.employee_id,
             rms_name: c.rms_name,
-            jira_username: c.jira_username,
+            jira_username: c.jira_username ?? null,
             aws_email: c.aws_email,
             jira_hours: c.jira_billable_hours,
             billable_hours: null,

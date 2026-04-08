@@ -36,7 +36,7 @@ export function KPICard({ label, value, accent, sub, subColor, subClassName, ico
                     className="p-2.5 rounded-xl transition-colors shrink-0"
                     style={{ backgroundColor: `${accent}10` }}
                 >
-                    <Icon size={22} style={{ color: accent }} />
+                    <span style={{ color: accent }}><Icon size={22} /></span>
                 </div>
             </div>
             <p className={cn('text-[10px] font-semibold mt-3 uppercase tracking-wider', subCls || 'text-text-muted')}>

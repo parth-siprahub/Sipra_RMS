@@ -360,6 +360,17 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
     useEffect(() => {
         if (candidate && isOpen) {
             setEditForm({
+                // Basic info — editable
+                first_name: candidate.first_name || '',
+                last_name: candidate.last_name || '',
+                phone: candidate.phone || '',
+                current_company: candidate.current_company || '',
+                current_location: candidate.current_location || '',
+                total_experience: candidate.total_experience ?? undefined,
+                relevant_experience: candidate.relevant_experience ?? undefined,
+                notice_period: candidate.notice_period ?? undefined,
+                skills: candidate.skills || '',
+                // Interview
                 l1_feedback: candidate.l1_feedback || '',
                 l1_score: candidate.l1_score || 0,
                 l2_feedback: candidate.l2_feedback || '',
@@ -469,63 +480,69 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                 {/* Tab Content */}
                 <div className="min-h-[300px]">
                     {activeTab === 'info' && (
-                        <div className="grid grid-cols-2 gap-6">
-                            <div>
-                                <h4 className="text-xs font-bold text-text-muted uppercase mb-3">Basic Details</h4>
-                                <div className="space-y-3">
-                                    <div className="flex justify-between">
-                                        <span className="text-sm text-text-muted">Email</span>
-                                        <span className="text-sm font-medium text-text">{candidate.email}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-sm text-text-muted">Phone</span>
-                                        <span className="text-sm font-medium text-text">{candidate.phone || '—'}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-sm text-text-muted">Source</span>
-                                        <span className="badge badge-neutral">
-                                            {candidate.source ? candidate.source.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) : '—'}
-                                        </span>
-                                    </div>
-                                    {candidate.source === 'VENDORS' && (
-                                        <div className="flex justify-between">
-                                            <span className="text-sm text-text-muted">Vendor</span>
-                                            <span className="badge badge-neutral">
-                                                {vendors.find(v => v.id === candidate.vendor_id)?.name || candidate.vendor || '—'}
-                                            </span>
-                                        </div>
-                                    )}
+                        <div className="space-y-4">
+                            {/* Name row */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="input-label">First Name</label>
+                                    <input className="input-field mt-1" value={editForm.first_name ?? ''} onChange={e => setEditForm(f => ({ ...f, first_name: e.target.value }))} />
+                                </div>
+                                <div>
+                                    <label className="input-label">Last Name</label>
+                                    <input className="input-field mt-1" value={editForm.last_name ?? ''} onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))} />
                                 </div>
                             </div>
-                            <div>
-                                <h4 className="text-xs font-bold text-text-muted uppercase mb-3">Professional</h4>
-                                <div className="space-y-3">
-                                    <div className="flex justify-between">
-                                        <span className="text-sm text-text-muted">Current Co</span>
-                                        <span className="text-sm font-medium text-text">{candidate.current_company || '—'}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-sm text-text-muted">Exp (Total/Rel)</span>
-                                        <span className="text-sm font-medium text-text">
-                                            {candidate.total_experience || 0}y / {candidate.relevant_experience || 0}y
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm text-text-muted">Resume</span>
-                                        {candidate.resume_url ? (
-                                            <a
-                                                href={candidate.resume_url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-sm font-medium text-cta hover:underline"
-                                            >
-                                                View Resume
-                                            </a>
-                                        ) : (
-                                            <span className="text-sm text-text-muted italic">Not uploaded</span>
-                                        )}
-                                    </div>
+                            {/* Contact row */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="input-label">Email</label>
+                                    <input className="input-field mt-1 bg-surface-hover cursor-not-allowed" value={candidate.email} readOnly />
                                 </div>
+                                <div>
+                                    <label className="input-label">Phone</label>
+                                    <input className="input-field mt-1" value={editForm.phone ?? ''} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} placeholder="10-digit number" />
+                                </div>
+                            </div>
+                            {/* Professional row */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="input-label">Current Company</label>
+                                    <input className="input-field mt-1" value={editForm.current_company ?? ''} onChange={e => setEditForm(f => ({ ...f, current_company: e.target.value }))} />
+                                </div>
+                                <div>
+                                    <label className="input-label">Current Location</label>
+                                    <input className="input-field mt-1" value={editForm.current_location ?? ''} onChange={e => setEditForm(f => ({ ...f, current_location: e.target.value }))} />
+                                </div>
+                            </div>
+                            {/* Experience row */}
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label className="input-label">Total Exp (yrs)</label>
+                                    <input type="number" min="0" step="0.5" className="input-field mt-1" value={editForm.total_experience ?? ''} onChange={e => setEditForm(f => ({ ...f, total_experience: parseFloat(e.target.value) || undefined }))} />
+                                </div>
+                                <div>
+                                    <label className="input-label">Relevant Exp (yrs)</label>
+                                    <input type="number" min="0" step="0.5" className="input-field mt-1" value={editForm.relevant_experience ?? ''} onChange={e => setEditForm(f => ({ ...f, relevant_experience: parseFloat(e.target.value) || undefined }))} />
+                                </div>
+                                <div>
+                                    <label className="input-label">Notice (days)</label>
+                                    <input type="number" min="0" className="input-field mt-1" value={editForm.notice_period ?? ''} onChange={e => setEditForm(f => ({ ...f, notice_period: parseInt(e.target.value) || undefined }))} />
+                                </div>
+                            </div>
+                            {/* Skills */}
+                            <div>
+                                <label className="input-label">Skills</label>
+                                <input className="input-field mt-1" value={editForm.skills ?? ''} onChange={e => setEditForm(f => ({ ...f, skills: e.target.value }))} placeholder="e.g. React, Node.js, Python" />
+                            </div>
+                            {/* Read-only fields */}
+                            <div className="flex items-center gap-4 pt-1 text-sm text-text-muted border-t border-border">
+                                <span>Source: <span className="badge badge-neutral ml-1">{candidate.source?.replace(/_/g, ' ') || '—'}</span></span>
+                                {candidate.source === 'VENDORS' && <span>Vendor: <span className="badge badge-neutral ml-1">{vendors.find(v => v.id === candidate.vendor_id)?.name || candidate.vendor || '—'}</span></span>}
+                                {candidate.resume_url ? (
+                                    <a href={candidate.resume_url} target="_blank" rel="noopener noreferrer" className="text-cta hover:underline ml-auto">View Resume ↗</a>
+                                ) : (
+                                    <span className="text-sm text-text-muted italic ml-auto">Not uploaded</span>
+                                )}
                             </div>
                         </div>
                     )}
@@ -1532,6 +1549,7 @@ export function Candidates() {
                                         <th>Company</th>
                                         <th>Exp (yrs)</th>
                                         <th>Added</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1563,6 +1581,17 @@ export function Candidates() {
                                                 {c.total_experience != null ? `${c.total_experience}y` : '—'}
                                             </td>
                                             <td className="text-text-muted text-sm">{formatDate(c.created_at)}</td>
+                                            <td onClick={(e) => e.stopPropagation()}>
+                                                {c.status === 'EXIT' && (
+                                                    <button
+                                                        onClick={() => handleRevertExit(c.id)}
+                                                        className="text-xs font-semibold text-warning hover:text-warning/70 transition-colors whitespace-nowrap"
+                                                        title="Revert exit — move back to pipeline"
+                                                    >
+                                                        ↩ Revert
+                                                    </button>
+                                                )}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>

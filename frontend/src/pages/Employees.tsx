@@ -411,7 +411,7 @@ export function Employees() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            {user?.role === 'SUPER_ADMIN' && (
+            {(user?.role as string) === 'SUPER_ADMIN' && (
                 <div className="flex justify-end">
                     <button onClick={() => exportEmployees()} className="btn btn-secondary flex items-center gap-2">
                         <Download size={18} /> Export CSV

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight, Clock, FileText, Coffee, Download } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { JiraRawEntry } from '../../api/timesheets';
