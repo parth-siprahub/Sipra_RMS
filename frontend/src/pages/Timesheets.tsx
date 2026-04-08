@@ -86,6 +86,22 @@ function getMonthOptions(): { value: string; label: string }[] {
 
 const MONTH_OPTIONS = getMonthOptions();
 
+function normalizeEmail(value: string | null | undefined): string {
+    return (value || '').trim().toLowerCase();
+}
+
+function nameFromEmail(email: string | null | undefined): string {
+    const normalized = normalizeEmail(email);
+    if (!normalized || !normalized.includes('@')) return '';
+    const localPart = normalized.split('@')[0];
+    const spaced = localPart.replace(/[._-]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return formatPersonName(spaced);
+}
+
+function sameText(a: string | null | undefined, b: string | null | undefined): boolean {
+    return (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+}
+
 export function Timesheets() {
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
@@ -175,8 +191,10 @@ export function Timesheets() {
         () => Object.fromEntries(
             employees.flatMap(e => {
                 const results = [];
-                if (e.aws_email) results.push([e.aws_email.toLowerCase(), e]);
-                if (e.siprahub_email) results.push([e.siprahub_email.toLowerCase(), e]);
+                const awsEmail = normalizeEmail(e.aws_email);
+                const sipraEmail = normalizeEmail(e.siprahub_email);
+                if (awsEmail) results.push([awsEmail, e]);
+                if (sipraEmail) results.push([sipraEmail, e]);
                 return results;
             })
         ),
@@ -570,12 +588,21 @@ function JiraTab({
                                 >
                                     {/* Name */}
                                     <div className="min-w-0">
-                                        <p className="font-semibold text-sm text-text truncate group-hover:text-cta transition-colors">
-                                            {formatPersonName(jiraEmpMap[summary.user]?.rms_name || '') || summary.user}
-                                        </p>
-                                        {jiraEmpMap[summary.user] && (
-                                            <p className="text-xs text-text-muted truncate">{summary.user}</p>
-                                        )}
+                                        {(() => {
+                                            const mappedEmployee = jiraEmpMap[summary.user];
+                                            const displayName = formatPersonName(mappedEmployee?.rms_name || '') || summary.user;
+                                            const showSecondary = Boolean(mappedEmployee && !sameText(summary.user, displayName));
+                                            return (
+                                                <>
+                                                    <p className="font-semibold text-sm text-text truncate group-hover:text-cta transition-colors">
+                                                        {displayName}
+                                                    </p>
+                                                    {showSecondary && (
+                                                        <p className="text-xs text-text-muted truncate">{summary.user}</p>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
                                     </div>
 
                                     {/* Total hours */}
@@ -675,20 +702,21 @@ function AwsV2Tab({
         let result = entries;
         if (query) {
             result = entries.filter(e => {
-                const emp = e.employee_id ? empMap[e.employee_id] : null;
+                const normalizedAwsEmail = normalizeEmail(e.aws_email);
+                const emp = (e.employee_id ? empMap[e.employee_id] : null) || awsEmpMap[normalizedAwsEmail];
                 return (emp?.rms_name || '').toLowerCase().includes(query) ||
                        (e.aws_email || '').toLowerCase().includes(query);
             });
         }
         return [...result].sort((a, b) => {
             const dir = sortDir === 'asc' ? 1 : -1;
-            const empA = a.employee_id ? empMap[a.employee_id] : null;
-            const empB = b.employee_id ? empMap[b.employee_id] : null;
-            const nameA = (empA?.rms_name || a.aws_email || '').toLowerCase();
-            const nameB = (empB?.rms_name || b.aws_email || '').toLowerCase();
+            const empA = (a.employee_id ? empMap[a.employee_id] : null) || awsEmpMap[normalizeEmail(a.aws_email)];
+            const empB = (b.employee_id ? empMap[b.employee_id] : null) || awsEmpMap[normalizeEmail(b.aws_email)];
+            const nameA = (formatPersonName(empA?.rms_name || '') || nameFromEmail(a.aws_email) || a.aws_email || '').toLowerCase();
+            const nameB = (formatPersonName(empB?.rms_name || '') || nameFromEmail(b.aws_email) || b.aws_email || '').toLowerCase();
             return nameA.localeCompare(nameB) * dir;
         });
-    }, [entries, searchQuery, sortDir, empMap]);
+    }, [entries, searchQuery, sortDir, empMap, awsEmpMap]);
 
     return (
         <>
@@ -775,16 +803,17 @@ function AwsV2Tab({
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {filteredEntries.map((entry, idx) => {
-                                    const emp = entry.employee_id ? empMap[entry.employee_id] : null;
+                                    const normalizedAwsEmail = normalizeEmail(entry.aws_email);
+                                    const emp = (entry.employee_id ? empMap[entry.employee_id] : null) || awsEmpMap[normalizedAwsEmail];
+                                    const displayName =
+                                        formatPersonName(emp?.rms_name || '') ||
+                                        nameFromEmail(entry.aws_email) ||
+                                        entry.aws_email;
                                     return (
                                         <tr key={entry.id} className="hover:bg-surface-hover/30 transition-colors cursor-pointer" onClick={() => navigateToDrillDown(filteredEntries, idx, empMap)}>
                                             <td className="sticky left-0 z-10 bg-surface px-4 py-2.5 min-w-[200px]">
-                                                <p className="font-medium text-text">{formatPersonName(emp?.rms_name || '') || entry.aws_email}</p>
-                                                {emp && <p className="text-xs text-text-muted">{entry.aws_email}</p>}
-                                                {!emp && awsEmpMap[entry.aws_email?.toLowerCase() || ''] && (
-                                                    <p className="text-xs text-info italic">Matchable: {formatPersonName(awsEmpMap[entry.aws_email?.toLowerCase() || '']?.rms_name || '')}</p>
-                                                )}
-                                                {!emp && !awsEmpMap[entry.aws_email?.toLowerCase() || ''] && <p className="text-xs text-warning font-medium">Unlinked</p>}
+                                                <p className="font-medium text-text">{displayName}</p>
+                                                {entry.aws_email && <p className="text-xs text-text-muted">{entry.aws_email}</p>}
                                             </td>
                                             {AWS_DISPLAY_COLS.map(col => {
                                                 const hms = entry[col.hmsKey] as string | null;
