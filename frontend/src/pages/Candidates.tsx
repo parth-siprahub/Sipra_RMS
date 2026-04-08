@@ -128,24 +128,10 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick, on
     const draggingIdRef = useRef<number | null>(null);
     const [draggingId, setDraggingId] = useState<number | null>(null);
     const [dragOverStatus, setDragOverStatus] = useState<CandidateStatus | null>(null);
-    const [kanbanSearch, setKanbanSearch] = useState('');
-
-    // Client-side filter for instant kanban search (no API round-trip)
-    const filteredCandidates = kanbanSearch.trim()
-        ? candidates.filter((c) => {
-              const q = kanbanSearch.toLowerCase();
-              return (
-                  formatCandidateFullName(c.first_name, c.last_name).toLowerCase().includes(q) ||
-                  c.email.toLowerCase().includes(q) ||
-                  (c.current_company || '').toLowerCase().includes(q) ||
-                  (c.skills || '').toLowerCase().includes(q)
-              );
-          })
-        : candidates;
 
     const grouped = (stages: CandidateStatus[]) =>
         stages.reduce<Record<string, Candidate[]>>((acc, s) => {
-            acc[s] = filteredCandidates.filter((c) => c.status === s);
+            acc[s] = candidates.filter((c) => c.status === s);
             return acc;
         }, {});
 
@@ -302,36 +288,6 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick, on
 
     return (
         <div className="space-y-6">
-            {/* Kanban Search */}
-            <div className="flex items-center gap-3">
-                <div className="relative w-72">
-                    <input
-                        type="text"
-                        className="input-field pl-8 py-1.5 text-sm"
-                        placeholder="Filter cards by name, company, skills..."
-                        value={kanbanSearch}
-                        onChange={(e) => setKanbanSearch(e.target.value)}
-                        aria-label="Filter kanban cards"
-                    />
-                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-text-muted">
-                        <Search size={13} />
-                    </div>
-                </div>
-                {kanbanSearch && (
-                    <button
-                        onClick={() => setKanbanSearch('')}
-                        className="text-xs text-text-muted hover:text-text transition-colors"
-                    >
-                        Clear
-                    </button>
-                )}
-                {kanbanSearch && (
-                    <span className="text-xs text-text-muted">
-                        {filteredCandidates.length} of {candidates.length} candidates
-                    </span>
-                )}
-            </div>
-
             {/* Pipeline Columns */}
             <div>
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
