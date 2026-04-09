@@ -120,7 +120,8 @@ async def create_employee(
     if dup.data:
         raise HTTPException(status.HTTP_409_CONFLICT, "Employee record already exists for this candidate")
 
-    data = payload.model_dump(exclude_none=True, mode="json")
+    # Use exclude_unset so explicit nulls (e.g. clearing exit_date on revert) are preserved.
+    data = payload.model_dump(exclude_unset=True, mode="json")
     data["status"] = EmployeeStatus.ACTIVE.value
     data = normalize_employee_text(data)
 
@@ -230,7 +231,8 @@ async def update_employee(
     current_user: dict = Depends(require_admin),
 ):
     client = await get_supabase_admin_async()
-    data = payload.model_dump(exclude_none=True, mode="json")
+    # Keep explicitly provided nulls (e.g., exit_date=null on revert to ACTIVE).
+    data = payload.model_dump(exclude_unset=True, mode="json")
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
     data = normalize_employee_text(data)

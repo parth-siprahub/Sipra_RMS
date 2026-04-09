@@ -37,27 +37,35 @@ export function Sows() {
     const fetchSows = async () => {
         try {
             setLoading(true);
-            const [sowsRes, reqsRes, candidatesRes, profilesRes] = await Promise.all([
+            const [sowsResult, reqsResult, candidatesResult, profilesResult] = await Promise.allSettled([
                 sowApi.list(),
                 resourceRequestsApi.list(),
                 candidatesApi.list(),
                 jobProfileApi.list()
             ]);
 
-            setSows(sowsRes || []);
-            setJobProfiles(profilesRes || []);
+            const sowsRes = sowsResult.status === 'fulfilled' ? (sowsResult.value || []) : [];
+            const reqsRes = reqsResult.status === 'fulfilled' ? (reqsResult.value || []) : [];
+            const candidatesRes = candidatesResult.status === 'fulfilled' ? (candidatesResult.value || []) : [];
+            const profilesRes = profilesResult.status === 'fulfilled' ? (profilesResult.value || []) : [];
+
+            setSows(sowsRes);
+            setJobProfiles(profilesRes);
 
             const counts: Record<number, number> = {};
-            const onboardedCandidates = (candidatesRes || []).filter(c => c.status === 'ONBOARDED');
+            const onboardedCandidates = candidatesRes.filter(c => c.status === 'ONBOARDED');
 
             onboardedCandidates.forEach(c => {
-                const request = (reqsRes || []).find(r => r.id === c.request_id);
+                const request = reqsRes.find(r => r.id === c.request_id);
                 if (request && request.sow_id) {
                     counts[request.sow_id] = (counts[request.sow_id] || 0) + 1;
                 }
             });
 
             setOnboardedCounts(counts);
+            if (sowsResult.status === 'rejected') {
+                throw sowsResult.reason;
+            }
         } catch (error) {
             console.error('Failed to fetch SOW data Bundle:', error);
             toast.error('Failed to load SOW data');

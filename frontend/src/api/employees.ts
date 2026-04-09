@@ -36,7 +36,7 @@ export interface EmployeeUpdate {
     github_id?: string;
     jira_username?: string;
     start_date?: string;
-    exit_date?: string;
+    exit_date?: string | null;
     status?: 'ACTIVE' | 'EXITED' | 'TERMINATED';
 }
 

@@ -256,7 +256,9 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick, on
                             <p className="text-sm font-semibold text-text truncate">
                                 {formatCandidateFullName(c.first_name, c.last_name)}
                             </p>
-                            <p className="text-xs text-text-muted truncate mt-0.5">{c.email}</p>
+                            {c.status !== 'ONBOARDED' && (
+                                <p className="text-xs text-text-muted truncate mt-0.5">{c.email}</p>
+                            )}
                             {c.current_company && (
                                 <p className="text-xs text-text-muted truncate">{c.current_company}</p>
                             )}
@@ -1567,7 +1569,9 @@ export function Candidates() {
                                                     <div className="text-xs text-text-muted">{c.current_location}</div>
                                                 )}
                                             </td>
-                                            <td className="text-text-muted text-sm">{c.email}</td>
+                                            <td className="text-text-muted text-sm">
+                                                {c.status === 'ONBOARDED' ? '—' : c.email}
+                                            </td>
                                             <td>
                                                 <span className="badge badge-neutral">
                                                     {vendors.find(v => v.id === c.vendor_id)?.name || c.vendor || '—'}
