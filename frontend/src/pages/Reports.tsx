@@ -317,17 +317,17 @@ function ComparisonTab({
             <div className="card overflow-hidden p-0">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse text-sm">
-                        <thead>
-                            <tr className="bg-surface-hover/50 border-b border-border">
-                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase tracking-wide">Employee</th>
-                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase tracking-wide">Payroll</th>
-                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">Billable Target</th>
-                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">Jira Hrs</th>
-                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">AWS Hrs</th>
-                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-center">OOO</th>
-                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">Diff</th>
-                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">%</th>
-                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-center">Flag</th>
+                        <thead className="sticky top-0 z-10">
+                            <tr className="bg-surface border-b border-border">
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted">Employee</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted">Payroll</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted text-right">Billable Target</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted text-right">Jira Hrs</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted text-right">AWS Hrs</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted text-center">OOO</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted text-right">Diff</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted text-right">%</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted text-center">Flag</th>
                                 <th className="px-2 py-2 w-9"></th>
                             </tr>
                         </thead>
