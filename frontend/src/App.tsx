@@ -21,8 +21,18 @@ import { ReportEmployeeDrillDown } from './pages/ReportEmployeeDrillDown';
 import { BillingConfig } from './pages/BillingConfig';
 import { TimesheetJiraDrillDown } from './pages/TimesheetJiraDrillDown';
 import { TimesheetAwsDrillDown } from './pages/TimesheetAwsDrillDown';
+import { BILLING_CONFIG_EMAILS } from './lib/accessControl';
 
 const NotFound = () => <div className="p-10 text-center text-2xl text-text-muted font-medium">404 - Page Not Found</div>;
+
+function BillingConfigGuard({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (!BILLING_CONFIG_EMAILS.has((user.email ?? '').toLowerCase())) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
 
 function RoleRedirect({ role, to, defaultElement }: { role: string; to: string; defaultElement: React.ReactNode }) {
   const { user } = useAuth();
@@ -99,7 +109,11 @@ function App() {
               <Route path="clients" element={<Clients />} />
               <Route path="reports" element={<Reports />} />
               <Route path="reports/employee/:employeeId" element={<ReportEmployeeDrillDown />} />
-              <Route path="billing-config" element={<BillingConfig />} />
+              <Route path="billing-config" element={
+                <BillingConfigGuard>
+                  <BillingConfig />
+                </BillingConfigGuard>
+              } />
               <Route path="timesheets/drill-down/jira" element={<TimesheetJiraDrillDown />} />
               <Route path="timesheets/drill-down/aws" element={<TimesheetAwsDrillDown />} />
             </Route>

@@ -1,5 +1,6 @@
 """Billing configuration CRUD — configurable billable hours per client/month."""
 import logging
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query, Depends, status
 from app.database import get_supabase_admin_async
 from app.billing_config.schemas import BillingConfigCreate, BillingConfigResponse
@@ -9,15 +10,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/billing-config", tags=["Billing Config"])
 
 # Authorized emails for modifying billing configuration
-BILLING_AUTH_EMAILS = {"jaicind@siprahub.com", "sreenath.reddy@siprahub.com"}
+BILLING_AUTH_EMAILS = {"jaicind@siprahub.com", "sreenath.reddy@siprahub.com", "rajapv@siprahub.com"}
 
 
 @router.get("/", response_model=list[BillingConfigResponse])
 async def list_billing_configs(
     month: str | None = Query(None, description="Filter by YYYY-MM"),
     client_name: str | None = Query(None),
+    current_user: dict = Depends(get_current_user),
 ):
-    """List billing configurations, optionally filtered by month/client."""
+    """List billing configurations — restricted to authorised emails."""
+    user_email = current_user.get("email", "").lower()
+    if user_email not in BILLING_AUTH_EMAILS:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to view billing configurations.",
+        )
     client = await get_supabase_admin_async()
     query = client.table("billing_config").select("*").order("billing_month", desc=True)
     if month:
@@ -29,8 +37,17 @@ async def list_billing_configs(
 
 
 @router.get("/{config_id}", response_model=BillingConfigResponse)
-async def get_billing_config(config_id: int):
-    """Get a single billing config by ID."""
+async def get_billing_config(
+    config_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get a single billing config — restricted to authorised emails."""
+    user_email = current_user.get("email", "").lower()
+    if user_email not in BILLING_AUTH_EMAILS:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to view billing configurations.",
+        )
     client = await get_supabase_admin_async()
     result = await client.table("billing_config").select("*").eq("id", config_id).execute()
     if not result.data:
@@ -68,7 +85,7 @@ async def upsert_billing_config(
     if existing.data:
         # Update
         config_id = existing.data[0]["id"]
-        data["updated_at"] = "now()"
+        data["updated_at"] = datetime.now(timezone.utc).isoformat()
         result = await (
             client.table("billing_config")
             .update(data)
@@ -85,8 +102,17 @@ async def upsert_billing_config(
 
 
 @router.delete("/{config_id}", status_code=204)
-async def delete_billing_config(config_id: int):
-    """Delete a billing config."""
+async def delete_billing_config(
+    config_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a billing config — restricted to authorised emails."""
+    user_email = current_user.get("email", "").lower()
+    if user_email not in BILLING_AUTH_EMAILS:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to delete billing configurations.",
+        )
     client = await get_supabase_admin_async()
     existing = await client.table("billing_config").select("id").eq("id", config_id).execute()
     if not existing.data:
