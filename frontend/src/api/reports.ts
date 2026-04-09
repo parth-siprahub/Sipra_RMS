@@ -13,6 +13,7 @@ export interface TimesheetComparison {
     difference: number | null;
     difference_pct: number | null;
     flag: 'green' | 'amber' | 'red' | 'no_aws';
+    source: string | null;
 }
 
 export interface ComparisonReport {
@@ -57,6 +58,7 @@ export interface ComputedReport {
     rms_name?: string;
     jira_username?: string | null;
     aws_email?: string | null;
+    source?: string | null;
 }
 
 export interface CalculateResult {
