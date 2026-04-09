@@ -101,6 +101,8 @@ class CandidateUpdate(BaseModel):
     onboarding_date: date | None = None
     client_email: str | None = None
     client_jira_id: str | None = None
+    exit_reason: str | None = None
+    last_working_day: date | None = None
     l1_feedback: str | None = None
     l1_score: int | None = None
     l2_feedback: str | None = None
