@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { employeesApi, type Employee, type EmployeeUpdate } from '../api/employees';
 import { clientsApi, type Client } from '../api/clients';
+import { candidatesApi } from '../api/candidates';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { cn } from '../lib/utils';
