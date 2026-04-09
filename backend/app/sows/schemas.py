@@ -19,13 +19,6 @@ class SowCreate(BaseModel):
             raise ValueError("Max resources cannot exceed 100")
         return v
 
-    @field_validator("start_date")
-    @classmethod
-    def start_not_in_past(cls, v: date | None) -> date | None:
-        if v is not None and v < date.today():
-            raise ValueError("Start date cannot be in the past")
-        return v
-
     @model_validator(mode="after")
     def start_before_target(self) -> "SowCreate":
         if self.start_date and self.target_date and self.start_date > self.target_date:
