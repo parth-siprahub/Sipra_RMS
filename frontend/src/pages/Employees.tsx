@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { employeesApi, type Employee, type EmployeeUpdate } from '../api/employees';
 import { clientsApi, type Client } from '../api/clients';
-import { candidatesApi, type Candidate } from '../api/candidates';
-import { resourceRequestsApi, type ResourceRequest } from '../api/resourceRequests';
-import { sowApi, type SOW } from '../api/sows';
+import { candidatesApi } from '../api/candidates';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { cn } from '../lib/utils';
@@ -366,9 +364,6 @@ export function Employees() {
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
     const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
-    const [allCandidates, setAllCandidates] = useState<Candidate[]>([]);
-    const [allRequests, setAllRequests] = useState<ResourceRequest[]>([]);
-    const [allSows, setAllSows] = useState<SOW[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('ACTIVE');
@@ -380,16 +375,8 @@ export function Employees() {
     const fetchEmployees = useCallback(async () => {
         setLoading(true);
         try {
-            const [employeesData, candidatesData, requestsData, sowsData] = await Promise.all([
-                employeesApi.list({ page_size: 500 }),
-                candidatesApi.list({ page_size: 3000 }),
-                resourceRequestsApi.list(),
-                sowApi.list(),
-            ]);
+            const employeesData = await employeesApi.list({ page_size: 500 });
             setAllEmployees(employeesData || []);
-            setAllCandidates(candidatesData || []);
-            setAllRequests(requestsData || []);
-            setAllSows(sowsData || []);
         } catch {
             toast.error('Failed to load employees');
         } finally {
@@ -438,18 +425,6 @@ export function Employees() {
         return rows;
     }, [filtered, sortKey, sortDir]);
 
-    const candidateById = useMemo(
-        () => Object.fromEntries(allCandidates.map(c => [c.id, c])),
-        [allCandidates],
-    );
-    const requestById = useMemo(
-        () => Object.fromEntries(allRequests.map(r => [r.id, r])),
-        [allRequests],
-    );
-    const sowById = useMemo(
-        () => Object.fromEntries(allSows.map(s => [s.id, s])),
-        [allSows],
-    );
 
     if (user?.role === 'SUPER_ADMIN') {
         return (
@@ -623,8 +598,15 @@ export function Employees() {
                                         <td className="px-6 py-4 text-sm text-text">
                                             {emp.client_name ? emp.client_name.toUpperCase() : '—'}
                                         </td>
-                                        <td className="px-6 py-4 text-sm text-text">
-                                            {payroll}
+                                        <td className="px-6 py-4 text-sm text-text-muted">
+                                            {emp.sow_number || <span className="italic">—</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm">
+                                            {emp.source ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-text capitalize">
+                                                    {emp.source}
+                                                </span>
+                                            ) : <span className="text-text-muted italic">—</span>}
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text-muted">
                                             {emp.sow_number || <span className="italic">—</span>}
