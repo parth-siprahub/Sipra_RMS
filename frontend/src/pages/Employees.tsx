@@ -22,7 +22,7 @@ import {
     ArrowUpDown,
 } from 'lucide-react';
 
-type EmployeeSortKey = 'rms_name' | 'client_name' | 'status' | 'start_date';
+type EmployeeSortKey = 'rms_name' | 'job_profile_name' | 'client_name' | 'ids' | 'status' | 'start_date';
 type SortDir = 'asc' | 'desc';
 
 function todayIsoDate(): string {
@@ -37,6 +37,8 @@ function sortValueForKey(emp: Employee, key: EmployeeSortKey): string {
             return (emp.job_profile_name || '').toLowerCase();
         case 'client_name':
             return (emp.client_name || '').toLowerCase();
+        case 'ids':
+            return `${emp.aws_email || ''} ${emp.siprahub_email || ''}`.toLowerCase();
         case 'status':
             return (emp.status || '').toLowerCase();
         case 'start_date':
@@ -609,8 +611,6 @@ export function Employees() {
                                                 ? (candidate.vendor || 'External Vendor')
                                                 : 'Internal')
                                             : '—';
-                                    const hiringType = request ? (request.is_backfill ? 'Backfill' : 'New Request') : '—';
-                                    const sowDisplay = sow?.sow_number || '—';
                                     return (
                                     <tr key={emp.id} className="hover:bg-surface-hover/30 transition-colors">
                                         <td className="px-6 py-4">

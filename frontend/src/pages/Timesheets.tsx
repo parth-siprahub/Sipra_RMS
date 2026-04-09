@@ -17,16 +17,12 @@ import { UnmatchedRecordsModal } from '../components/timesheets/UnmatchedRecords
 import {
     Upload,
     Download,
-    Clock,
     AlertTriangle,
     CheckCircle,
     Calculator,
     Monitor,
     FileSpreadsheet,
     Search,
-    Coffee,
-    FileText,
-    ExternalLink,
     ArrowUpDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
