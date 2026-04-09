@@ -13,6 +13,7 @@ import {
     Clock,
     Landmark,
     BarChart3,
+    Settings2,
 } from 'lucide-react';
 
 import { cn } from '../lib/utils';
@@ -23,6 +24,12 @@ interface SidebarProps {
     collapsed: boolean;
     setCollapsed: (collapsed: boolean) => void;
 }
+
+const BILLING_CONFIG_EMAILS = new Set([
+    'jaicind@siprahub.com',
+    'sreenath.reddy@siprahub.com',
+    'rajapv@siprahub.com',
+]);
 
 const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
@@ -35,6 +42,7 @@ const navItems = [
     { to: '/reports', icon: BarChart3, label: 'Reports' },
     { to: '/clients', icon: Landmark, label: 'Clients' },
     { to: '/vendors', icon: Building2, label: 'Vendors' },
+    { to: '/billing-config', icon: Settings2, label: 'Billing Config', emailOnly: true },
 ];
 
 function getInitials(name: string) {
@@ -130,7 +138,10 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                         if (user.role === 'SUPER_ADMIN') {
                             return item.to === '/employees';
                         }
-                        // All other roles see all pages
+                        // Billing Config: only visible to authorized emails
+                        if ((item as { emailOnly?: boolean }).emailOnly) {
+                            return BILLING_CONFIG_EMAILS.has((user.email ?? '').toLowerCase());
+                        }
                         return true;
                     })
                     .map((item) => {

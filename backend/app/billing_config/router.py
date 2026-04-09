@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/billing-config", tags=["Billing Config"])
 
 # Authorized emails for modifying billing configuration
-BILLING_AUTH_EMAILS = {"jaicind@siprahub.com", "sreenath.reddy@siprahub.com"}
+BILLING_AUTH_EMAILS = {"jaicind@siprahub.com", "sreenath.reddy@siprahub.com", "rajapv@siprahub.com"}
 
 
 @router.get("/", response_model=list[BillingConfigResponse])
