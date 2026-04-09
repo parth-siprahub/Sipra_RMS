@@ -604,7 +604,6 @@ export function Employees() {
                                 {sortedRows.map(emp => {
                                     const candidate = emp.candidate_id ? candidateById[emp.candidate_id] : undefined;
                                     const request = candidate?.request_id ? requestById[candidate.request_id] : undefined;
-                                    const sow = request?.sow_id ? sowById[request.sow_id] : undefined;
                                     const payroll =
                                         candidate
                                             ? (candidate.source === 'VENDORS'
