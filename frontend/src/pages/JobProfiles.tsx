@@ -164,7 +164,7 @@ export function JobProfiles() {
                     <div className="card overflow-hidden">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b border-border text-xs font-bold text-text-muted uppercase">
+                                <tr className="border-b border-border text-xs font-bold text-text-muted">
                                     <th className="text-left py-3 px-4">Role Name</th>
                                     <th className="text-left py-3 px-4">Technology</th>
                                     <th className="text-left py-3 px-4">Experience Level</th>

@@ -63,7 +63,7 @@ function EmployeeSortTh({
 }) {
     const active = sortKey === columnKey;
     return (
-        <th className={cn('px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider', className)}>
+        <th className={cn('px-6 py-4 text-xs font-bold text-text-muted', className)}>
             <button
                 type="button"
                 onClick={() => onSort(columnKey)}
@@ -586,16 +586,16 @@ export function Employees() {
                 ) : sortedRows.length > 0 ? (
                     <div className="overflow-auto max-h-[70vh] custom-scrollbar">
                         <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-surface-hover/50 border-b border-border">
+                            <thead className="sticky top-0 z-10">
+                                <tr className="bg-surface border-b border-border">
                                     <EmployeeSortTh label="Employee" columnKey="rms_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Client Name" columnKey="client_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Payroll</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Hiring Type</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">SOW</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">SOW</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">Payroll</th>
+                                    <EmployeeSortTh label="IDs" columnKey="ids" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Status" columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    <EmployeeSortTh label="Start Date" columnKey="start_date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    {isAdmin && <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider text-right">Actions</th>}
+                                    <EmployeeSortTh label="Dates" columnKey="start_date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                    {isAdmin && <th className="px-6 py-4 text-xs font-bold text-text-muted text-right">Actions</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
@@ -627,11 +627,22 @@ export function Employees() {
                                         <td className="px-6 py-4 text-sm text-text">
                                             {payroll}
                                         </td>
-                                        <td className="px-6 py-4 text-sm text-text">
-                                            {hiringType}
+                                        <td className="px-6 py-4 text-sm text-text-muted">
+                                            {emp.sow_number || <span className="italic">—</span>}
                                         </td>
-                                        <td className="px-6 py-4 text-sm text-text">
-                                            {sowDisplay}
+                                        <td className="px-6 py-4 text-sm">
+                                            {emp.source ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-text capitalize">
+                                                    {emp.source}
+                                                </span>
+                                            ) : <span className="text-text-muted italic">—</span>}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="space-y-1 text-xs">
+                                                <span className={emp.aws_email ? 'text-text' : 'text-text-muted italic'}>{emp.aws_email || 'Missing DCLI Email'}</span>
+                                                <br />
+                                                <span className={emp.siprahub_email ? 'text-text' : 'text-text-muted italic'}>{emp.siprahub_email || 'Missing SipraHub'}</span>
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">

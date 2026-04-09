@@ -552,7 +552,7 @@ function JiraTab({
                 ) : filteredSummaries.length > 0 ? (
                     <>
                         {/* Column header: SOW | Employee | Job Profile | Total JIRA Hrs | OOO | Billable Hrs */}
-                        <div className="grid grid-cols-[100px_1fr_120px_90px_70px_90px] items-center px-4 py-2.5 border-b border-border bg-surface-hover/30 text-xs font-bold text-text-muted uppercase">
+                        <div className="grid grid-cols-[100px_1fr_120px_90px_70px_90px] items-center px-4 py-2.5 border-b border-border bg-surface text-xs font-bold text-text-muted">
                             <span>SOW</span>
                             <button
                                 onClick={() => toggleSort('name')}
@@ -784,11 +784,11 @@ function AwsV2Tab({
                 ) : filteredEntries.length > 0 ? (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr className="bg-surface-hover/50 border-b border-border">
-                                    <th className="sticky left-0 z-10 bg-surface-hover/50 px-4 py-3 text-xs font-bold text-text-muted uppercase min-w-[200px]">User / Email</th>
+                            <thead className="sticky top-0 z-10">
+                                <tr className="bg-surface border-b border-border">
+                                    <th className="sticky left-0 z-20 bg-surface px-4 py-3 text-xs font-bold text-text-muted min-w-[200px]">User / Email</th>
                                     {AWS_DISPLAY_COLS.map(col => (
-                                        <th key={col.label} className="px-3 py-3 text-xs font-bold text-text-muted uppercase text-center min-w-[110px]">
+                                        <th key={col.label} className="px-3 py-3 text-xs font-bold text-text-muted text-center min-w-[110px]">
                                             {col.label}
                                         </th>
                                     ))}
