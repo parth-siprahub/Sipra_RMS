@@ -600,6 +600,16 @@ export function Employees() {
                                                 </span>
                                             ) : <span className="text-text-muted italic">—</span>}
                                         </td>
+                                        <td className="px-6 py-4 text-sm text-text-muted">
+                                            {emp.sow_number || <span className="italic">—</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm">
+                                            {emp.source ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-text capitalize">
+                                                    {emp.source}
+                                                </span>
+                                            ) : <span className="text-text-muted italic">—</span>}
+                                        </td>
                                         <td className="px-6 py-4">
                                             <div className="space-y-1 text-xs">
                                                 <span className={emp.aws_email ? 'text-text' : 'text-text-muted italic'}>{emp.aws_email || 'Missing DCLI Email'}</span>
