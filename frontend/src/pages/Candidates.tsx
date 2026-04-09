@@ -996,7 +996,7 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, onViewDuplicate, req
                                 id="c-email"
                                 type="email"
                                 className={cn("input-field", validationErrors.email && "border-danger")}
-                                placeholder="name@company.com"
+                                placeholder="Personal email address"
                                 required
                                 value={form.email}
                                 onChange={(e) => { set('email', e.target.value); setValidationErrors(p => ({ ...p, email: '' })); }}

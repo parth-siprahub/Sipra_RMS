@@ -218,6 +218,7 @@ function ComparisonTab({
             difference: c.difference,
             difference_pct: c.difference_pct,
             flag: c.flag,
+            source: c.source ?? null,
         }))
         : (report?.comparisons || []).map(c => ({
             employee_id: c.employee_id,
@@ -231,6 +232,7 @@ function ComparisonTab({
             difference: c.difference,
             difference_pct: c.difference_pct,
             flag: c.flag,
+            source: c.source ?? null,
         }));
 
     if (rows.length === 0) {
@@ -318,6 +320,7 @@ function ComparisonTab({
                         <thead>
                             <tr className="bg-surface-hover/50 border-b border-border">
                                 <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase tracking-wide">Employee</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase tracking-wide">Payroll</th>
                                 <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">Billable Target</th>
                                 <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">Jira Hrs</th>
                                 <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">AWS Hrs</th>
@@ -338,6 +341,15 @@ function ComparisonTab({
                                     <td className="px-3 py-2">
                                         <p className="font-medium text-text leading-tight">{formatPersonName(row.rms_name)}</p>
                                         <p className="text-xs text-text-muted leading-tight mt-0.5">{row.jira_username || row.aws_email || '—'}</p>
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        {row.source ? (
+                                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-surface-hover text-text-muted capitalize">
+                                                {row.source}
+                                            </span>
+                                        ) : (
+                                            <span className="text-text-muted text-xs">—</span>
+                                        )}
                                     </td>
                                     <td className="px-3 py-2 text-right text-text-muted tabular-nums">
                                         {row.billable_hours != null ? `${row.billable_hours}h` : '—'}
@@ -397,6 +409,7 @@ interface RowData {
     rms_name: string;
     jira_username: string | null;
     aws_email: string | null;
+    source: string | null;
     jira_hours: number;
     billable_hours: number | null;
     ooo_days: number;

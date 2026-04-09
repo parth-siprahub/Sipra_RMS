@@ -482,6 +482,8 @@ export function Employees() {
                                     <EmployeeSortTh label="Employee" columnKey="rms_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Job Profile" columnKey="job_profile_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Client Name" columnKey="client_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">SOW</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Payroll</th>
                                     <EmployeeSortTh label="IDs" columnKey="ids" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Status" columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Dates" columnKey="start_date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
@@ -501,6 +503,16 @@ export function Employees() {
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text">
                                             {emp.client_name ? emp.client_name.toUpperCase() : '—'}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-text-muted">
+                                            {emp.sow_number || <span className="italic">—</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm">
+                                            {emp.source ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-text capitalize">
+                                                    {emp.source}
+                                                </span>
+                                            ) : <span className="text-text-muted italic">—</span>}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="space-y-1 text-xs">
