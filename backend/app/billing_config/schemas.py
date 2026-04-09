@@ -1,11 +1,11 @@
 """Billing configuration schemas — configurable billable hours per client/month."""
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 import re
 
 
 class BillingConfigCreate(BaseModel):
-    client_name: str = "DCLI"
+    client_name: str = Field(default="DCLI", max_length=100)
     billing_month: str  # "YYYY-MM"
     billable_hours: float = 176.0
     working_days: int = 22
