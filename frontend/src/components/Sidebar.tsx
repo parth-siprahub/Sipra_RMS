@@ -26,6 +26,12 @@ interface SidebarProps {
     setCollapsed: (collapsed: boolean) => void;
 }
 
+const BILLING_CONFIG_EMAILS = new Set([
+    'jaicind@siprahub.com',
+    'sreenath.reddy@siprahub.com',
+    'rajapv@siprahub.com',
+]);
+
 const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
     { to: '/sows', icon: ScrollText, label: 'SOWs' },

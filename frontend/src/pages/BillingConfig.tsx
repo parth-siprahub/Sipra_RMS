@@ -5,7 +5,14 @@ import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { BILLING_CONFIG_EMAILS } from '../lib/accessControl';
+
+// ─── Access Control ───────────────────────────────────────────────────────────
+
+const BILLING_EMAILS = new Set([
+    'jaicind@siprahub.com',
+    'sreenath.reddy@siprahub.com',
+    'rajapv@siprahub.com',
+]);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -106,7 +113,6 @@ function AddConfigModal({ isOpen, onClose, onSuccess }: AddConfigModalProps) {
                         className="input-field"
                         placeholder="e.g. DCLI"
                         required
-                        maxLength={100}
                         value={form.client_name}
                         onChange={(e) => setForm(f => ({ ...f, client_name: e.target.value }))}
                     />
@@ -206,7 +212,7 @@ interface EditRowState {
 
 export function BillingConfig() {
     const { user } = useAuth();
-    const canAccess = user?.email ? BILLING_CONFIG_EMAILS.has(user.email.toLowerCase()) : false;
+    const canAccess = user?.email ? BILLING_EMAILS.has(user.email.toLowerCase()) : false;
 
     const [configs, setConfigs] = useState<BillingConfig[]>([]);
     const [loading, setLoading] = useState(true);
@@ -383,7 +389,6 @@ export function BillingConfig() {
                                                     <input
                                                         className="input-field py-1 text-sm w-32"
                                                         value={editRow.client_name}
-                                                        maxLength={100}
                                                         onChange={(e) => setEditRow(r => ({ ...r, client_name: e.target.value }))}
                                                     />
                                                 ) : (

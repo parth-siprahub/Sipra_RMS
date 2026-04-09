@@ -21,9 +21,14 @@ import { ReportEmployeeDrillDown } from './pages/ReportEmployeeDrillDown';
 import { BillingConfig } from './pages/BillingConfig';
 import { TimesheetJiraDrillDown } from './pages/TimesheetJiraDrillDown';
 import { TimesheetAwsDrillDown } from './pages/TimesheetAwsDrillDown';
-import { BILLING_CONFIG_EMAILS } from './lib/accessControl';
 
 const NotFound = () => <div className="p-10 text-center text-2xl text-text-muted font-medium">404 - Page Not Found</div>;
+
+const BILLING_CONFIG_EMAILS = new Set([
+  'jaicind@siprahub.com',
+  'sreenath.reddy@siprahub.com',
+  'rajapv@siprahub.com',
+]);
 
 function BillingConfigGuard({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
