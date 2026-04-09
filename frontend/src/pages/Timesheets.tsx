@@ -882,8 +882,6 @@ function JiraRawImportModal({
                 toast.success('Upload sent — processing may still be running. Refreshing data...', { duration: 5000 });
                 onClose();
                 setTimeout(() => onSuccess({ month, total_rows_processed: 0, employees_matched: 0, employees_unmatched: [], entries_inserted: 0 }), 3000);
-            } else {
-                toast.error(msg);
             }
         } finally {
             setUploading(false);
@@ -957,8 +955,6 @@ function AwsV2ImportModal({
                 toast.success('Upload sent — processing may still be running. Refreshing data...', { duration: 5000 });
                 onClose();
                 setTimeout(() => onSuccess({ month, total_rows: 0, employees_matched: 0, employees_unmatched: 0, entries_inserted: 0, unmatched_emails: [] }), 3000);
-            } else {
-                toast.error(msg);
             }
         } finally {
             setUploading(false);
@@ -990,8 +986,8 @@ function AwsV2ImportModal({
                     />
                 </div>
                 <div className="text-xs text-text-muted space-y-1">
-                    <p><Monitor size={12} className="inline text-cta mr-1" />Monthly export from AWS ActiveTrack</p>
-                    <p><CheckCircle size={12} className="inline text-success mr-1" />All h:mm:ss and seconds values stored as-is</p>
+                    <p><Monitor size={12} className="inline text-cta mr-1" />Export from AWS ActiveTrack — single or multi-month CSV supported</p>
+                    <p><CheckCircle size={12} className="inline text-success mr-1" />Only rows matching the selected billing month are imported</p>
                     <p><CheckCircle size={12} className="inline text-info mr-1" />Re-uploading same month replaces previous data</p>
                 </div>
                 <div className="flex gap-3 pt-2">
