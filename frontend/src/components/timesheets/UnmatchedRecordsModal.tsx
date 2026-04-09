@@ -54,7 +54,8 @@ export function UnmatchedRecordsModal({
     const fetchUnmatched = async () => {
         setLoading(true);
         try {
-            const records = await timesheetsApi.getUnmatched(billingMonth, sourceType);
+            const res = await timesheetsApi.getUnmatched(billingMonth, sourceType);
+            const records = res.unmatched || [];
             setUnmatchedRecords(records);
             initRowStates(records);
         } catch {
