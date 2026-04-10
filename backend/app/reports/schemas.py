@@ -15,6 +15,7 @@ class TimesheetComparison(BaseModel):
     difference: float | None = None
     difference_pct: float | None = None
     flag: str  # "green" | "amber" | "red" (legacy rows may still have "no_aws")
+    source: str | None = None  # payroll type: internal / vendor / contractor
 
 
 class ComplianceEntry(BaseModel):
@@ -85,6 +86,7 @@ class ComputedReportRow(BaseModel):
     rms_name: str | None = None
     jira_username: str | None = None
     aws_email: str | None = None
+    source: str | None = None  # payroll type: internal / vendor / contractor
 
 
 class CalculateResult(BaseModel):

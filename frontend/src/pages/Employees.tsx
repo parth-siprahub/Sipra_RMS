@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { employeesApi, type Employee, type EmployeeUpdate } from '../api/employees';
 import { clientsApi, type Client } from '../api/clients';
+import { candidatesApi } from '../api/candidates';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { cn } from '../lib/utils';
@@ -21,6 +22,10 @@ import {
 
 type EmployeeSortKey = 'rms_name' | 'job_profile_name' | 'client_name' | 'ids' | 'status' | 'start_date';
 type SortDir = 'asc' | 'desc';
+
+function todayIsoDate(): string {
+    return new Date().toISOString().slice(0, 10);
+}
 
 function sortValueForKey(emp: Employee, key: EmployeeSortKey): string {
     switch (key) {
@@ -58,7 +63,7 @@ function EmployeeSortTh({
 }) {
     const active = sortKey === columnKey;
     return (
-        <th className={cn('px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider', className)}>
+        <th className={cn('px-6 py-4 text-xs font-bold text-text-muted', className)}>
             <button
                 type="button"
                 onClick={() => onSort(columnKey)}
@@ -87,6 +92,7 @@ function EditEmployeeModal({
     onSuccess: () => void;
     employee: Employee;
 }) {
+    const initiallyExited = employee.status === 'EXITED';
     const [form, setForm] = useState<EmployeeUpdate>({
         rms_name: employee.rms_name,
         client_name: employee.client_name || '',
@@ -95,6 +101,11 @@ function EditEmployeeModal({
         github_id: employee.github_id || '',
         jira_username: employee.jira_username || '',
     });
+    const [employmentStatus, setEmploymentStatus] = useState<'ACTIVE' | 'EXITED'>(
+        initiallyExited ? 'EXITED' : 'ACTIVE'
+    );
+    const [exitDate, setExitDate] = useState<string>(employee.exit_date || todayIsoDate());
+    const [exitReason, setExitReason] = useState<string>('');
     const [submitting, setSubmitting] = useState(false);
     const [clients, setClients] = useState<Client[]>([]);
     useEffect(() => {
@@ -105,6 +116,17 @@ function EditEmployeeModal({
         e.preventDefault();
         setSubmitting(true);
         try {
+            if (employmentStatus === 'EXITED' && !exitReason.trim()) {
+                toast.error('Please provide an exit reason');
+                setSubmitting(false);
+                return;
+            }
+            if (employmentStatus === 'EXITED' && !exitDate) {
+                toast.error('Please select an exit date');
+                setSubmitting(false);
+                return;
+            }
+
             const payload: EmployeeUpdate = {};
             if (form.rms_name && form.rms_name !== employee.rms_name) payload.rms_name = form.rms_name;
             if (form.client_name !== undefined) payload.client_name = form.client_name || undefined;
@@ -112,8 +134,17 @@ function EditEmployeeModal({
             if (form.siprahub_email !== undefined) payload.siprahub_email = form.siprahub_email || undefined;
             if (form.github_id !== undefined) payload.github_id = form.github_id || undefined;
             if (form.jira_username !== undefined) payload.jira_username = form.jira_username || undefined;
+            payload.status = employmentStatus;
+            payload.exit_date = employmentStatus === 'EXITED' ? exitDate : null;
 
             await employeesApi.update(employee.id, payload);
+            // Persist reason/date on linked candidate record when available.
+            if (employee.candidate_id && employmentStatus === 'EXITED') {
+                await candidatesApi.update(employee.candidate_id, {
+                    exit_reason: exitReason.trim(),
+                    last_working_day: exitDate,
+                });
+            }
             toast.success('Employee updated');
             onSuccess();
             onClose();
@@ -162,10 +193,64 @@ function EditEmployeeModal({
                     <label className="input-label" htmlFor="jira_username">Jira Username</label>
                     <input id="jira_username" className="input-field" value={form.jira_username || ''} onChange={e => setForm(p => ({ ...p, jira_username: e.target.value }))} placeholder="jira-username" />
                 </div>
+                <div className="card p-3 space-y-3 border border-border">
+                    <div className="flex items-center justify-between gap-3">
+                        <label className="input-label mb-0">Employment Status</label>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setEmploymentStatus('ACTIVE')}
+                                className={cn(
+                                    'btn btn-sm',
+                                    employmentStatus === 'ACTIVE' ? 'btn-secondary' : 'btn-ghost'
+                                )}
+                            >
+                                Revert to Active
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setEmploymentStatus('EXITED');
+                                    if (!exitDate) setExitDate(todayIsoDate());
+                                }}
+                                className={cn(
+                                    'btn btn-sm',
+                                    employmentStatus === 'EXITED' ? 'btn-danger' : 'btn-ghost'
+                                )}
+                            >
+                                Mark as Exited
+                            </button>
+                        </div>
+                    </div>
+                    {employmentStatus === 'EXITED' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="md:col-span-2">
+                                <label className="input-label" htmlFor="exit_reason">Exit Reason *</label>
+                                <textarea
+                                    id="exit_reason"
+                                    className="input-field min-h-[80px]"
+                                    value={exitReason}
+                                    onChange={e => setExitReason(e.target.value)}
+                                    placeholder="Enter reason for exit"
+                                />
+                            </div>
+                            <div>
+                                <label className="input-label" htmlFor="exit_date">Exit Date *</label>
+                                <input
+                                    id="exit_date"
+                                    type="date"
+                                    className="input-field"
+                                    value={exitDate}
+                                    onChange={e => setExitDate(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
                 <div className="flex gap-3 pt-2">
                     <button type="button" onClick={onClose} className="btn btn-secondary flex-1" disabled={submitting}>Cancel</button>
                     <button type="submit" className="btn btn-cta flex-1" disabled={submitting}>
-                        {submitting ? <span className="spinner w-4 h-4" /> : 'Save'}
+                        {submitting ? <span className="spinner w-4 h-4" /> : 'Save Changes'}
                     </button>
                 </div>
             </form>
@@ -290,8 +375,8 @@ export function Employees() {
     const fetchEmployees = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await employeesApi.list({ page_size: 500 });
-            setAllEmployees(data || []);
+            const employeesData = await employeesApi.list({ page_size: 500 });
+            setAllEmployees(employeesData || []);
         } catch {
             toast.error('Failed to load employees');
         } finally {
@@ -339,6 +424,7 @@ export function Employees() {
         });
         return rows;
     }, [filtered, sortKey, sortDir]);
+
 
     if (user?.role === 'SUPER_ADMIN') {
         return (
@@ -477,30 +563,70 @@ export function Employees() {
                 ) : sortedRows.length > 0 ? (
                     <div className="overflow-auto max-h-[70vh] custom-scrollbar">
                         <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-surface-hover/50 border-b border-border">
+                            <thead className="sticky top-0 z-10">
+                                <tr className="bg-surface border-b border-border">
                                     <EmployeeSortTh label="Employee" columnKey="rms_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    <EmployeeSortTh label="Job Profile" columnKey="job_profile_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Client Name" columnKey="client_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">SOW</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">Payroll</th>
                                     <EmployeeSortTh label="IDs" columnKey="ids" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Status" columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Dates" columnKey="start_date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    {isAdmin && <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider text-right">Actions</th>}
+                                    {isAdmin && <th className="px-6 py-4 text-xs font-bold text-text-muted text-right">Actions</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {sortedRows.map(emp => (
+                                {sortedRows.map(emp => {
+                                    const candidate = emp.candidate_id ? candidateById[emp.candidate_id] : undefined;
+                                    const request = candidate?.request_id ? requestById[candidate.request_id] : undefined;
+                                    const payroll =
+                                        candidate
+                                            ? (candidate.source === 'VENDORS'
+                                                ? (candidate.vendor || 'External Vendor')
+                                                : 'Internal')
+                                            : '—';
+                                    return (
                                     <tr key={emp.id} className="hover:bg-surface-hover/30 transition-colors">
                                         <td className="px-6 py-4">
                                             <div>
                                                 <p className="font-bold text-text">{formatPersonName(emp.rms_name)}</p>
+                                                <p className="text-xs text-text-muted mt-0.5">
+                                                    {emp.job_profile_name || '—'}
+                                                </p>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text">
-                                            {emp.job_profile_name || <span className="text-text-muted italic">—</span>}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-text">
                                             {emp.client_name ? emp.client_name.toUpperCase() : '—'}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-text-muted">
+                                            {emp.sow_number || <span className="italic">—</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm">
+                                            {emp.source ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-text capitalize">
+                                                    {emp.source}
+                                                </span>
+                                            ) : <span className="text-text-muted italic">—</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-text-muted">
+                                            {emp.sow_number || <span className="italic">—</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm">
+                                            {emp.source ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-text capitalize">
+                                                    {emp.source}
+                                                </span>
+                                            ) : <span className="text-text-muted italic">—</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-text-muted">
+                                            {emp.sow_number || <span className="italic">—</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm">
+                                            {emp.source ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-text capitalize">
+                                                    {emp.source}
+                                                </span>
+                                            ) : <span className="text-text-muted italic">—</span>}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="space-y-1 text-xs">
@@ -545,7 +671,7 @@ export function Employees() {
                                             </td>
                                         )}
                                     </tr>
-                                ))}
+                                );})}
                             </tbody>
                         </table>
                     </div>

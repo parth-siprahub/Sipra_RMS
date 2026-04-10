@@ -17,16 +17,12 @@ import { UnmatchedRecordsModal } from '../components/timesheets/UnmatchedRecords
 import {
     Upload,
     Download,
-    Clock,
     AlertTriangle,
     CheckCircle,
     Calculator,
     Monitor,
     FileSpreadsheet,
     Search,
-    Coffee,
-    FileText,
-    ExternalLink,
     ArrowUpDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -551,8 +547,9 @@ function JiraTab({
                     </div>
                 ) : filteredSummaries.length > 0 ? (
                     <>
-                        {/* Column header */}
-                        <div className="grid grid-cols-[1fr_90px_80px_80px_44px] sm:grid-cols-[1fr_100px_90px_90px_48px] items-center px-4 py-2.5 border-b border-border bg-surface-hover/30 text-xs font-bold text-text-muted uppercase">
+                        {/* Column header: SOW | Employee | Job Profile | Total JIRA Hrs | OOO | Billable Hrs */}
+                        <div className="grid grid-cols-[100px_1fr_120px_90px_70px_90px] items-center px-4 py-2.5 border-b border-border bg-surface text-xs font-bold text-text-muted">
+                            <span>SOW</span>
                             <button
                                 onClick={() => toggleSort('name')}
                                 className="flex items-center gap-1 cursor-pointer hover:text-text transition-colors text-left"
@@ -560,86 +557,78 @@ function JiraTab({
                                 Employee
                                 {sortField === 'name' && <ArrowUpDown size={12} className="text-cta" />}
                             </button>
+                            <span>Job Profile</span>
                             <button
                                 onClick={() => toggleSort('hours')}
                                 className="flex items-center gap-1 cursor-pointer hover:text-text transition-colors justify-end"
                             >
-                                Hours
+                                JIRA Hrs
                                 {sortField === 'hours' && <ArrowUpDown size={12} className="text-cta" />}
                             </button>
                             <span className="text-center">OOO</span>
-                            <button
-                                onClick={() => toggleSort('issues')}
-                                className="flex items-center gap-1 cursor-pointer hover:text-text transition-colors justify-center"
-                            >
-                                Issues
-                                {sortField === 'issues' && <ArrowUpDown size={12} className="text-cta" />}
-                            </button>
-                            <span />
+                            <span className="text-right">Billable Hrs</span>
                         </div>
 
                         {/* Rows */}
                         <div className="divide-y divide-border/50 max-h-[65vh] overflow-y-auto">
-                            {filteredSummaries.map((summary, idx) => (
-                                <button
-                                    key={summary.user}
-                                    onClick={() => navigateToDrillDown(filteredSummaries, idx, selectedMonth)}
-                                    className="grid grid-cols-[1fr_90px_80px_80px_44px] sm:grid-cols-[1fr_100px_90px_90px_48px] items-center w-full px-4 py-3 text-left hover:bg-surface-hover/40 transition-colors cursor-pointer group"
-                                >
-                                    {/* Name */}
-                                    <div className="min-w-0">
-                                        {(() => {
-                                            const mappedEmployee = jiraEmpMap[summary.user];
-                                            const displayName = formatPersonName(mappedEmployee?.rms_name || '') || summary.user;
-                                            const showSecondary = Boolean(mappedEmployee && !sameText(summary.user, displayName));
-                                            return (
-                                                <>
-                                                    <p className="font-semibold text-sm text-text truncate group-hover:text-cta transition-colors">
-                                                        {displayName}
-                                                    </p>
-                                                    {showSecondary && (
-                                                        <p className="text-xs text-text-muted truncate">{summary.user}</p>
-                                                    )}
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
+                            {filteredSummaries.map((summary, idx) => {
+                                const mappedEmployee = jiraEmpMap[summary.user];
+                                const displayName = formatPersonName(mappedEmployee?.rms_name || '') || summary.user;
+                                const showSecondary = Boolean(mappedEmployee && !sameText(summary.user, displayName));
+                                const billableHours = Math.max(0, 176 - (summary.oooHours ?? 0));
+                                return (
+                                    <button
+                                        key={summary.user}
+                                        onClick={() => navigateToDrillDown(filteredSummaries, idx, selectedMonth)}
+                                        className="grid grid-cols-[100px_1fr_120px_90px_70px_90px] items-center w-full px-4 py-3 text-left hover:bg-surface-hover/40 transition-colors cursor-pointer group"
+                                    >
+                                        {/* SOW */}
+                                        <div className="text-xs text-text-muted truncate">
+                                            {mappedEmployee?.sow_number || <span className="opacity-30">—</span>}
+                                        </div>
 
-                                    {/* Total hours */}
-                                    <div className="flex items-center justify-end gap-1.5">
-                                        <Clock size={13} className="text-cta shrink-0" />
-                                        <span className="font-bold text-sm text-text tabular-nums">
-                                            {summary.totalHours}h
-                                        </span>
-                                    </div>
+                                        {/* Employee */}
+                                        <div className="min-w-0">
+                                            <p className="font-semibold text-sm text-text truncate group-hover:text-cta transition-colors">
+                                                {displayName}
+                                            </p>
+                                            {showSecondary && (
+                                                <p className="text-xs text-text-muted truncate">{summary.user}</p>
+                                            )}
+                                        </div>
 
-                                    {/* OOO */}
-                                    <div className="flex items-center justify-center">
-                                        {summary.oooHours > 0 ? (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-warning/10 text-warning text-xs font-medium">
-                                                <Coffee size={11} />
-                                                {summary.oooHours}h
+                                        {/* Job Profile */}
+                                        <div className="text-xs text-text-muted truncate">
+                                            {mappedEmployee?.job_profile_name || <span className="opacity-30">—</span>}
+                                        </div>
+
+                                        {/* Total JIRA hours */}
+                                        <div className="text-right">
+                                            <span className="font-bold text-sm text-text tabular-nums">
+                                                {summary.totalHours}h
                                             </span>
-                                        ) : (
-                                            <span className="text-xs text-text-muted/40">—</span>
-                                        )}
-                                    </div>
+                                        </div>
 
-                                    {/* Issues count */}
-                                    <div className="flex items-center justify-center gap-1">
-                                        <FileText size={13} className="text-text-muted shrink-0" />
-                                        <span className="text-sm text-text-muted tabular-nums">{summary.issueCount}</span>
-                                    </div>
+                                        {/* OOO */}
+                                        <div className="text-center">
+                                            {summary.oooHours > 0 ? (
+                                                <span className="px-1.5 py-0.5 rounded bg-warning/10 text-warning text-xs font-medium tabular-nums">
+                                                    {summary.oooHours}h
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-text-muted/40">—</span>
+                                            )}
+                                        </div>
 
-                                    {/* Expand icon */}
-                                    <div className="flex items-center justify-center">
-                                        <ExternalLink
-                                            size={15}
-                                            className="text-text-muted/40 group-hover:text-cta transition-colors"
-                                        />
-                                    </div>
-                                </button>
-                            ))}
+                                        {/* Billable hours = 176 - OOO */}
+                                        <div className="text-right">
+                                            <span className="font-bold text-sm text-cta tabular-nums">
+                                                {billableHours}h
+                                            </span>
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </>
                 ) : (
@@ -791,11 +780,11 @@ function AwsV2Tab({
                 ) : filteredEntries.length > 0 ? (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr className="bg-surface-hover/50 border-b border-border">
-                                    <th className="sticky left-0 z-10 bg-surface-hover/50 px-4 py-3 text-xs font-bold text-text-muted uppercase min-w-[200px]">User / Email</th>
+                            <thead className="sticky top-0 z-10">
+                                <tr className="bg-surface border-b border-border">
+                                    <th className="sticky left-0 z-20 bg-surface px-4 py-3 text-xs font-bold text-text-muted min-w-[200px]">User / Email</th>
                                     {AWS_DISPLAY_COLS.map(col => (
-                                        <th key={col.label} className="px-3 py-3 text-xs font-bold text-text-muted uppercase text-center min-w-[110px]">
+                                        <th key={col.label} className="px-3 py-3 text-xs font-bold text-text-muted text-center min-w-[110px]">
                                             {col.label}
                                         </th>
                                     ))}

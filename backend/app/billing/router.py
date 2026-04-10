@@ -121,11 +121,13 @@ async def calculate_monthly_billing(
         )
 
     # Get all employees (include EXITED to handle partial months)
-    employees = await client.table("employees").select("*").execute()
+    # NOTE: .limit(10000) is required — Supabase/PostgREST defaults cap results
+    employees = await client.table("employees").select("*").limit(10000).execute()
     all_employees = employees.data or []
 
     # Get all timesheets for this month
-    timesheets = await client.table("timesheet_logs").select("*").eq("import_month", billing_month).execute()
+    # NOTE: .limit(10000) prevents Supabase row cap silently truncating data
+    timesheets = await client.table("timesheet_logs").select("*").eq("import_month", billing_month).limit(10000).execute()
     all_timesheets = timesheets.data or []
 
     # Group timesheets by employee_id

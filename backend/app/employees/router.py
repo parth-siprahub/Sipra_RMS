@@ -71,28 +71,36 @@ async def list_employees(
     result = await query.order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
     employees = result.data or []
 
-    # Batch-fetch job profile names via candidate -> resource_request -> job_profile
+    # Batch-fetch job profile names + sow_number via candidate -> resource_request -> job_profile/sow
     candidate_ids = [e["candidate_id"] for e in employees if e.get("candidate_id")]
     job_profile_map: dict[int, str] = {}
+    sow_number_map: dict[int, str] = {}
     cand_onboarding: dict[int, object | None] = {}
     if candidate_ids:
         cands = await client.table("candidates").select("id,request_id,onboarding_date").in_("id", candidate_ids).execute()
         request_ids = [c["request_id"] for c in (cands.data or []) if c.get("request_id")]
         cand_onboarding = {c["id"]: c.get("onboarding_date") for c in (cands.data or []) if c.get("id")}
-        # map candidate_id -> request_id
         cand_to_req = {c["id"]: c["request_id"] for c in (cands.data or []) if c.get("request_id")}
         if request_ids:
-            rrs = await client.table("resource_requests").select("id,job_profile_id").in_("id", request_ids).execute()
+            rrs = await client.table("resource_requests").select("id,job_profile_id,sow_id").in_("id", request_ids).execute()
             jp_ids = [r["job_profile_id"] for r in (rrs.data or []) if r.get("job_profile_id")]
+            sow_ids = [r["sow_id"] for r in (rrs.data or []) if r.get("sow_id")]
             req_to_jp = {r["id"]: r["job_profile_id"] for r in (rrs.data or []) if r.get("job_profile_id")}
+            req_to_sow = {r["id"]: r["sow_id"] for r in (rrs.data or []) if r.get("sow_id")}
             if jp_ids:
                 jps = await client.table("job_profiles").select("id,role_name").in_("id", jp_ids).execute()
                 jp_to_name = {j["id"]: j["role_name"] for j in (jps.data or [])}
-                # Build final map: candidate_id -> job_profile_name
                 for cid, rid in cand_to_req.items():
                     jpid = req_to_jp.get(rid)
                     if jpid and jpid in jp_to_name:
                         job_profile_map[cid] = jp_to_name[jpid]
+            if sow_ids:
+                sows = await client.table("sows").select("id,sow_number").in_("id", sow_ids).execute()
+                sow_to_number = {s["id"]: s["sow_number"] for s in (sows.data or [])}
+                for cid, rid in cand_to_req.items():
+                    sowid = req_to_sow.get(rid)
+                    if sowid and sowid in sow_to_number:
+                        sow_number_map[cid] = sow_to_number[sowid]
 
     enriched = []
     for e in employees:
@@ -100,6 +108,8 @@ async def list_employees(
         merged = {
             **e,
             "job_profile_name": job_profile_map.get(cid) if cid else None,
+            "sow_number": sow_number_map.get(cid) if cid else None,
+            "source": e.get("source"),
             "start_date": e.get("start_date") or (cand_onboarding.get(cid) if cid else None),
         }
         enriched.append(_employee_api_row(merged))
@@ -120,7 +130,8 @@ async def create_employee(
     if dup.data:
         raise HTTPException(status.HTTP_409_CONFLICT, "Employee record already exists for this candidate")
 
-    data = payload.model_dump(exclude_none=True, mode="json")
+    # Use exclude_unset so explicit nulls (e.g. clearing exit_date on revert) are preserved.
+    data = payload.model_dump(exclude_unset=True, mode="json")
     data["status"] = EmployeeStatus.ACTIVE.value
     data = normalize_employee_text(data)
 
@@ -230,7 +241,8 @@ async def update_employee(
     current_user: dict = Depends(require_admin),
 ):
     client = await get_supabase_admin_async()
-    data = payload.model_dump(exclude_none=True, mode="json")
+    # Keep explicitly provided nulls (e.g., exit_date=null on revert to ACTIVE).
+    data = payload.model_dump(exclude_unset=True, mode="json")
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
     data = normalize_employee_text(data)

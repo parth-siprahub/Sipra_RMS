@@ -15,6 +15,8 @@ export interface Employee {
     created_at: string | null;
     updated_at: string | null;
     job_profile_name: string | null;
+    source: string | null;       // payroll type: internal / vendor / contractor
+    sow_number: string | null;   // from resource_request → sow
 }
 
 export interface EmployeeCreate {
@@ -36,7 +38,7 @@ export interface EmployeeUpdate {
     github_id?: string;
     jira_username?: string;
     start_date?: string;
-    exit_date?: string;
+    exit_date?: string | null;
     status?: 'ACTIVE' | 'EXITED' | 'TERMINATED';
 }
 

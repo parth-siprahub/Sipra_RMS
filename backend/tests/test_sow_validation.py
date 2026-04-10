@@ -1,6 +1,7 @@
 """Tests for SOW date validation rules.
 
 Business rules:
+- start_date may be in the past (historical SOWs are allowed)
 - start_date <= target_date (same day OK)
 - submitted_date >= start_date
 - max_resources <= 100
@@ -13,6 +14,16 @@ from app.sows.schemas import SowCreate, SowUpdate
 
 class TestSowCreateDateValidation:
     """Validate SowCreate date constraints."""
+
+    def test_past_start_date_allowed(self):
+        """Historical SOWs must be allowed: past start dates are valid."""
+        sow = SowCreate(
+            sow_number="SOW-000",
+            client_name="TestClient",
+            start_date=date(2024, 1, 1),
+            target_date=date(2024, 12, 31),
+        )
+        assert sow.start_date < date.today()
 
     def test_same_day_start_and_target_allowed(self):
         """start_date == target_date should pass (same day OK)."""
