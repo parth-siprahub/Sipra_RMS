@@ -18,7 +18,11 @@ import {
     ArrowUp,
     ArrowDown,
     ArrowUpDown,
+    LogOut,
+    RotateCcw,
 } from 'lucide-react';
+import { ExitConfirmModal } from '../components/ui/ExitConfirmModal';
+import type { ExitPayload } from '../api/candidates';
 
 type EmployeeSortKey = 'rms_name' | 'job_profile_name' | 'client_name' | 'ids' | 'status' | 'start_date';
 type SortDir = 'asc' | 'desc';
@@ -371,6 +375,7 @@ export function Employees() {
     const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
     const [sortKey, setSortKey] = useState<EmployeeSortKey>('rms_name');
     const [sortDir, setSortDir] = useState<SortDir>('asc');
+    const [exitTarget, setExitTarget] = useState<{ id: number; name: string; candidateId: number } | null>(null);
 
     const fetchEmployees = useCallback(async () => {
         setLoading(true);
@@ -383,6 +388,37 @@ export function Employees() {
             setLoading(false);
         }
     }, []);
+
+    const handleExitEmployee = async (payload: ExitPayload) => {
+        if (!exitTarget) return;
+        try {
+            await candidatesApi.exit(exitTarget.candidateId, payload);
+            await employeesApi.update(exitTarget.id, {
+                status: 'EXITED',
+                exit_date: payload.last_working_day,
+            });
+            toast.success(`${exitTarget.name} marked as exited`);
+            setExitTarget(null);
+            fetchEmployees();
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to mark exit');
+        }
+    };
+
+    const handleRevertEmployee = async (emp: Employee) => {
+        if (!emp.candidate_id) {
+            toast.error('No candidate linked to this employee');
+            return;
+        }
+        try {
+            await candidatesApi.revertExit(emp.candidate_id);
+            await employeesApi.update(emp.id, { status: 'ACTIVE', exit_date: null });
+            toast.success(`${emp.rms_name} reverted to Active`);
+            fetchEmployees();
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to revert');
+        }
+    };
 
     useEffect(() => {
         fetchEmployees();
@@ -571,21 +607,12 @@ export function Employees() {
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted">Payroll</th>
                                     <EmployeeSortTh label="IDs" columnKey="ids" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Status" columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    <EmployeeSortTh label="Dates" columnKey="start_date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                    <EmployeeSortTh label="Start Date" columnKey="start_date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     {isAdmin && <th className="px-6 py-4 text-xs font-bold text-text-muted text-right">Actions</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {sortedRows.map(emp => {
-                                    const candidate = emp.candidate_id ? candidateById[emp.candidate_id] : undefined;
-                                    const request = candidate?.request_id ? requestById[candidate.request_id] : undefined;
-                                    const payroll =
-                                        candidate
-                                            ? (candidate.source === 'VENDORS'
-                                                ? (candidate.vendor || 'External Vendor')
-                                                : 'Internal')
-                                            : '—';
-                                    return (
+                                {sortedRows.map(emp => (
                                     <tr key={emp.id} className="hover:bg-surface-hover/30 transition-colors">
                                         <td className="px-6 py-4">
                                             <div>
@@ -597,26 +624,6 @@ export function Employees() {
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text">
                                             {emp.client_name ? emp.client_name.toUpperCase() : '—'}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-text-muted">
-                                            {emp.sow_number || <span className="italic">—</span>}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm">
-                                            {emp.source ? (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-text capitalize">
-                                                    {emp.source}
-                                                </span>
-                                            ) : <span className="text-text-muted italic">—</span>}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-text-muted">
-                                            {emp.sow_number || <span className="italic">—</span>}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm">
-                                            {emp.source ? (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-text capitalize">
-                                                    {emp.source}
-                                                </span>
-                                            ) : <span className="text-text-muted italic">—</span>}
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text-muted">
                                             {emp.sow_number || <span className="italic">—</span>}
@@ -667,11 +674,33 @@ export function Employees() {
                                                     >
                                                         <Edit2 size={18} />
                                                     </button>
+                                                    {emp.status === 'ACTIVE' && emp.candidate_id && (
+                                                        <button
+                                                            onClick={() => setExitTarget({
+                                                                id: emp.id,
+                                                                name: emp.rms_name,
+                                                                candidateId: emp.candidate_id!,
+                                                            })}
+                                                            className="p-2 hover:bg-danger/10 rounded-lg text-text-muted hover:text-danger transition-colors"
+                                                            title="Mark as Exited"
+                                                        >
+                                                            <LogOut size={18} />
+                                                        </button>
+                                                    )}
+                                                    {emp.status === 'EXITED' && emp.candidate_id && (
+                                                        <button
+                                                            onClick={() => handleRevertEmployee(emp)}
+                                                            className="p-2 hover:bg-success/10 rounded-lg text-text-muted hover:text-[var(--brand-green)] transition-colors"
+                                                            title="Revert to Active"
+                                                        >
+                                                            <RotateCcw size={18} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         )}
                                     </tr>
-                                );})}
+                                ))}
                             </tbody>
                         </table>
                     </div>
@@ -688,6 +717,13 @@ export function Employees() {
                     employee={editEmployee}
                 />
             )}
+
+            <ExitConfirmModal
+                isOpen={exitTarget !== null}
+                candidateName={exitTarget?.name ?? ''}
+                onConfirm={handleExitEmployee}
+                onCancel={() => setExitTarget(null)}
+            />
         </div>
     );
 }
