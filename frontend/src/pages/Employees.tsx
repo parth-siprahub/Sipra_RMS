@@ -142,12 +142,29 @@ function EditEmployeeModal({
             payload.exit_date = employmentStatus === 'EXITED' ? exitDate : null;
 
             await employeesApi.update(employee.id, payload);
-            // Persist reason/date on linked candidate record when available.
+            // Persist exit details on linked candidate record and sync status.
             if (employee.candidate_id && employmentStatus === 'EXITED') {
-                await candidatesApi.update(employee.candidate_id, {
-                    exit_reason: exitReason.trim(),
-                    last_working_day: exitDate,
-                });
+                try {
+                    // Use the proper exit endpoint to sync candidate.status → EXIT
+                    await candidatesApi.exit(employee.candidate_id, {
+                        last_working_day: exitDate,
+                        ...(exitReason.trim() ? { exit_reason: exitReason.trim() } : {}),
+                    });
+                } catch {
+                    // Candidate may already be EXIT or not ONBOARDED — fallback to field update only
+                    await candidatesApi.update(employee.candidate_id, {
+                        exit_reason: exitReason.trim() || undefined,
+                        last_working_day: exitDate,
+                    });
+                }
+            }
+            // Sync candidate back to ONBOARDED if reverting employee to ACTIVE
+            if (employee.candidate_id && employmentStatus === 'ACTIVE' && initiallyExited) {
+                try {
+                    await candidatesApi.revertExit(employee.candidate_id);
+                } catch {
+                    // Already active or not in EXIT state — ignore
+                }
             }
             toast.success('Employee updated');
             onSuccess();
@@ -604,6 +621,7 @@ export function Employees() {
                                     <EmployeeSortTh label="Employee" columnKey="rms_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Client Name" columnKey="client_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted">SOW</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">Hiring Type</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted">Payroll</th>
                                     <EmployeeSortTh label="IDs" columnKey="ids" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Status" columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
@@ -627,6 +645,14 @@ export function Employees() {
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text-muted">
                                             {emp.sow_number || <span className="italic">—</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm">
+                                            {emp.is_backfill === true
+                                                ? <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-600">Backfill</span>
+                                                : emp.is_backfill === false
+                                                    ? <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-500/10 text-blue-600">New Request</span>
+                                                    : <span className="text-text-muted italic">—</span>
+                                            }
                                         </td>
                                         <td className="px-6 py-4 text-sm">
                                             {emp.source ? (
