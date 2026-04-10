@@ -4,11 +4,8 @@ import type { JobProfile } from '../api/jobProfiles';
 import { JobProfileModal } from '../components/jobProfiles/JobProfileModal';
 import {
     Plus,
-    Search,
     Edit2,
     Trash2,
-    Code,
-    Layers,
     LayoutGrid,
     Table2
 } from 'lucide-react';
@@ -91,12 +88,11 @@ export function JobProfiles() {
 
             {/* Filter Bar */}
             <div className="card flex flex-col md:flex-row items-center gap-4 py-3 px-4">
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+                <div className="flex-1 w-full">
                     <input
                         type="search"
                         placeholder="Search by role or tech..."
-                        className="input-field pl-10 h-10"
+                        className="input-field h-10 w-full"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -144,12 +140,10 @@ export function JobProfiles() {
                                     </div>
                                 </div>
                                 <div className="space-y-3 mt-2">
-                                    <div className="flex items-center gap-2 text-sm text-text-muted">
-                                        <Code size={16} className="text-cta" />
+                                    <div className="text-sm text-text-muted">
                                         <span>{profile.technology}</span>
                                     </div>
-                                    <div className="flex items-center gap-2 text-sm text-text-muted">
-                                        <Layers size={16} className="text-info" />
+                                    <div className="text-sm text-text-muted">
                                         <span className="font-medium">{profile.experience_level || 'Not Specified'}</span>
                                     </div>
                                 </div>

@@ -22,7 +22,6 @@ import {
     Calculator,
     Monitor,
     FileSpreadsheet,
-    Search,
     ArrowUpDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -491,12 +490,11 @@ function JiraTab({
                 </div>
 
                 {/* Search */}
-                <div className="relative flex-1 max-w-xs">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+                <div className="flex-1 max-w-xs">
                     <input
                         type="text"
                         placeholder="Search by name..."
-                        className="input-field pl-9 w-full text-sm"
+                        className="input-field w-full text-sm"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                     />
@@ -562,11 +560,11 @@ function JiraTab({
                                 onClick={() => toggleSort('hours')}
                                 className="flex items-center gap-1 cursor-pointer hover:text-text transition-colors justify-end"
                             >
-                                JIRA Hrs
+                                Total JIRA Hours
                                 {sortField === 'hours' && <ArrowUpDown size={12} className="text-cta" />}
                             </button>
                             <span className="text-center">OOO</span>
-                            <span className="text-right">Billable Hrs</span>
+                            <span className="text-right">Total Billable Hours</span>
                         </div>
 
                         {/* Rows */}
@@ -725,12 +723,11 @@ function AwsV2Tab({
                 </div>
 
                 {/* Search */}
-                <div className="relative flex-1 max-w-xs">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+                <div className="flex-1 max-w-xs">
                     <input
                         type="text"
                         placeholder="Search by name or email..."
-                        className="input-field pl-9 w-full text-sm"
+                        className="input-field w-full text-sm"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                     />

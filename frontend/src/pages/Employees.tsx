@@ -18,13 +18,10 @@ import {
     ArrowUp,
     ArrowDown,
     ArrowUpDown,
-    LogOut,
     RotateCcw,
 } from 'lucide-react';
-import { ExitConfirmModal } from '../components/ui/ExitConfirmModal';
-import type { ExitPayload } from '../api/candidates';
 
-type EmployeeSortKey = 'rms_name' | 'job_profile_name' | 'client_name' | 'ids' | 'status' | 'start_date';
+type EmployeeSortKey = 'rms_name' | 'job_profile_name' | 'client_name' | 'status' | 'start_date';
 type SortDir = 'asc' | 'desc';
 
 function todayIsoDate(): string {
@@ -39,8 +36,6 @@ function sortValueForKey(emp: Employee, key: EmployeeSortKey): string {
             return (emp.job_profile_name || '').toLowerCase();
         case 'client_name':
             return (emp.client_name || '').toLowerCase();
-        case 'ids':
-            return `${emp.aws_email || ''} ${emp.siprahub_email || ''}`.toLowerCase();
         case 'status':
             return (emp.status || '').toLowerCase();
         case 'start_date':
@@ -392,8 +387,6 @@ export function Employees() {
     const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
     const [sortKey, setSortKey] = useState<EmployeeSortKey>('rms_name');
     const [sortDir, setSortDir] = useState<SortDir>('asc');
-    const [exitTarget, setExitTarget] = useState<{ id: number; name: string; candidateId: number } | null>(null);
-
     const fetchEmployees = useCallback(async () => {
         setLoading(true);
         try {
@@ -405,22 +398,6 @@ export function Employees() {
             setLoading(false);
         }
     }, []);
-
-    const handleExitEmployee = async (payload: ExitPayload) => {
-        if (!exitTarget) return;
-        try {
-            await candidatesApi.exit(exitTarget.candidateId, payload);
-            await employeesApi.update(exitTarget.id, {
-                status: 'EXITED',
-                exit_date: payload.last_working_day,
-            });
-            toast.success(`${exitTarget.name} marked as exited`);
-            setExitTarget(null);
-            fetchEmployees();
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to mark exit');
-        }
-    };
 
     const handleRevertEmployee = async (emp: Employee) => {
         if (!emp.candidate_id) {
@@ -559,12 +536,11 @@ export function Employees() {
             )}
 
             <div className="card flex flex-col md:flex-row items-center gap-4 py-3 px-4">
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+                <div className="flex-1 w-full">
                     <input
                         type="search"
                         placeholder="Search employees..."
-                        className="input-field pl-10 h-10"
+                        className="input-field h-10 w-full"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                     />
@@ -623,7 +599,6 @@ export function Employees() {
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted">SOW</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted">Hiring Type</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted">Payroll</th>
-                                    <EmployeeSortTh label="IDs" columnKey="ids" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Status" columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Start Date" columnKey="start_date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     {isAdmin && <th className="px-6 py-4 text-xs font-bold text-text-muted text-right">Actions</th>}
@@ -646,27 +621,18 @@ export function Employees() {
                                         <td className="px-6 py-4 text-sm text-text-muted">
                                             {emp.sow_number || <span className="italic">—</span>}
                                         </td>
-                                        <td className="px-6 py-4 text-sm">
+                                        <td className="px-6 py-4 text-sm text-text">
                                             {emp.is_backfill === true
-                                                ? <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-600">Backfill</span>
+                                                ? 'Backfill'
                                                 : emp.is_backfill === false
-                                                    ? <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-500/10 text-blue-600">New Request</span>
+                                                    ? 'New'
                                                     : <span className="text-text-muted italic">—</span>
                                             }
                                         </td>
-                                        <td className="px-6 py-4 text-sm">
-                                            {emp.source ? (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-text capitalize">
-                                                    {emp.source}
-                                                </span>
-                                            ) : <span className="text-text-muted italic">—</span>}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="space-y-1 text-xs">
-                                                <span className={emp.aws_email ? 'text-text' : 'text-text-muted italic'}>{emp.aws_email || 'Missing DCLI Email'}</span>
-                                                <br />
-                                                <span className={emp.siprahub_email ? 'text-text' : 'text-text-muted italic'}>{emp.siprahub_email || 'Missing SipraHub'}</span>
-                                            </div>
+                                        <td className="px-6 py-4 text-sm text-text">
+                                            {emp.source
+                                                ? (emp.source.toLowerCase() === 'vendor' ? 'Vendor' : 'Internal')
+                                                : <span className="text-text-muted italic">—</span>}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
@@ -700,19 +666,6 @@ export function Employees() {
                                                     >
                                                         <Edit2 size={18} />
                                                     </button>
-                                                    {emp.status === 'ACTIVE' && emp.candidate_id && (
-                                                        <button
-                                                            onClick={() => setExitTarget({
-                                                                id: emp.id,
-                                                                name: emp.rms_name,
-                                                                candidateId: emp.candidate_id!,
-                                                            })}
-                                                            className="p-2 hover:bg-danger/10 rounded-lg text-text-muted hover:text-danger transition-colors"
-                                                            title="Mark as Exited"
-                                                        >
-                                                            <LogOut size={18} />
-                                                        </button>
-                                                    )}
                                                     {emp.status === 'EXITED' && emp.candidate_id && (
                                                         <button
                                                             onClick={() => handleRevertEmployee(emp)}
@@ -744,12 +697,6 @@ export function Employees() {
                 />
             )}
 
-            <ExitConfirmModal
-                isOpen={exitTarget !== null}
-                candidateName={exitTarget?.name ?? ''}
-                onConfirm={handleExitEmployee}
-                onCancel={() => setExitTarget(null)}
-            />
         </div>
     );
 }
