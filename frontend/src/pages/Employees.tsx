@@ -576,16 +576,7 @@ export function Employees() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {sortedRows.map(emp => {
-                                    const candidate = emp.candidate_id ? candidateById[emp.candidate_id] : undefined;
-                                    const request = candidate?.request_id ? requestById[candidate.request_id] : undefined;
-                                    const payroll =
-                                        candidate
-                                            ? (candidate.source === 'VENDORS'
-                                                ? (candidate.vendor || 'External Vendor')
-                                                : 'Internal')
-                                            : '—';
-                                    return (
+                                {sortedRows.map(emp => (
                                     <tr key={emp.id} className="hover:bg-surface-hover/30 transition-colors">
                                         <td className="px-6 py-4">
                                             <div>
@@ -597,26 +588,6 @@ export function Employees() {
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text">
                                             {emp.client_name ? emp.client_name.toUpperCase() : '—'}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-text-muted">
-                                            {emp.sow_number || <span className="italic">—</span>}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm">
-                                            {emp.source ? (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-text capitalize">
-                                                    {emp.source}
-                                                </span>
-                                            ) : <span className="text-text-muted italic">—</span>}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-text-muted">
-                                            {emp.sow_number || <span className="italic">—</span>}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm">
-                                            {emp.source ? (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-text capitalize">
-                                                    {emp.source}
-                                                </span>
-                                            ) : <span className="text-text-muted italic">—</span>}
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text-muted">
                                             {emp.sow_number || <span className="italic">—</span>}
@@ -671,7 +642,7 @@ export function Employees() {
                                             </td>
                                         )}
                                     </tr>
-                                );})}
+                                ))}
                             </tbody>
                         </table>
                     </div>
