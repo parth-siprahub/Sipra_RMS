@@ -604,6 +604,7 @@ export function Employees() {
                                     <EmployeeSortTh label="Employee" columnKey="rms_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Client Name" columnKey="client_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted">SOW</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">Hiring Type</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted">Payroll</th>
                                     <EmployeeSortTh label="IDs" columnKey="ids" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Status" columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
@@ -627,6 +628,14 @@ export function Employees() {
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text-muted">
                                             {emp.sow_number || <span className="italic">—</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm">
+                                            {emp.is_backfill === true
+                                                ? <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-600">Backfill</span>
+                                                : emp.is_backfill === false
+                                                    ? <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-500/10 text-blue-600">New Request</span>
+                                                    : <span className="text-text-muted italic">—</span>
+                                            }
                                         </td>
                                         <td className="px-6 py-4 text-sm">
                                             {emp.source ? (
