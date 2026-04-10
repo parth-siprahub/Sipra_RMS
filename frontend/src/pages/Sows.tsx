@@ -353,7 +353,14 @@ export function Sows() {
                         setIsModalOpen(false);
                         setSelectedSow(undefined);
                     }}
-                    onSuccess={fetchSows}
+                    onSuccess={(updatedIsActive?: boolean) => {
+                        fetchSows();
+                        if (updatedIsActive === false) {
+                            setStatusFilter('INACTIVE');
+                        } else if (updatedIsActive === true && statusFilter === 'INACTIVE') {
+                            setStatusFilter('ACTIVE');
+                        }
+                    }}
                     sow={selectedSow}
                 />
             )}
