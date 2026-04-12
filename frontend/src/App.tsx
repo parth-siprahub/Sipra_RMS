@@ -9,7 +9,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Dashboard } from './pages/Dashboard';
 import { ResourceRequests } from './pages/ResourceRequests';
 import { Candidates } from './pages/Candidates';
-import { Sows } from './pages/SOWs';
+import { Sows } from './pages/Sows';
 import { JobProfiles } from './pages/JobProfiles';
 import { CommunicationLogs } from './pages/CommunicationLogs';
 import { Vendors } from './pages/Vendors';
