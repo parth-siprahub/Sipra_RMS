@@ -627,7 +627,7 @@ export function ResourceRequests() {
                                 <tr>
                                     <th>Request ID</th>
                                     <th>SOW / Client</th>
-                                    <th>Role / Profile</th>
+                                    <th>Role</th>
                                     <th>Priority</th>
                                     <th>Status</th>
                                     <th>Created</th>
@@ -653,14 +653,9 @@ export function ResourceRequests() {
                                             </div>
                                         </td>
                                         <td>
-                                            <div className="flex flex-col">
-                                                <span className="font-medium text-text">
-                                                    {jobProfiles.find(p => p.id === req.job_profile_id)?.role_name || 'Unknown Role'}
-                                                </span>
-                                                <span className="text-xs text-text-muted">
-                                                    {jobProfiles.find(p => p.id === req.job_profile_id)?.technology || '—'}
-                                                </span>
-                                            </div>
+                                            <span className="font-medium text-text">
+                                                {jobProfiles.find(p => p.id === req.job_profile_id)?.role_name || 'Unknown Role'}
+                                            </span>
                                         </td>
                                         <td>
                                             <StatusBadge value={req.priority} type="priority" />

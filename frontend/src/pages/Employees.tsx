@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { employeesApi, type Employee, type EmployeeUpdate } from '../api/employees';
 import { clientsApi, type Client } from '../api/clients';
-import { candidatesApi, type Candidate } from '../api/candidates';
-import { resourceRequestsApi, type ResourceRequest } from '../api/resourceRequests';
-import { sowApi, type SOW } from '../api/sows';
+import { candidatesApi } from '../api/candidates';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { cn } from '../lib/utils';
@@ -20,9 +18,10 @@ import {
     ArrowUp,
     ArrowDown,
     ArrowUpDown,
+    RotateCcw,
 } from 'lucide-react';
 
-type EmployeeSortKey = 'rms_name' | 'client_name' | 'status' | 'start_date';
+type EmployeeSortKey = 'rms_name' | 'job_profile_name' | 'client_name' | 'status' | 'start_date';
 type SortDir = 'asc' | 'desc';
 
 function todayIsoDate(): string {
@@ -63,7 +62,7 @@ function EmployeeSortTh({
 }) {
     const active = sortKey === columnKey;
     return (
-        <th className={cn('px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider', className)}>
+        <th className={cn('px-6 py-4 text-xs font-bold text-text-muted', className)}>
             <button
                 type="button"
                 onClick={() => onSort(columnKey)}
@@ -142,12 +141,29 @@ function EditEmployeeModal({
             payload.siprahub_offboarding_date = employmentStatus === 'EXITED' ? (siprahubOffboardingDate || null) : null;
 
             await employeesApi.update(employee.id, payload);
-            // Persist reason/date on linked candidate record when available.
+            // Persist exit details on linked candidate record and sync status.
             if (employee.candidate_id && employmentStatus === 'EXITED') {
-                await candidatesApi.update(employee.candidate_id, {
-                    exit_reason: exitReason.trim(),
-                    last_working_day: exitDate,
-                });
+                try {
+                    // Use the proper exit endpoint to sync candidate.status → EXIT
+                    await candidatesApi.exit(employee.candidate_id, {
+                        last_working_day: exitDate,
+                        ...(exitReason.trim() ? { exit_reason: exitReason.trim() } : {}),
+                    });
+                } catch {
+                    // Candidate may already be EXIT or not ONBOARDED — fallback to field update only
+                    await candidatesApi.update(employee.candidate_id, {
+                        exit_reason: exitReason.trim() || undefined,
+                        last_working_day: exitDate,
+                    });
+                }
+            }
+            // Sync candidate back to ONBOARDED if reverting employee to ACTIVE
+            if (employee.candidate_id && employmentStatus === 'ACTIVE' && initiallyExited) {
+                try {
+                    await candidatesApi.revertExit(employee.candidate_id);
+                } catch {
+                    // Already active or not in EXIT state — ignore
+                }
             }
             toast.success('Employee updated');
             onSuccess();
@@ -394,9 +410,6 @@ export function Employees() {
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
     const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
-    const [allCandidates, setAllCandidates] = useState<Candidate[]>([]);
-    const [allRequests, setAllRequests] = useState<ResourceRequest[]>([]);
-    const [allSows, setAllSows] = useState<SOW[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('ACTIVE');
@@ -404,26 +417,32 @@ export function Employees() {
     const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
     const [sortKey, setSortKey] = useState<EmployeeSortKey>('rms_name');
     const [sortDir, setSortDir] = useState<SortDir>('asc');
-
     const fetchEmployees = useCallback(async () => {
         setLoading(true);
         try {
-            const [employeesData, candidatesData, requestsData, sowsData] = await Promise.all([
-                employeesApi.list({ page_size: 500 }),
-                candidatesApi.list({ page_size: 3000 }),
-                resourceRequestsApi.list(),
-                sowApi.list(),
-            ]);
+            const employeesData = await employeesApi.list({ page_size: 500 });
             setAllEmployees(employeesData || []);
-            setAllCandidates(candidatesData || []);
-            setAllRequests(requestsData || []);
-            setAllSows(sowsData || []);
         } catch {
             toast.error('Failed to load employees');
         } finally {
             setLoading(false);
         }
     }, []);
+
+    const handleRevertEmployee = async (emp: Employee) => {
+        if (!emp.candidate_id) {
+            toast.error('No candidate linked to this employee');
+            return;
+        }
+        try {
+            await candidatesApi.revertExit(emp.candidate_id);
+            await employeesApi.update(emp.id, { status: 'ACTIVE', exit_date: null });
+            toast.success(`${emp.rms_name} reverted to Active`);
+            fetchEmployees();
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to revert');
+        }
+    };
 
     useEffect(() => {
         fetchEmployees();
@@ -466,18 +485,6 @@ export function Employees() {
         return rows;
     }, [filtered, sortKey, sortDir]);
 
-    const candidateById = useMemo(
-        () => Object.fromEntries(allCandidates.map(c => [c.id, c])),
-        [allCandidates],
-    );
-    const requestById = useMemo(
-        () => Object.fromEntries(allRequests.map(r => [r.id, r])),
-        [allRequests],
-    );
-    const sowById = useMemo(
-        () => Object.fromEntries(allSows.map(s => [s.id, s])),
-        [allSows],
-    );
 
     if (user?.role === 'SUPER_ADMIN') {
         return (
@@ -559,12 +566,11 @@ export function Employees() {
             )}
 
             <div className="card flex flex-col md:flex-row items-center gap-4 py-3 px-4">
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+                <div className="flex-1 w-full">
                     <input
                         type="search"
                         placeholder="Search employees..."
-                        className="input-field pl-10 h-10"
+                        className="input-field h-10 w-full"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                     />
@@ -616,32 +622,20 @@ export function Employees() {
                 ) : sortedRows.length > 0 ? (
                     <div className="overflow-auto max-h-[70vh] custom-scrollbar">
                         <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-surface-hover/50 border-b border-border">
+                            <thead className="sticky top-0 z-10">
+                                <tr className="bg-surface border-b border-border">
                                     <EmployeeSortTh label="Employee" columnKey="rms_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Client Name" columnKey="client_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Payroll</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Hiring Type</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">SOW</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">SOW</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">Hiring Type</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">Payroll</th>
                                     <EmployeeSortTh label="Status" columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Start Date" columnKey="start_date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    {isAdmin && <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider text-right">Actions</th>}
+                                    {isAdmin && <th className="px-6 py-4 text-xs font-bold text-text-muted text-right">Actions</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {sortedRows.map(emp => {
-                                    const candidate = emp.candidate_id ? candidateById[emp.candidate_id] : undefined;
-                                    const request = candidate?.request_id ? requestById[candidate.request_id] : undefined;
-                                    const sow = request?.sow_id ? sowById[request.sow_id] : undefined;
-                                    const payroll =
-                                        candidate
-                                            ? (candidate.source === 'VENDORS'
-                                                ? (candidate.vendor || 'External Vendor')
-                                                : 'Internal')
-                                            : '—';
-                                    const hiringType = request ? (request.is_backfill ? 'Backfill' : 'New Request') : '—';
-                                    const sowDisplay = sow?.sow_number || '—';
-                                    return (
+                                {sortedRows.map(emp => (
                                     <tr key={emp.id} className="hover:bg-surface-hover/30 transition-colors">
                                         <td className="px-6 py-4">
                                             <div>
@@ -654,14 +648,21 @@ export function Employees() {
                                         <td className="px-6 py-4 text-sm text-text">
                                             {emp.client_name ? emp.client_name.toUpperCase() : '—'}
                                         </td>
-                                        <td className="px-6 py-4 text-sm text-text">
-                                            {payroll}
+                                        <td className="px-6 py-4 text-sm text-text-muted">
+                                            {emp.sow_number || <span className="italic">—</span>}
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text">
-                                            {hiringType}
+                                            {emp.is_backfill === true
+                                                ? 'Backfill'
+                                                : emp.is_backfill === false
+                                                    ? 'New'
+                                                    : <span className="text-text-muted italic">—</span>
+                                            }
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text">
-                                            {sowDisplay}
+                                            {emp.source
+                                                ? emp.source
+                                                : <span className="text-text-muted italic">—</span>}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
@@ -695,11 +696,20 @@ export function Employees() {
                                                     >
                                                         <Edit2 size={18} />
                                                     </button>
+                                                    {emp.status === 'EXITED' && emp.candidate_id && (
+                                                        <button
+                                                            onClick={() => handleRevertEmployee(emp)}
+                                                            className="p-2 hover:bg-success/10 rounded-lg text-text-muted hover:text-[var(--brand-green)] transition-colors"
+                                                            title="Revert to Active"
+                                                        >
+                                                            <RotateCcw size={18} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         )}
                                     </tr>
-                                );})}
+                                ))}
                             </tbody>
                         </table>
                     </div>
@@ -716,6 +726,7 @@ export function Employees() {
                     employee={editEmployee}
                 />
             )}
+
         </div>
     );
 }

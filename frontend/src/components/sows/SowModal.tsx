@@ -11,7 +11,7 @@ import { cn } from '../../lib/utils';
 interface SowModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSuccess: () => void;
+    onSuccess: (updatedIsActive?: boolean) => void;
     sow?: SOW;
 }
 
@@ -88,12 +88,21 @@ export function SowModal({ isOpen, onClose, onSuccess, sow }: SowModalProps) {
 
             if (sow?.id) {
                 await sowApi.update(sow.id, sanitized);
-                toast.success('SOW updated successfully');
+                const wasActive = sow.is_active !== false;
+                const nowActive = sanitized.is_active !== false;
+                if (wasActive && !nowActive) {
+                    toast.success('SOW marked as inactive — switch to Inactive tab to view it');
+                } else if (!wasActive && nowActive) {
+                    toast.success('SOW reactivated successfully');
+                } else {
+                    toast.success('SOW updated successfully');
+                }
+                onSuccess(sanitized.is_active);
             } else {
                 await sowApi.create(sanitized);
                 toast.success('SOW created successfully');
+                onSuccess(true);
             }
-            onSuccess();
             onClose();
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : 'An unexpected error occurred';

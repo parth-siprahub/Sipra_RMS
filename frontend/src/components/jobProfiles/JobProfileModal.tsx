@@ -3,16 +3,17 @@ import { Modal } from '../ui/Modal';
 import { jobProfileApi } from '../../api/jobProfiles';
 import type { JobProfile } from '../../api/jobProfiles';
 import toast from 'react-hot-toast';
-import { Briefcase, Code, Layers, FileText, Upload, ExternalLink } from 'lucide-react';
+import { Briefcase, Code, Layers, FileText, Upload, ExternalLink, Trash2 } from 'lucide-react';
 
 interface JobProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
     jobProfile?: JobProfile;
+    onDelete?: (id: number) => void;
 }
 
-export function JobProfileModal({ isOpen, onClose, onSuccess, jobProfile }: JobProfileModalProps) {
+export function JobProfileModal({ isOpen, onClose, onSuccess, jobProfile, onDelete }: JobProfileModalProps) {
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         role_name: '',
@@ -209,23 +210,36 @@ export function JobProfileModal({ isOpen, onClose, onSuccess, jobProfile }: JobP
                     </div>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="btn btn-secondary px-6"
-                        disabled={loading}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        className="btn btn-primary px-8 flex items-center gap-2"
-                        disabled={loading}
-                    >
-                        {loading && <span className="spinner w-4 h-4 border-white"></span>}
-                        {jobProfile ? 'Update Profile' : 'Create Profile'}
-                    </button>
+                <div className="flex items-center pt-4">
+                    {jobProfile && onDelete && (
+                        <button
+                            type="button"
+                            onClick={() => onDelete(jobProfile.id)}
+                            className="btn btn-secondary text-danger hover:bg-danger/10 hover:border-danger/30 px-4 flex items-center gap-2"
+                            disabled={loading}
+                        >
+                            <Trash2 size={16} />
+                            Delete
+                        </button>
+                    )}
+                    <div className="flex gap-3 ml-auto">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="btn btn-secondary px-6"
+                            disabled={loading}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="btn btn-primary px-8 flex items-center gap-2"
+                            disabled={loading}
+                        >
+                            {loading && <span className="spinner w-4 h-4 border-white"></span>}
+                            {jobProfile ? 'Update Profile' : 'Create Profile'}
+                        </button>
+                    </div>
                 </div>
             </form>
         </Modal>

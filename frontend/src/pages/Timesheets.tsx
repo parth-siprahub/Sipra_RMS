@@ -17,16 +17,11 @@ import { UnmatchedRecordsModal } from '../components/timesheets/UnmatchedRecords
 import {
     Upload,
     Download,
-    Clock,
     AlertTriangle,
     CheckCircle,
     Calculator,
     Monitor,
     FileSpreadsheet,
-    Search,
-    Coffee,
-    FileText,
-    ExternalLink,
     ArrowUpDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -314,6 +309,7 @@ export function Timesheets() {
                     onImport={() => setIsJiraImportOpen(true)}
                     empMap={empMap}
                     jiraEmpMap={jiraEmpMap}
+                    empMap={empMap}
                     navigateToDrillDown={(users, idx, month) => {
                         navigate('/timesheets/drill-down/jira', {
                             state: { users, currentIndex: idx, month },
@@ -417,6 +413,7 @@ function JiraTab({
     onImport: () => void;
     empMap: Record<number, Employee>;
     jiraEmpMap: Record<string, Employee>;
+    empMap: Record<number, Employee>;
     navigateToDrillDown: (users: UserSummary[], idx: number, month: string) => void;
     setUnmatchedModalOpen: (open: boolean) => void;
     setUnmatchedModalSource: (source: 'JIRA' | 'AWS') => void;
@@ -443,6 +440,9 @@ function JiraTab({
             const summaryRow = rows.find(r => r.is_summary_row);
             const oooRow = rows.find(r => r.is_ooo);
             const issueRows = rows.filter(r => !r.is_summary_row && !r.is_ooo);
+
+            // Use employee_id from the first row that has it (set during import matching)
+            const matchedEmpId = rows.find(r => r.employee_id)?.employee_id ?? null;
 
             summaries.push({
                 user,
@@ -499,12 +499,11 @@ function JiraTab({
                 </div>
 
                 {/* Search */}
-                <div className="relative flex-1 max-w-xs">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+                <div className="flex-1 max-w-xs">
                     <input
                         type="text"
                         placeholder="Search by name..."
-                        className="input-field pl-9 w-full text-sm"
+                        className="input-field w-full text-sm"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                     />
@@ -570,11 +569,11 @@ function JiraTab({
                                 onClick={() => toggleSort('hours')}
                                 className="flex items-center gap-1 cursor-pointer hover:text-text transition-colors justify-end"
                             >
-                                JIRA Hrs
+                                Total JIRA Hours
                                 {sortField === 'hours' && <ArrowUpDown size={12} className="text-cta" />}
                             </button>
                             <span className="text-center">OOO</span>
-                            <span className="text-right">Billable Hrs</span>
+                            <span className="text-right">Total Billable Hours</span>
                         </div>
 
                         {/* Rows */}
@@ -741,12 +740,11 @@ function AwsV2Tab({
                 </div>
 
                 {/* Search */}
-                <div className="relative flex-1 max-w-xs">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+                <div className="flex-1 max-w-xs">
                     <input
                         type="text"
                         placeholder="Search by name or email..."
-                        className="input-field pl-9 w-full text-sm"
+                        className="input-field w-full text-sm"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                     />
@@ -796,11 +794,11 @@ function AwsV2Tab({
                 ) : filteredEntries.length > 0 ? (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr className="bg-surface-hover/50 border-b border-border">
-                                    <th className="sticky left-0 z-10 bg-surface-hover/50 px-4 py-3 text-xs font-bold text-text-muted uppercase min-w-[200px]">User / Email</th>
+                            <thead className="sticky top-0 z-10">
+                                <tr className="bg-surface border-b border-border">
+                                    <th className="sticky left-0 z-20 bg-surface px-4 py-3 text-xs font-bold text-text-muted min-w-[200px]">User / Email</th>
                                     {AWS_DISPLAY_COLS.map(col => (
-                                        <th key={col.label} className="px-3 py-3 text-xs font-bold text-text-muted uppercase text-center min-w-[110px]">
+                                        <th key={col.label} className="px-3 py-3 text-xs font-bold text-text-muted text-center min-w-[110px]">
                                             {col.label}
                                         </th>
                                     ))}

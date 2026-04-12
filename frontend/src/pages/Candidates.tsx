@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Plus, RefreshCw, LayoutGrid, List, Download, Search } from 'lucide-react';
+import { Plus, RefreshCw, LayoutGrid, List, Download, Edit2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { candidatesApi } from '../api/candidates';
 import { resourceRequestsApi } from '../api/resourceRequests';
@@ -118,16 +118,52 @@ const STAGE_COLORS: Record<string, string> = {
 interface KanbanBoardProps {
     candidates: Candidate[];
     vendors: Vendor[];
+    sows: SOW[];
+    requests: ResourceRequest[];
     onStatusChange: (id: number, status: CandidateStatus) => void;
     onCandidateClick: (candidate: Candidate) => void;
     onExitRequest: (id: number) => void;
     onRevertExit: (id: number) => void;
 }
 
-function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick, onExitRequest, onRevertExit }: KanbanBoardProps) {
+function useDragScroll() {
+    const ref = useRef<HTMLDivElement>(null);
+    const isDown = useRef(false);
+    const startX = useRef(0);
+    const scrollLeft = useRef(0);
+
+    const onMouseDown = (e: React.MouseEvent) => {
+        if (!ref.current) return;
+        isDown.current = true;
+        startX.current = e.pageX - ref.current.offsetLeft;
+        scrollLeft.current = ref.current.scrollLeft;
+        ref.current.style.cursor = 'grabbing';
+    };
+    const onMouseLeave = () => {
+        isDown.current = false;
+        if (ref.current) ref.current.style.cursor = '';
+    };
+    const onMouseUp = () => {
+        isDown.current = false;
+        if (ref.current) ref.current.style.cursor = '';
+    };
+    const onMouseMove = (e: React.MouseEvent) => {
+        if (!isDown.current || !ref.current) return;
+        e.preventDefault();
+        const x = e.pageX - ref.current.offsetLeft;
+        const walk = (x - startX.current) * 1.2;
+        ref.current.scrollLeft = scrollLeft.current - walk;
+    };
+
+    return { ref, onMouseDown, onMouseLeave, onMouseUp, onMouseMove };
+}
+
+function KanbanBoard({ candidates, vendors, sows, requests, onStatusChange, onCandidateClick, onExitRequest, onRevertExit }: KanbanBoardProps) {
     const draggingIdRef = useRef<number | null>(null);
     const [draggingId, setDraggingId] = useState<number | null>(null);
     const [dragOverStatus, setDragOverStatus] = useState<CandidateStatus | null>(null);
+    const pipelineScroll = useDragScroll();
+    const closedScroll = useDragScroll();
 
     const grouped = (stages: CandidateStatus[]) =>
         stages.reduce<Record<string, Candidate[]>>((acc, s) => {
@@ -256,9 +292,15 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick, on
                             <p className="text-sm font-semibold text-text truncate">
                                 {formatCandidateFullName(c.first_name, c.last_name)}
                             </p>
-                            {c.status !== 'ONBOARDED' && (
-                                <p className="text-xs text-text-muted truncate mt-0.5">{c.email}</p>
-                            )}
+                            {(() => {
+                                const req = requests.find(r => r.id === c.request_id);
+                                const sow = req ? sows.find(s => s.id === req.sow_id) : null;
+                                return sow ? (
+                                    <p className="text-xs text-text-muted truncate mt-0.5">{sow.sow_number}</p>
+                                ) : (
+                                    <p className="text-xs text-text-muted truncate mt-0.5">{c.email}</p>
+                                );
+                            })()}
                             {c.current_company && (
                                 <p className="text-xs text-text-muted truncate">{c.current_company}</p>
                             )}
@@ -295,7 +337,15 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick, on
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
                     Active Pipeline
                 </p>
-                <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar">
+                <div
+                    ref={pipelineScroll.ref}
+                    className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar select-none"
+                    style={{ cursor: 'grab' }}
+                    onMouseDown={pipelineScroll.onMouseDown}
+                    onMouseLeave={pipelineScroll.onMouseLeave}
+                    onMouseUp={pipelineScroll.onMouseUp}
+                    onMouseMove={pipelineScroll.onMouseMove}
+                >
                     {PIPELINE_STAGES.map((s) => renderColumn(s, pipelineGroups[s]))}
                 </div>
             </div>
@@ -305,7 +355,15 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick, on
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
                     Closed / Inactive
                 </p>
-                <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar">
+                <div
+                    ref={closedScroll.ref}
+                    className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar select-none"
+                    style={{ cursor: 'grab' }}
+                    onMouseDown={closedScroll.onMouseDown}
+                    onMouseLeave={closedScroll.onMouseLeave}
+                    onMouseUp={closedScroll.onMouseUp}
+                    onMouseMove={closedScroll.onMouseMove}
+                >
                     {CLOSED_STAGES.map((s) => renderColumn(s, closedGroups[s]))}
                 </div>
             </div>
@@ -1494,18 +1552,15 @@ export function Candidates() {
                 </div>
 
                 {/* Search Bar */}
-                <div className="flex-1 min-w-[250px] relative">
+                <div className="flex-1 min-w-[250px]">
                     <input
                         type="text"
-                        className="input-field pl-9"
+                        className="input-field w-full"
                         placeholder="Search candidates..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         aria-label="Search candidates"
                     />
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
-                        <Search size={14} />
-                    </div>
                 </div>
 
                 {/* Status filter (table view only) */}
@@ -1592,8 +1647,6 @@ export function Candidates() {
                                         <th>Email</th>
                                         <th>Vendor</th>
                                         <th>Status</th>
-                                        <th>Company</th>
-                                        <th>Exp (yrs)</th>
                                         <th>Added</th>
                                         <th>Actions</th>
                                     </tr>
@@ -1624,21 +1677,15 @@ export function Candidates() {
                                             <td>
                                                 <StatusBadge value={c.status} type="candidate" />
                                             </td>
-                                            <td className="text-text-muted text-sm">{c.current_company ?? '—'}</td>
-                                            <td className="text-text-muted text-sm">
-                                                {c.total_experience != null ? `${c.total_experience}y` : '—'}
-                                            </td>
                                             <td className="text-text-muted text-sm">{formatDate(c.created_at)}</td>
                                             <td onClick={(e) => e.stopPropagation()}>
-                                                {c.status === 'EXIT' && (
-                                                    <button
-                                                        onClick={() => handleRevertExit(c.id)}
-                                                        className="text-xs font-semibold text-warning hover:text-warning/70 transition-colors whitespace-nowrap"
-                                                        title="Revert exit — move back to pipeline"
-                                                    >
-                                                        ↩ Revert
-                                                    </button>
-                                                )}
+                                                <button
+                                                    onClick={() => { setSelectedCandidate(c); setIsDetailsOpen(true); }}
+                                                    className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors"
+                                                    title="Edit Candidate"
+                                                >
+                                                    <Edit2 size={16} />
+                                                </button>
                                             </td>
                                         </tr>
                                     ))}
@@ -1654,6 +1701,8 @@ export function Candidates() {
                 <KanbanBoard
                     candidates={candidates}
                     vendors={vendors}
+                    sows={sows}
+                    requests={requests}
                     onStatusChange={handleStatusChange}
                     onCandidateClick={(c) => { setSelectedCandidate(c); setIsDetailsOpen(true); }}
                     onExitRequest={handleExitRequest}

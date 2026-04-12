@@ -56,4 +56,6 @@ class EmployeeResponse(BaseModel):
     job_profile_name: str | None = None
     # Enriched fields (not stored on employees table directly)
     source: str | None = None        # payroll type: internal / vendor / contractor
+    vendor_name: str | None = None   # from candidate → vendor
     sow_number: str | None = None    # from candidate → resource_request → sow
+    is_backfill: bool | None = None  # from candidate → resource_request → is_backfill
