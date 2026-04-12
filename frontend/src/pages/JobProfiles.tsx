@@ -5,7 +5,6 @@ import { JobProfileModal } from '../components/jobProfiles/JobProfileModal';
 import {
     Plus,
     Edit2,
-    Trash2,
     LayoutGrid,
     Table2
 } from 'lucide-react';
@@ -127,16 +126,9 @@ export function JobProfiles() {
                                 <div className="flex items-start justify-between mb-3">
                                     <h3 className="text-lg font-bold text-text">{profile.role_name}</h3>
                                     <div className="flex gap-1">
-                                        {isAdmin && (
                                         <button onClick={() => handleEdit(profile)} className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors" title="Edit" aria-label="Edit">
                                             <Edit2 size={16} />
                                         </button>
-                                        )}
-                                        {isAdmin && (
-                                        <button onClick={() => handleDelete(profile.id)} className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-danger transition-colors" title="Delete" aria-label="Delete">
-                                            <Trash2 size={16} />
-                                        </button>
-                                        )}
                                     </div>
                                 </div>
                                 <div className="space-y-3 mt-2">
@@ -163,7 +155,7 @@ export function JobProfiles() {
                                     <th className="text-left py-3 px-4">Technology</th>
                                     <th className="text-left py-3 px-4">Experience Level</th>
                                     <th className="text-left py-3 px-4">Created</th>
-                                    {isAdmin && <th className="text-right py-3 px-4">Actions</th>}
+                                    <th className="text-right py-3 px-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -173,18 +165,11 @@ export function JobProfiles() {
                                         <td className="py-3 px-4 text-text-muted">{profile.technology}</td>
                                         <td className="py-3 px-4 text-text-muted">{profile.experience_level || '—'}</td>
                                         <td className="py-3 px-4 text-text-muted">{new Date(profile.created_at || '').toLocaleDateString()}</td>
-                                        {isAdmin && (
-                                            <td className="py-3 px-4 text-right">
-                                                <div className="flex gap-1 justify-end">
-                                                    <button onClick={() => handleEdit(profile)} className="p-1.5 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors" title="Edit">
-                                                        <Edit2 size={14} />
-                                                    </button>
-                                                    <button onClick={() => handleDelete(profile.id)} className="p-1.5 hover:bg-surface-hover rounded-lg text-text-muted hover:text-danger transition-colors" title="Delete">
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        )}
+                                        <td className="py-3 px-4 text-right">
+                                            <button onClick={() => handleEdit(profile)} className="p-1.5 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors" title="Edit">
+                                                <Edit2 size={14} />
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -216,6 +201,7 @@ export function JobProfiles() {
                     }}
                     onSuccess={fetchProfiles}
                     jobProfile={selectedProfile}
+                    onDelete={isAdmin ? handleDelete : undefined}
                 />
             )}
         </div>

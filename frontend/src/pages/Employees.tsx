@@ -631,7 +631,7 @@ export function Employees() {
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text">
                                             {emp.source
-                                                ? (emp.source.toLowerCase() === 'vendor' ? 'Vendor' : 'Internal')
+                                                ? emp.source
                                                 : <span className="text-text-muted italic">—</span>}
                                         </td>
                                         <td className="px-6 py-4">
