@@ -4,9 +4,7 @@ import { type SOW } from '../api/sows';
 import { SowModal } from '../components/sows/SowModal';
 import {
     Plus,
-    Search,
     Edit2,
-    Calendar,
     Download,
     ChevronDown
 } from 'lucide-react';
@@ -197,12 +195,11 @@ export function Sows() {
 
             {/* Filter Bar */}
             <div className="card flex flex-col md:flex-row items-center gap-4 py-3 px-4">
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+                <div className="flex-1 w-full">
                     <input
                         type="search"
                         placeholder="Search SOWs..."
-                        className="input-field pl-10 h-10"
+                        className="input-field h-10 w-full"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -233,10 +230,10 @@ export function Sows() {
                         <p className="text-text-muted text-sm animate-pulse">Loading SOWs...</p>
                     </div>
                 ) : filteredSows.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-auto max-h-[70vh] custom-scrollbar">
                         <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-surface-hover/50 border-b border-border">
+                            <thead className="sticky top-0 z-10">
+                                <tr className="bg-surface border-b border-border">
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">SOW Details</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Job Profile</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider whitespace-nowrap" style={{ minWidth: '220px' }}>Duration</th>
@@ -273,7 +270,6 @@ export function Sows() {
                                         </td>
                                         <td className="px-6 py-4 text-sm whitespace-nowrap">
                                             <div className="flex items-center gap-2 text-text-muted">
-                                                <Calendar size={14} />
                                                 <span>{sow.start_date || 'N/A'}</span>
                                                 <span>→</span>
                                                 <span className={cn(

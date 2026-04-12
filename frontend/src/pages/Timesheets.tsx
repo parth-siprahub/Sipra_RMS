@@ -308,6 +308,7 @@ export function Timesheets() {
                     isAdmin={isAdmin}
                     onImport={() => setIsJiraImportOpen(true)}
                     jiraEmpMap={jiraEmpMap}
+                    empMap={empMap}
                     navigateToDrillDown={(users, idx, month) => {
                         navigate('/timesheets/drill-down/jira', {
                             state: { users, currentIndex: idx, month },
@@ -391,6 +392,7 @@ type SortDir = 'asc' | 'desc';
 
 interface UserSummary {
     user: string;
+    employee_id: number | null;
     rows: JiraRawEntry[];
     totalHours: number;
     oooHours: number;
@@ -398,7 +400,7 @@ interface UserSummary {
 }
 
 function JiraTab({
-    jiraEntries, jiraLoading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport, jiraEmpMap,
+    jiraEntries, jiraLoading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport, jiraEmpMap, empMap,
     navigateToDrillDown, setUnmatchedModalOpen, setUnmatchedModalSource, setUnmatchedDetails
 }: {
     jiraEntries: JiraRawEntry[];
@@ -409,6 +411,7 @@ function JiraTab({
     isAdmin: boolean;
     onImport: () => void;
     jiraEmpMap: Record<string, Employee>;
+    empMap: Record<number, Employee>;
     navigateToDrillDown: (users: UserSummary[], idx: number, month: string) => void;
     setUnmatchedModalOpen: (open: boolean) => void;
     setUnmatchedModalSource: (source: 'JIRA' | 'AWS') => void;
@@ -436,8 +439,12 @@ function JiraTab({
             const oooRow = rows.find(r => r.is_ooo);
             const issueRows = rows.filter(r => !r.is_summary_row && !r.is_ooo);
 
+            // Use employee_id from the first row that has it (set during import matching)
+            const matchedEmpId = rows.find(r => r.employee_id)?.employee_id ?? null;
+
             summaries.push({
                 user,
+                employee_id: matchedEmpId,
                 rows,
                 totalHours: summaryRow?.logged ?? 0,
                 oooHours: oooRow?.logged ?? 0,
@@ -570,7 +577,7 @@ function JiraTab({
                         {/* Rows */}
                         <div className="divide-y divide-border/50 max-h-[65vh] overflow-y-auto">
                             {filteredSummaries.map((summary, idx) => {
-                                const mappedEmployee = jiraEmpMap[summary.user];
+                                const mappedEmployee = (summary.employee_id ? empMap[summary.employee_id] : null) || jiraEmpMap[summary.user];
                                 const displayName = formatPersonName(mappedEmployee?.rms_name || '') || summary.user;
                                 const showSecondary = Boolean(mappedEmployee && !sameText(summary.user, displayName));
                                 const billableHours = Math.max(0, 176 - (summary.oooHours ?? 0));

@@ -344,7 +344,7 @@ function ComparisonTab({
                                     </td>
                                     <td className="px-3 py-2">
                                         {row.source ? (
-                                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-surface-hover text-text-muted capitalize">
+                                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-surface-hover text-text-muted">
                                                 {row.source}
                                             </span>
                                         ) : (

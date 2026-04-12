@@ -73,3 +73,4 @@ class SowResponse(BaseModel):
     job_profile_id: int | None = None
     is_active: bool | None = None
     created_at: datetime | None = None
+    updated_at: datetime | None = None

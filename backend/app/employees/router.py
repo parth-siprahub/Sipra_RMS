@@ -76,12 +76,16 @@ async def list_employees(
     job_profile_map: dict[int, str] = {}
     sow_number_map: dict[int, str] = {}
     is_backfill_map: dict[int, bool | None] = {}
+    vendor_name_map: dict[int, str | None] = {}
     cand_onboarding: dict[int, object | None] = {}
     if candidate_ids:
-        cands = await client.table("candidates").select("id,request_id,onboarding_date").in_("id", candidate_ids).execute()
+        cands = await client.table("candidates").select("id,request_id,onboarding_date,vendor_id,vendor").in_("id", candidate_ids).execute()
         request_ids = [c["request_id"] for c in (cands.data or []) if c.get("request_id")]
         cand_onboarding = {c["id"]: c.get("onboarding_date") for c in (cands.data or []) if c.get("id")}
         cand_to_req = {c["id"]: c["request_id"] for c in (cands.data or []) if c.get("request_id")}
+        for c in (cands.data or []):
+            if c.get("id") and c.get("vendor"):
+                vendor_name_map[c["id"]] = c["vendor"]
         if request_ids:
             rrs = await client.table("resource_requests").select("id,job_profile_id,sow_id,is_backfill").in_("id", request_ids).execute()
             jp_ids = [r["job_profile_id"] for r in (rrs.data or []) if r.get("job_profile_id")]
@@ -114,6 +118,7 @@ async def list_employees(
             "job_profile_name": job_profile_map.get(cid) if cid else None,
             "sow_number": sow_number_map.get(cid) if cid else None,
             "source": e.get("source"),
+            "vendor_name": vendor_name_map.get(cid) if cid else None,
             "start_date": e.get("start_date") or (cand_onboarding.get(cid) if cid else None),
             "is_backfill": is_backfill_map.get(cid) if cid else None,
         }
