@@ -153,7 +153,7 @@ export function Timesheets() {
             const [jiraRaw, awsRaw, empData, counts] = await Promise.all([
                 timesheetsApi.listJiraRaw(month),
                 timesheetsApi.listAwsV2(month),
-                employees.length ? Promise.resolve(employees) : employeesApi.list({ page_size: 200 }),
+                employees.length ? Promise.resolve(employees) : employeesApi.list({ page_size: 1000 }),
                 timesheetsApi.getUnmatchedCount(month),
             ]);
             setJiraEntries(jiraRaw || []);
@@ -307,6 +307,7 @@ export function Timesheets() {
                     importResult={jiraImportResult}
                     isAdmin={isAdmin}
                     onImport={() => setIsJiraImportOpen(true)}
+                    empMap={empMap}
                     jiraEmpMap={jiraEmpMap}
                     empMap={empMap}
                     navigateToDrillDown={(users, idx, month) => {
@@ -400,7 +401,7 @@ interface UserSummary {
 }
 
 function JiraTab({
-    jiraEntries, jiraLoading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport, jiraEmpMap, empMap,
+    jiraEntries, jiraLoading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport, empMap, jiraEmpMap,
     navigateToDrillDown, setUnmatchedModalOpen, setUnmatchedModalSource, setUnmatchedDetails
 }: {
     jiraEntries: JiraRawEntry[];
@@ -410,6 +411,7 @@ function JiraTab({
     importResult: JiraRawImportResult | null;
     isAdmin: boolean;
     onImport: () => void;
+    empMap: Record<number, Employee>;
     jiraEmpMap: Record<string, Employee>;
     empMap: Record<number, Employee>;
     navigateToDrillDown: (users: UserSummary[], idx: number, month: string) => void;
@@ -444,7 +446,7 @@ function JiraTab({
 
             summaries.push({
                 user,
-                employee_id: matchedEmpId,
+                employee_id: rows[0]?.employee_id ?? null,
                 rows,
                 totalHours: summaryRow?.logged ?? 0,
                 oooHours: oooRow?.logged ?? 0,
@@ -552,8 +554,8 @@ function JiraTab({
                     </div>
                 ) : filteredSummaries.length > 0 ? (
                     <>
-                        {/* Column header: SOW | Employee | Job Profile | Total JIRA Hrs | OOO | Billable Hrs */}
-                        <div className="grid grid-cols-[100px_1fr_120px_90px_70px_90px] items-center px-4 py-2.5 border-b border-border bg-surface text-xs font-bold text-text-muted">
+                        {/* Column header */}
+                        <div className="grid grid-cols-[90px_1fr_200px_90px_70px_110px] items-center px-6 py-3 border-b border-border bg-surface-hover/30 text-xs font-semibold text-text-muted uppercase tracking-wide">
                             <span>SOW</span>
                             <button
                                 onClick={() => toggleSort('name')}
@@ -577,7 +579,7 @@ function JiraTab({
                         {/* Rows */}
                         <div className="divide-y divide-border/50 max-h-[65vh] overflow-y-auto">
                             {filteredSummaries.map((summary, idx) => {
-                                const mappedEmployee = (summary.employee_id ? empMap[summary.employee_id] : null) || jiraEmpMap[summary.user];
+                                const mappedEmployee = (summary.employee_id ? empMap[summary.employee_id] : null) ?? jiraEmpMap[summary.user];
                                 const displayName = formatPersonName(mappedEmployee?.rms_name || '') || summary.user;
                                 const showSecondary = Boolean(mappedEmployee && !sameText(summary.user, displayName));
                                 const billableHours = Math.max(0, 176 - (summary.oooHours ?? 0));
@@ -585,49 +587,57 @@ function JiraTab({
                                     <button
                                         key={summary.user}
                                         onClick={() => navigateToDrillDown(filteredSummaries, idx, selectedMonth)}
-                                        className="grid grid-cols-[100px_1fr_120px_90px_70px_90px] items-center w-full px-4 py-3 text-left hover:bg-surface-hover/40 transition-colors cursor-pointer group"
+                                        className="grid grid-cols-[90px_1fr_200px_90px_70px_110px] items-center w-full px-6 py-3.5 text-left hover:bg-surface-hover/40 transition-colors cursor-pointer group"
                                     >
                                         {/* SOW */}
-                                        <div className="text-xs text-text-muted truncate">
-                                            {mappedEmployee?.sow_number || <span className="opacity-30">—</span>}
+                                        <div>
+                                            {mappedEmployee?.sow_number
+                                                ? <span className="inline-block text-xs font-medium text-text-muted bg-surface-hover px-2 py-0.5 rounded-full">
+                                                    {mappedEmployee.sow_number}
+                                                  </span>
+                                                : <span className="text-xs text-text-muted/30">—</span>
+                                            }
                                         </div>
 
                                         {/* Employee */}
-                                        <div className="min-w-0">
+                                        <div className="min-w-0 pr-4">
                                             <p className="font-semibold text-sm text-text truncate group-hover:text-cta transition-colors">
                                                 {displayName}
                                             </p>
                                             {showSecondary && (
-                                                <p className="text-xs text-text-muted truncate">{summary.user}</p>
+                                                <p className="text-xs text-text-muted truncate mt-0.5">{summary.user}</p>
                                             )}
                                         </div>
 
                                         {/* Job Profile */}
-                                        <div className="text-xs text-text-muted truncate">
-                                            {mappedEmployee?.job_profile_name || <span className="opacity-30">—</span>}
+                                        <div className="pr-4">
+                                            {mappedEmployee?.job_profile_name
+                                                ? <span className="text-xs text-text-muted truncate block">{mappedEmployee.job_profile_name}</span>
+                                                : <span className="text-xs text-text-muted/30">—</span>
+                                            }
                                         </div>
 
                                         {/* Total JIRA hours */}
                                         <div className="text-right">
-                                            <span className="font-bold text-sm text-text tabular-nums">
+                                            <span className="font-semibold text-sm text-text tabular-nums">
                                                 {summary.totalHours}h
                                             </span>
                                         </div>
 
                                         {/* OOO */}
-                                        <div className="text-center">
+                                        <div className="flex justify-center">
                                             {summary.oooHours > 0 ? (
-                                                <span className="px-1.5 py-0.5 rounded bg-warning/10 text-warning text-xs font-medium tabular-nums">
+                                                <span className="px-2 py-0.5 rounded-full bg-warning/10 text-warning text-xs font-medium tabular-nums">
                                                     {summary.oooHours}h
                                                 </span>
                                             ) : (
-                                                <span className="text-xs text-text-muted/40">—</span>
+                                                <span className="text-xs text-text-muted/30">—</span>
                                             )}
                                         </div>
 
-                                        {/* Billable hours = 176 - OOO */}
+                                        {/* Billable hours */}
                                         <div className="text-right">
-                                            <span className="font-bold text-sm text-cta tabular-nums">
+                                            <span className="font-semibold text-sm text-cta tabular-nums">
                                                 {billableHours}h
                                             </span>
                                         </div>

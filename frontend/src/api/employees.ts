@@ -11,6 +11,10 @@ export interface Employee {
     jira_username: string | null;
     start_date: string | null;
     exit_date: string | null;
+    /** Final billing date — last day billed to the client */
+    client_offboarding_date: string | null;
+    /** Final salary date — last day on Siprahub payroll */
+    siprahub_offboarding_date: string | null;
     status: 'ACTIVE' | 'EXITED' | 'TERMINATED' | null;
     created_at: string | null;
     updated_at: string | null;
@@ -40,6 +44,10 @@ export interface EmployeeUpdate {
     jira_username?: string;
     start_date?: string;
     exit_date?: string | null;
+    /** Final billing date — last day billed to the client */
+    client_offboarding_date?: string | null;
+    /** Final salary date — last day on Siprahub payroll */
+    siprahub_offboarding_date?: string | null;
     status?: 'ACTIVE' | 'EXITED' | 'TERMINATED';
 }
 

@@ -416,6 +416,7 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
     const [logs, setLogs] = useState<CommunicationLog[]>([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
     const [changingStatus, setChangingStatus] = useState(false);
+    const [pendingStatus, setPendingStatus] = useState<CandidateStatus | null>(null);
 
     useEffect(() => {
         if (candidate && isOpen) {
@@ -435,9 +436,12 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                 l1_score: candidate.l1_score || 0,
                 l2_feedback: candidate.l2_feedback || '',
                 l2_score: candidate.l2_score || 0,
-                overlap_until: candidate.overlap_until || '',
+                overlap_until: candidate.overlap_until || null,
+                last_working_day: candidate.last_working_day || null,
+                exit_reason: candidate.exit_reason || '',
                 remarks: candidate.remarks || '',
             });
+            setPendingStatus(null);
             fetchLogs();
         }
     }, [candidate, isOpen]);
@@ -457,21 +461,20 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
 
     if (!candidate) return null;
 
-    const handleManualStatusChange = async (newStatus: CandidateStatus) => {
+    const handleManualStatusChange = (newStatus: CandidateStatus) => {
         if (!candidate || newStatus === candidate.status) return;
-        setChangingStatus(true);
-        try {
-            await onStatusChange(candidate.id, newStatus);
-        } finally {
-            setChangingStatus(false);
-        }
+        setPendingStatus(newStatus);
     };
 
     const handleUpdate = async () => {
         setSubmitting(true);
         try {
             await candidatesApi.update(candidate.id, editForm);
-            toast.success('Candidate updated');
+            if (pendingStatus) {
+                await onStatusChange(candidate.id, pendingStatus);
+            } else {
+                toast.success('Candidate updated');
+            }
             onUpdated();
             onClose();
         } catch {
@@ -494,24 +497,39 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                     <span className="text-xs font-bold text-text-muted uppercase tracking-wider shrink-0">
                         Status
                     </span>
-                    <div className="flex items-center gap-2 flex-1">
+                    <div className="flex items-center gap-2 flex-1 flex-wrap">
                         <StatusBadge value={candidate.status} type="candidate" />
-                        <span className="text-text-muted text-xs">→</span>
-                        <select
-                            className="input-field text-sm py-1.5 flex-1 max-w-[220px]"
-                            value=""
-                            onChange={(e) => handleManualStatusChange(e.target.value as CandidateStatus)}
-                            disabled={changingStatus}
-                            aria-label="Change candidate status"
-                        >
-                            <option value="" disabled>Move to...</option>
-                            {(NEXT_STEP_TRANSITIONS[candidate.status as CandidateStatus] || []).map((s) => (
-                                <option key={s} value={s}>
-                                    {STAGE_LABELS[s]}
-                                </option>
-                            ))}
-                        </select>
-                        {changingStatus && <span className="spinner w-4 h-4" />}
+                        {pendingStatus ? (
+                            <>
+                                <span className="text-text-muted text-xs">→</span>
+                                <StatusBadge value={pendingStatus} type="candidate" />
+                                <button
+                                    type="button"
+                                    className="text-[10px] text-text-muted hover:text-danger transition-colors"
+                                    onClick={() => setPendingStatus(null)}
+                                    title="Clear staged status change"
+                                >
+                                    ✕ clear
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <span className="text-text-muted text-xs">→</span>
+                                <select
+                                    className="input-field text-sm py-1.5 flex-1 max-w-[220px]"
+                                    value=""
+                                    onChange={(e) => handleManualStatusChange(e.target.value as CandidateStatus)}
+                                    aria-label="Change candidate status"
+                                >
+                                    <option value="" disabled>Move to...</option>
+                                    {(NEXT_STEP_TRANSITIONS[candidate.status as CandidateStatus] || []).map((s) => (
+                                        <option key={s} value={s}>
+                                            {STAGE_LABELS[s]}
+                                        </option>
+                                    ))}
+                                </select>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -594,6 +612,32 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                 <label className="input-label">Skills</label>
                                 <input className="input-field mt-1" value={editForm.skills ?? ''} onChange={e => setEditForm(f => ({ ...f, skills: e.target.value }))} placeholder="e.g. React, Node.js, Python" />
                             </div>
+                            {/* Exit / Rejection Info — show only for terminal statuses */}
+                            {(['EXIT', 'REJECTED_BY_ADMIN', 'REJECTED_BY_CLIENT', 'L1_REJECT', 'SCREEN_REJECT', 'OFFER_BACK_OUT', 'INTERVIEW_BACK_OUT'] as CandidateStatus[]).includes(candidate.status as CandidateStatus) && (
+                                <div className="space-y-3 pt-3 border-t border-border">
+                                    <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Exit / Rejection Details</p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="input-label">Last Working Day</label>
+                                            <input
+                                                type="date"
+                                                className="input-field mt-1"
+                                                value={editForm.last_working_day || ''}
+                                                onChange={e => setEditForm(f => ({ ...f, last_working_day: e.target.value || null }))}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="input-label">Reason</label>
+                                            <input
+                                                className="input-field mt-1"
+                                                value={editForm.exit_reason ?? ''}
+                                                placeholder="e.g. Better offer, project end..."
+                                                onChange={e => setEditForm(f => ({ ...f, exit_reason: e.target.value }))}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             {/* Read-only fields */}
                             <div className="flex items-center gap-4 pt-1 text-sm text-text-muted border-t border-border">
                                 <span>Source: <span className="badge badge-neutral ml-1">{candidate.source?.replace(/_/g, ' ') || '—'}</span></span>
@@ -731,7 +775,7 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                             type="date"
                                             className="input-field"
                                             value={editForm.overlap_until || ''}
-                                            onChange={(e) => setEditForm(prev => ({ ...prev, overlap_until: e.target.value }))}
+                                            onChange={(e) => setEditForm(prev => ({ ...prev, overlap_until: e.target.value || null }))}
                                             title="Overlap Until"
                                         />
                                         <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/10">
