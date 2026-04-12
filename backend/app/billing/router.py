@@ -145,10 +145,12 @@ async def calculate_monthly_billing(
             continue
 
         exit_date = date_type.fromisoformat(emp["exit_date"]) if emp.get("exit_date") else None
+        start_date = date_type.fromisoformat(emp["start_date"]) if emp.get("start_date") else None
 
         billing = calculate_billing(
             entries=entries,
             employee_exit_date=exit_date,
+            employee_start_date=start_date,
         )
 
         # Upsert billing record — mark as processed immediately

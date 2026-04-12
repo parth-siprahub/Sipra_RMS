@@ -134,10 +134,10 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
 
     const totalCandidates = metrics.total_candidates || 0;
 
-    const selectedOnboarded = useMemo(() => {
-        const s = metrics.candidates_by_status;
-        return (s['SELECTED'] || 0) + (s['ONBOARDED'] || 0);
-    }, [metrics]);
+    // Use active_employees (employees table) as source of truth — more accurate than
+    // counting ONBOARDED candidates, which can drift when candidates are later marked EXIT.
+    const selectedOnboarded = metrics.active_employees
+        ?? ((metrics.candidates_by_status?.['SELECTED'] || 0) + (metrics.candidates_by_status?.['ONBOARDED'] || 0));
 
     const totalRejections = useMemo(() => {
         const s = metrics.candidates_by_status;
@@ -185,7 +185,7 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
             {/* KPI Strip */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <KPICard label="Total Candidates" value={totalCandidates} accent={KPI_ACCENT_COLORS.red} gradient={KPI_GRADIENTS.red} sub="All vendors combined" icon={Users} />
-                <KPICard label="Selected / Onboarded" value={selectedOnboarded} accent={KPI_ACCENT_COLORS.green} gradient={KPI_GRADIENTS.green} sub="Cleared pipeline" subClassName="text-[var(--color-success-text)]" icon={UserCheck} />
+                <KPICard label="Active Employees" value={selectedOnboarded} accent={KPI_ACCENT_COLORS.green} gradient={KPI_GRADIENTS.green} sub="Current headcount" subClassName="text-[var(--color-success-text)]" icon={UserCheck} />
                 <KPICard label="Total Rejections" value={totalRejections} accent={KPI_ACCENT_COLORS.orange} gradient={KPI_GRADIENTS.orange} sub="Screen + L1 + L2" icon={XCircle} />
                 <KPICard label="On Hold" value={onHoldCount} accent={KPI_ACCENT_COLORS.purple} gradient={KPI_GRADIENTS.purple} sub="Pending decisions" icon={Pause} />
                 <KPICard label="Active Requests" value={metrics.total_requests || 0} accent={KPI_ACCENT_COLORS.blue} gradient={KPI_GRADIENTS.blue} sub="Inflow active" icon={Briefcase} />

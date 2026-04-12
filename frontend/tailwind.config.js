@@ -35,6 +35,21 @@ export default {
                     muted: "var(--color-text-muted)",
                     inverse: "var(--color-text-inverse)",
                 },
+                danger: {
+                    DEFAULT: "var(--color-danger)",
+                    bg: "var(--color-danger-bg)",
+                },
+                success: {
+                    DEFAULT: "var(--color-success)",
+                    bg: "var(--color-success-bg)",
+                },
+                warning: {
+                    DEFAULT: "var(--color-warning)",
+                    bg: "var(--color-warning-bg)",
+                },
+                info: {
+                    DEFAULT: "var(--color-info, #3B82F6)",
+                },
                 status: {
                     new: "var(--status-new)",
                     submitted: "var(--status-submitted)",

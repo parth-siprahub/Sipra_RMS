@@ -106,6 +106,8 @@ function EditEmployeeModal({
     );
     const [exitDate, setExitDate] = useState<string>(employee.exit_date || todayIsoDate());
     const [exitReason, setExitReason] = useState<string>('');
+    const [clientOffboardingDate, setClientOffboardingDate] = useState<string>(employee.client_offboarding_date || '');
+    const [siprahubOffboardingDate, setSiprahubOffboardingDate] = useState<string>(employee.siprahub_offboarding_date || '');
     const [submitting, setSubmitting] = useState(false);
     const [clients, setClients] = useState<Client[]>([]);
     useEffect(() => {
@@ -136,6 +138,8 @@ function EditEmployeeModal({
             if (form.jira_username !== undefined) payload.jira_username = form.jira_username || undefined;
             payload.status = employmentStatus;
             payload.exit_date = employmentStatus === 'EXITED' ? exitDate : null;
+            payload.client_offboarding_date = employmentStatus === 'EXITED' ? (clientOffboardingDate || null) : null;
+            payload.siprahub_offboarding_date = employmentStatus === 'EXITED' ? (siprahubOffboardingDate || null) : null;
 
             await employeesApi.update(employee.id, payload);
             // Persist reason/date on linked candidate record when available.
@@ -242,6 +246,32 @@ function EditEmployeeModal({
                                     className="input-field"
                                     value={exitDate}
                                     onChange={e => setExitDate(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="input-label" htmlFor="client_offboarding_date">
+                                    Client Offboarding Date
+                                    <span className="ml-1 text-text-muted font-normal normal-case">(final billing date)</span>
+                                </label>
+                                <input
+                                    id="client_offboarding_date"
+                                    type="date"
+                                    className="input-field"
+                                    value={clientOffboardingDate}
+                                    onChange={e => setClientOffboardingDate(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="input-label" htmlFor="siprahub_offboarding_date">
+                                    Siprahub Offboarding Date
+                                    <span className="ml-1 text-text-muted font-normal normal-case">(final salary date)</span>
+                                </label>
+                                <input
+                                    id="siprahub_offboarding_date"
+                                    type="date"
+                                    className="input-field"
+                                    value={siprahubOffboardingDate}
+                                    onChange={e => setSiprahubOffboardingDate(e.target.value)}
                                 />
                             </div>
                         </div>
