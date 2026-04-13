@@ -11,6 +11,7 @@ import {
     Line, Area, AreaChart
 } from 'recharts';
 import { KPICard, KPI_ACCENT_COLORS, KPI_GRADIENTS } from './KPICard';
+import { Modal } from '../ui/Modal';
 import type { DashboardMetrics } from './types';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -121,23 +122,52 @@ function ViewToggle({
 export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
     const [statusView, setStatusView] = useState<'chart' | 'table'>('chart');
     const [funnelView, setFunnelView] = useState<'chart' | 'timeline' | 'table'>('chart');
-
-    const candidateStatusData = useMemo(() => {
-        return Object.entries(metrics.candidates_by_status)
-            .map(([name, value]) => ({
-                name: STATUS_LABELS[name] || name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-                key: name,
-                value,
-            }))
-            .sort((a, b) => b.value - a.value);
-    }, [metrics]);
-
-    const totalCandidates = metrics.total_candidates || 0;
+    const [resourceBreakdownOpen, setResourceBreakdownOpen] = useState(false);
 
     // Use active_employees (employees table) as source of truth — more accurate than
     // counting ONBOARDED candidates, which can drift when candidates are later marked EXIT.
     const selectedOnboarded = metrics.active_employees
         ?? ((metrics.candidates_by_status?.['SELECTED'] || 0) + (metrics.candidates_by_status?.['ONBOARDED'] || 0));
+
+    const candidateStatusData = useMemo(() => {
+        const headcount =
+            metrics.active_employees ??
+            ((metrics.candidates_by_status?.['SELECTED'] || 0) + (metrics.candidates_by_status?.['ONBOARDED'] || 0));
+        const rows = Object.entries(metrics.candidates_by_status).map(([name, value]) => {
+            if (name === 'ONBOARDED') {
+                return {
+                    name: 'Total Resources',
+                    key: name,
+                    value: headcount,
+                };
+            }
+            return {
+                name: STATUS_LABELS[name] || name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+                key: name,
+                value,
+            };
+        });
+        const hasOnboarded = rows.some((r) => r.key === 'ONBOARDED');
+        if (!hasOnboarded && headcount > 0) {
+            rows.push({ name: 'Total Resources', key: 'ONBOARDED', value: headcount });
+        }
+        return rows.sort((a, b) => b.value - a.value);
+    }, [metrics]);
+
+    const statusDistributionTotal = useMemo(
+        () => candidateStatusData.reduce((s, e) => s + e.value, 0),
+        [candidateStatusData]
+    );
+
+    const resourceTechChartData = useMemo(() => {
+        const raw = metrics.active_employees_by_technology;
+        if (!raw?.length) return [];
+        return [...raw]
+            .sort((a, b) => b.count - a.count)
+            .map((t) => ({ name: t.technology, value: t.count }));
+    }, [metrics.active_employees_by_technology]);
+
+    const openResourceBreakdown = () => setResourceBreakdownOpen(true);
 
     const totalRejections = useMemo(() => {
         const s = metrics.candidates_by_status;
@@ -180,11 +210,16 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
         return computeRollingAvg(metrics.timeline, 7);
     }, [metrics]);
 
+    const resourceTechTotal = useMemo(
+        () => resourceTechChartData.reduce((s, e) => s + e.value, 0),
+        [resourceTechChartData]
+    );
+
     return (
+        <>
         <div className="space-y-6">
             {/* KPI Strip */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                <KPICard label="Total Candidates" value={totalCandidates} accent={KPI_ACCENT_COLORS.red} gradient={KPI_GRADIENTS.red} sub="All vendors combined" icon={Users} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <KPICard label="Active Employees" value={selectedOnboarded} accent={KPI_ACCENT_COLORS.green} gradient={KPI_GRADIENTS.green} sub="Current headcount" subClassName="text-[var(--color-success-text)]" icon={UserCheck} />
                 <KPICard label="Total Rejections" value={totalRejections} accent={KPI_ACCENT_COLORS.orange} gradient={KPI_GRADIENTS.orange} sub="Screen + L1 + L2" icon={XCircle} />
                 <KPICard label="On Hold" value={onHoldCount} accent={KPI_ACCENT_COLORS.purple} gradient={KPI_GRADIENTS.purple} sub="Pending decisions" icon={Pause} />
@@ -215,7 +250,20 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
                             <div className="w-[200px] h-[200px] shrink-0">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie data={candidateStatusData} innerRadius={55} outerRadius={90} paddingAngle={1.5} dataKey="value" animationDuration={800} stroke="none">
+                                        <Pie
+                                            data={candidateStatusData}
+                                            innerRadius={55}
+                                            outerRadius={90}
+                                            paddingAngle={1.5}
+                                            dataKey="value"
+                                            animationDuration={800}
+                                            stroke="none"
+                                            style={{ cursor: 'pointer' }}
+                                            onClick={(_, index) => {
+                                                const seg = candidateStatusData[index];
+                                                if (seg?.key === 'ONBOARDED') openResourceBreakdown();
+                                            }}
+                                        >
                                             {candidateStatusData.map((entry, i) => (
                                                 <Cell key={`sd-${i}`} fill={STATUS_COLORS[entry.key] || '#CBD5E1'} />
                                             ))}
@@ -229,16 +277,35 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
                                 </ResponsiveContainer>
                             </div>
                             <div className="flex-1 max-h-[210px] overflow-y-auto custom-scrollbar pr-1 space-y-1.5">
-                                {candidateStatusData.map((entry) => (
-                                    <div key={entry.key} className="flex items-center gap-2.5">
-                                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: STATUS_COLORS[entry.key] || '#CBD5E1' }} />
-                                        <span className="text-xs text-text flex-1 truncate">{entry.name}</span>
-                                        <span className="text-sm font-bold text-text tabular-nums">{entry.value}</span>
-                                        <span className="text-xs text-text-muted tabular-nums w-10 text-right">
-                                            {totalCandidates > 0 ? Math.round((entry.value / totalCandidates) * 100) : 0}%
-                                        </span>
-                                    </div>
-                                ))}
+                                {candidateStatusData.map((entry) => {
+                                    const isResources = entry.key === 'ONBOARDED';
+                                    const pct = statusDistributionTotal > 0
+                                        ? Math.round((entry.value / statusDistributionTotal) * 100)
+                                        : 0;
+                                    return (
+                                        <div
+                                            key={entry.key}
+                                            className={cn(
+                                                'flex items-center gap-2.5 rounded-md px-1 -mx-1 py-0.5 transition-colors',
+                                                isResources && 'cursor-pointer hover:bg-surface-hover'
+                                            )}
+                                            role={isResources ? 'button' : undefined}
+                                            tabIndex={isResources ? 0 : undefined}
+                                            onClick={() => { if (isResources) openResourceBreakdown(); }}
+                                            onKeyDown={(e) => {
+                                                if (isResources && (e.key === 'Enter' || e.key === ' ')) {
+                                                    e.preventDefault();
+                                                    openResourceBreakdown();
+                                                }
+                                            }}
+                                        >
+                                            <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: STATUS_COLORS[entry.key] || '#CBD5E1' }} />
+                                            <span className="text-xs text-text flex-1 truncate">{entry.name}</span>
+                                            <span className="text-sm font-bold text-text tabular-nums">{entry.value}</span>
+                                            <span className="text-xs text-text-muted tabular-nums w-10 text-right">{pct}%</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     ) : (
@@ -252,18 +319,37 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {candidateStatusData.map((entry) => (
-                                        <tr key={entry.key} className="border-b border-border/40 hover:bg-surface-hover transition-colors">
-                                            <td className="py-2 flex items-center gap-2">
-                                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: STATUS_COLORS[entry.key] || '#CBD5E1' }} />
-                                                <span className="text-text">{entry.name}</span>
-                                            </td>
-                                            <td className="text-right font-bold text-text tabular-nums">{entry.value}</td>
-                                            <td className="text-right text-text-muted tabular-nums">
-                                                {totalCandidates > 0 ? Math.round((entry.value / totalCandidates) * 100) : 0}%
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {candidateStatusData.map((entry) => {
+                                        const isResources = entry.key === 'ONBOARDED';
+                                        const pct = statusDistributionTotal > 0
+                                            ? Math.round((entry.value / statusDistributionTotal) * 100)
+                                            : 0;
+                                        return (
+                                            <tr
+                                                key={entry.key}
+                                                className={cn(
+                                                    'border-b border-border/40 transition-colors',
+                                                    isResources ? 'cursor-pointer hover:bg-surface-hover' : 'hover:bg-surface-hover'
+                                                )}
+                                                role={isResources ? 'button' : undefined}
+                                                tabIndex={isResources ? 0 : undefined}
+                                                onClick={() => { if (isResources) openResourceBreakdown(); }}
+                                                onKeyDown={(e) => {
+                                                    if (isResources && (e.key === 'Enter' || e.key === ' ')) {
+                                                        e.preventDefault();
+                                                        openResourceBreakdown();
+                                                    }
+                                                }}
+                                            >
+                                                <td className="py-2 flex items-center gap-2">
+                                                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: STATUS_COLORS[entry.key] || '#CBD5E1' }} />
+                                                    <span className="text-text">{entry.name}</span>
+                                                </td>
+                                                <td className="text-right font-bold text-text tabular-nums">{entry.value}</td>
+                                                <td className="text-right text-text-muted tabular-nums">{pct}%</td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -479,5 +565,70 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
             </div>
 
         </div>
+
+        <Modal
+            isOpen={resourceBreakdownOpen}
+            onClose={() => setResourceBreakdownOpen(false)}
+            title="Total resources — by primary technology"
+            maxWidth="max-w-md"
+        >
+            {resourceTechChartData.length === 0 ? (
+                <p className="text-sm text-text-muted m-0">
+                    No technology breakdown available. Active employees need a linked candidate, resource request, and job profile with a technology set.
+                </p>
+            ) : (
+                <div className="flex flex-col gap-4">
+                    <p className="text-xs text-text-muted m-0">
+                        Headcount by primary job profile technology (first token when multiple are listed). Total:{' '}
+                        <span className="font-semibold text-text tabular-nums">{resourceTechTotal}</span>
+                    </p>
+                    <div className="h-[280px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={resourceTechChartData}
+                                    innerRadius={52}
+                                    outerRadius={88}
+                                    paddingAngle={1}
+                                    dataKey="value"
+                                    nameKey="name"
+                                    animationDuration={600}
+                                    stroke="none"
+                                >
+                                    {resourceTechChartData.map((_, i) => (
+                                        <Cell key={`tech-${i}`} fill={VENDOR_BAR_COLORS[i % VENDOR_BAR_COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    formatter={(value: number | undefined, _n: string | undefined, props: any) => [
+                                        value,
+                                        props?.payload?.name ?? '',
+                                    ]}
+                                    contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <ul className="max-h-40 overflow-y-auto custom-scrollbar space-y-1.5 m-0 p-0 list-none">
+                        {resourceTechChartData.map((row, i) => {
+                            const pct = resourceTechTotal > 0 ? Math.round((row.value / resourceTechTotal) * 100) : 0;
+                            return (
+                                <li key={`${row.name}-${i}`} className="flex items-center gap-2 text-xs">
+                                    <span
+                                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                                        style={{ backgroundColor: VENDOR_BAR_COLORS[i % VENDOR_BAR_COLORS.length] }}
+                                    />
+                                    <span className="text-text flex-1 truncate">{row.name}</span>
+                                    <span className="font-bold text-text tabular-nums">{row.value}</span>
+                                    <span className="text-text-muted tabular-nums w-9 text-right">{pct}%</span>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+            )}
+        </Modal>
+        </>
     );
 }

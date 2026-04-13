@@ -3,7 +3,7 @@ import httpx
 import json
 import sys
 
-base = "http://127.0.0.1:8000"
+base = "http://127.0.0.1:8000/api"
 results = []
 passed = 0
 failed = 0

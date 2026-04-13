@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { sowApi } from '../api/sows';
 import { type SOW } from '../api/sows';
 import { SowModal } from '../components/sows/SowModal';
@@ -19,6 +20,7 @@ import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 
 export function Sows() {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
     const [sows, setSows] = useState<SOW[]>([]);
@@ -134,8 +136,7 @@ export function Sows() {
     };
 
     const handleEdit = (sow: SOW) => {
-        setSelectedSow(sow);
-        setIsModalOpen(true);
+        navigate(`/sows/${sow.id}/edit`);
     };
 
     const handleCreate = () => {

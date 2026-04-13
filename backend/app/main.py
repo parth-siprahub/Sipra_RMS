@@ -6,12 +6,14 @@ Security hardened for production:
   - SlowAPI rate limiting (global + per-route)
   - CORS restricted to explicit origins/methods/headers
   - Structured JSON logging with request correlation IDs
+
+All HTTP routes are mounted under /api (matches Nginx location /api/ and VITE_API_URL …/api).
 """
 import time
 import uuid
 import logging
 import contextvars
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -37,6 +39,9 @@ from app.audit.router import router as audit_router
 from app.reports.router import router as reports_router
 from app.billing_config.router import router as billing_config_router
 
+# Public URL prefix (must match Nginx proxy_pass and frontend VITE_API_URL).
+API_PREFIX = "/api"
+
 # Set up structured JSON logging (replaces basicConfig)
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -50,9 +55,9 @@ request_id_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("req
 app = FastAPI(
     title="RMS API",
     version="1.0.0",
-    # Disable Swagger docs in production — set via env var
-    docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
-    redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
+    docs_url=f"{API_PREFIX}/docs" if settings.ENVIRONMENT != "production" else None,
+    redoc_url=f"{API_PREFIX}/redoc" if settings.ENVIRONMENT != "production" else None,
+    openapi_url=f"{API_PREFIX}/openapi.json",
 )
 
 # Attach rate limiter to app state
@@ -139,6 +144,11 @@ async def add_request_id_and_timing(request: Request, call_next):
     rid = request.headers.get("X-Request-ID") or str(uuid.uuid4())
     request_id_ctx.set(rid)
 
+    if settings.LOG_HTTP_REQUESTS:
+        # Temporary debugging: visible in PM2/docker stdout without log level changes
+        print(f"{request.method} {request.url.path}", flush=True)
+        logger.info("HTTP %s %s [rid=%s]", request.method, request.url.path, rid)
+
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
@@ -167,35 +177,18 @@ app.add_middleware(
     expose_headers=["X-Process-Time", "X-Request-ID"],
 )
 
-# ─── Routers ──────────────────────────────────────────────────────────────────
+# ─── Routers (all under /api) ────────────────────────────────────────────────
 from app.job_profiles.jd import router as jd_router
-app.include_router(jd_router)
-app.include_router(auth_router)
-app.include_router(job_profiles_router)
-app.include_router(resource_requests_router)
-app.include_router(candidates_router)
-app.include_router(resume_router)
-app.include_router(sows_router)
-app.include_router(communication_logs_router)
-app.include_router(dashboard_router)
-app.include_router(vendors_router)
-app.include_router(employees_router)
-app.include_router(timesheets_router)
-app.include_router(billing_router)
-app.include_router(clients_router)
-app.include_router(exports_router)
-app.include_router(audit_router)
-app.include_router(reports_router)
-app.include_router(billing_config_router)
+
+system_router = APIRouter(prefix=API_PREFIX, tags=["System"])
 
 
-# ─── Health ───────────────────────────────────────────────────────────────────
-@app.get("/health", tags=["System"])
+@system_router.get("/health")
 async def health():
     return {"status": "ok", "environment": settings.ENVIRONMENT}
 
 
-@app.get("/ready", tags=["System"])
+@system_router.get("/ready")
 async def readiness_check():
     """Check database connectivity. Returns 503 if Supabase is unreachable."""
     from app.database import get_supabase_admin_async
@@ -211,3 +204,24 @@ async def readiness_check():
             status_code=503,
             content={"status": "not_ready", "database": "disconnected", "error": str(exc)},
         )
+
+
+app.include_router(system_router)
+app.include_router(jd_router, prefix=API_PREFIX)
+app.include_router(auth_router, prefix=API_PREFIX)
+app.include_router(job_profiles_router, prefix=API_PREFIX)
+app.include_router(resource_requests_router, prefix=API_PREFIX)
+app.include_router(candidates_router, prefix=API_PREFIX)
+app.include_router(resume_router, prefix=API_PREFIX)
+app.include_router(sows_router, prefix=API_PREFIX)
+app.include_router(communication_logs_router, prefix=API_PREFIX)
+app.include_router(dashboard_router, prefix=API_PREFIX)
+app.include_router(vendors_router, prefix=API_PREFIX)
+app.include_router(employees_router, prefix=API_PREFIX)
+app.include_router(timesheets_router, prefix=API_PREFIX)
+app.include_router(billing_router, prefix=API_PREFIX)
+app.include_router(clients_router, prefix=API_PREFIX)
+app.include_router(exports_router, prefix=API_PREFIX)
+app.include_router(audit_router, prefix=API_PREFIX)
+app.include_router(reports_router, prefix=API_PREFIX)
+app.include_router(billing_config_router, prefix=API_PREFIX)

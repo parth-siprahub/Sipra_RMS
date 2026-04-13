@@ -92,6 +92,8 @@ export const candidatesApi = {
     list: (filters?: { status?: string; request_id?: number; page_size?: number; search?: string }) =>
         api.get<Candidate[]>('/candidates/', filters),
 
+    get: (id: number) => api.get<Candidate>(`/candidates/${id}`),
+
     create: (payload: CreateCandidatePayload) =>
         api.post<Candidate>('/candidates/', payload),
 

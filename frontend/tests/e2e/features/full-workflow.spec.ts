@@ -3,10 +3,10 @@ import { test, expect } from '@playwright/test';
 /**
  * Full Workflow E2E Test
  * Tests: SOW → Job Profile → Resource Request → Candidate → Pipeline Transitions
- * Runs against a live backend at localhost:8000
+ * Runs against a live backend at localhost:8000/api
  */
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'http://localhost:8000/api';
 const UNIQUE_SUFFIX = Date.now().toString().slice(-6);
 
 let authToken: string;
