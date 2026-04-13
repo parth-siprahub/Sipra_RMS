@@ -42,6 +42,8 @@ export interface EmployeeUpdate {
     siprahub_email?: string;
     github_id?: string;
     jira_username?: string;
+    /** Payroll / vendor name */
+    source?: string;
     start_date?: string;
     exit_date?: string | null;
     /** Final billing date — last day billed to the client */

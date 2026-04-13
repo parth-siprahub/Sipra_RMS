@@ -18,6 +18,7 @@ import {
     ArrowUp,
     ArrowDown,
     ArrowUpDown,
+    ChevronDown,
     RotateCcw,
 } from 'lucide-react';
 
@@ -85,11 +86,13 @@ function EditEmployeeModal({
     onClose,
     onSuccess,
     employee,
+    payrollOptions,
 }: {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
     employee: Employee;
+    payrollOptions: string[];
 }) {
     const initiallyExited = employee.status === 'EXITED';
     const [form, setForm] = useState<EmployeeUpdate>({
@@ -99,6 +102,7 @@ function EditEmployeeModal({
         siprahub_email: employee.siprahub_email || '',
         github_id: employee.github_id || '',
         jira_username: employee.jira_username || '',
+        source: employee.source || '',
     });
     const [employmentStatus, setEmploymentStatus] = useState<'ACTIVE' | 'EXITED'>(
         initiallyExited ? 'EXITED' : 'ACTIVE'
@@ -107,6 +111,7 @@ function EditEmployeeModal({
     const [exitReason, setExitReason] = useState<string>('');
     const [clientOffboardingDate, setClientOffboardingDate] = useState<string>(employee.client_offboarding_date || '');
     const [siprahubOffboardingDate, setSiprahubOffboardingDate] = useState<string>(employee.siprahub_offboarding_date || '');
+    const [showRevertConfirm, setShowRevertConfirm] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [clients, setClients] = useState<Client[]>([]);
     useEffect(() => {
@@ -135,6 +140,7 @@ function EditEmployeeModal({
             if (form.siprahub_email !== undefined) payload.siprahub_email = form.siprahub_email || undefined;
             if (form.github_id !== undefined) payload.github_id = form.github_id || undefined;
             if (form.jira_username !== undefined) payload.jira_username = form.jira_username || undefined;
+            if (form.source !== undefined) payload.source = form.source || undefined;
             payload.status = employmentStatus;
             payload.exit_date = employmentStatus === 'EXITED' ? exitDate : null;
             payload.client_offboarding_date = employmentStatus === 'EXITED' ? (clientOffboardingDate || null) : null;
@@ -213,33 +219,51 @@ function EditEmployeeModal({
                     <label className="input-label" htmlFor="jira_username">Jira Username</label>
                     <input id="jira_username" className="input-field" value={form.jira_username || ''} onChange={e => setForm(p => ({ ...p, jira_username: e.target.value }))} placeholder="jira-username" />
                 </div>
+                <div>
+                    <label className="input-label" htmlFor="payroll_source">Payroll</label>
+                    <select
+                        id="payroll_source"
+                        title="Payroll"
+                        className="input-field"
+                        value={form.source || ''}
+                        onChange={e => setForm(p => ({ ...p, source: e.target.value }))}
+                    >
+                        <option value="">Select payroll...</option>
+                        {payrollOptions.map((payroll) => (
+                            <option key={payroll} value={payroll}>
+                                {payroll}
+                            </option>
+                        ))}
+                    </select>
+                </div>
                 <div className="card p-3 space-y-3 border border-border">
                     <div className="flex items-center justify-between gap-3">
                         <label className="input-label mb-0">Employment Status</label>
                         <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setEmploymentStatus('ACTIVE')}
-                                className={cn(
-                                    'btn btn-sm',
-                                    employmentStatus === 'ACTIVE' ? 'btn-secondary' : 'btn-ghost'
-                                )}
-                            >
-                                Revert to Active
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setEmploymentStatus('EXITED');
-                                    if (!exitDate) setExitDate(todayIsoDate());
-                                }}
-                                className={cn(
-                                    'btn btn-sm',
-                                    employmentStatus === 'EXITED' ? 'btn-danger' : 'btn-ghost'
-                                )}
-                            >
-                                Mark as Exited
-                            </button>
+                            {(initiallyExited || employmentStatus === 'EXITED') && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowRevertConfirm(true)}
+                                    className={cn(
+                                        'btn btn-sm',
+                                        employmentStatus === 'ACTIVE' ? 'btn-secondary' : 'btn-ghost'
+                                    )}
+                                >
+                                    Revert to Active
+                                </button>
+                            )}
+                            {employmentStatus !== 'EXITED' && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEmploymentStatus('EXITED');
+                                        if (!exitDate) setExitDate(todayIsoDate());
+                                    }}
+                                    className="btn btn-sm btn-ghost"
+                                >
+                                    Mark as Exited
+                                </button>
+                            )}
                         </div>
                     </div>
                     {employmentStatus === 'EXITED' && (
@@ -267,7 +291,6 @@ function EditEmployeeModal({
                             <div>
                                 <label className="input-label" htmlFor="client_offboarding_date">
                                     Client Offboarding Date
-                                    <span className="ml-1 text-text-muted font-normal normal-case">(final billing date)</span>
                                 </label>
                                 <input
                                     id="client_offboarding_date"
@@ -275,12 +298,13 @@ function EditEmployeeModal({
                                     className="input-field"
                                     value={clientOffboardingDate}
                                     onChange={e => setClientOffboardingDate(e.target.value)}
+                                    onFocus={(e) => e.currentTarget.showPicker?.()}
+                                    onClick={(e) => e.currentTarget.showPicker?.()}
                                 />
                             </div>
                             <div>
                                 <label className="input-label" htmlFor="siprahub_offboarding_date">
                                     Siprahub Offboarding Date
-                                    <span className="ml-1 text-text-muted font-normal normal-case">(final salary date)</span>
                                 </label>
                                 <input
                                     id="siprahub_offboarding_date"
@@ -288,6 +312,8 @@ function EditEmployeeModal({
                                     className="input-field"
                                     value={siprahubOffboardingDate}
                                     onChange={e => setSiprahubOffboardingDate(e.target.value)}
+                                    onFocus={(e) => e.currentTarget.showPicker?.()}
+                                    onClick={(e) => e.currentTarget.showPicker?.()}
                                 />
                             </div>
                         </div>
@@ -300,6 +326,45 @@ function EditEmployeeModal({
                     </button>
                 </div>
             </form>
+
+            <Modal
+                isOpen={showRevertConfirm}
+                onClose={() => setShowRevertConfirm(false)}
+                title="Revert Exit"
+                maxWidth="max-w-md"
+            >
+                <div className="space-y-5">
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-warning/10 border border-warning/20">
+                        <RotateCcw size={18} className="text-warning shrink-0 mt-0.5" />
+                        <p className="text-sm text-text">
+                            Revert <span className="font-semibold">{formatPersonName(employee.rms_name)}</span> from{' '}
+                            <span className="font-semibold text-danger">Exit</span>? Their employee record
+                            will be restored to <span className="font-semibold">Active</span> and the
+                            exit date will be cleared.
+                        </p>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowRevertConfirm(false)}
+                            className="btn btn-secondary flex-1"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setEmploymentStatus('ACTIVE');
+                                setShowRevertConfirm(false);
+                            }}
+                            className="btn btn-cta flex-1 font-semibold"
+                        >
+                            Revert Exit
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </Modal>
     );
 }
@@ -413,6 +478,8 @@ export function Employees() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('ACTIVE');
+    const [payrollFilter, setPayrollFilter] = useState('ALL');
+    const [sowFilter, setSowFilter] = useState('ALL');
     const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
     const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
     const [sortKey, setSortKey] = useState<EmployeeSortKey>('rms_name');
@@ -429,21 +496,6 @@ export function Employees() {
         }
     }, []);
 
-    const handleRevertEmployee = async (emp: Employee) => {
-        if (!emp.candidate_id) {
-            toast.error('No candidate linked to this employee');
-            return;
-        }
-        try {
-            await candidatesApi.revertExit(emp.candidate_id);
-            await employeesApi.update(emp.id, { status: 'ACTIVE', exit_date: null });
-            toast.success(`${emp.rms_name} reverted to Active`);
-            fetchEmployees();
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to revert');
-        }
-    };
-
     useEffect(() => {
         fetchEmployees();
     }, []);
@@ -453,14 +505,56 @@ export function Employees() {
 
     const employees = allEmployees.filter(e => e.status === statusFilter);
 
+    const allPayrollOptions = useMemo(() => {
+        const values = new Set<string>();
+        for (const emp of allEmployees) {
+            if (emp.source?.trim()) {
+                values.add(emp.source.trim());
+            }
+        }
+        return Array.from(values).sort((a, b) => a.localeCompare(b));
+    }, [allEmployees]);
+
+    const payrollOptions = useMemo(() => {
+        const values = new Set<string>();
+        for (const emp of employees) {
+            if (emp.source?.trim()) {
+                values.add(emp.source.trim());
+            }
+        }
+        return Array.from(values).sort((a, b) => a.localeCompare(b));
+    }, [employees]);
+
+    const sowOptions = useMemo(() => {
+        const values = new Set<string>();
+        for (const emp of employees) {
+            if (emp.sow_number?.trim()) {
+                values.add(emp.sow_number.trim());
+            }
+        }
+        return Array.from(values).sort((a, b) => a.localeCompare(b));
+    }, [employees]);
+
     const filtered = employees.filter(emp => {
         const q = searchQuery.toLowerCase();
-        return (emp.rms_name || '').toLowerCase().includes(q)
+        const matchesSearch = (emp.rms_name || '').toLowerCase().includes(q)
             || (emp.client_name || '').toLowerCase().includes(q)
             || (emp.jira_username || '').toLowerCase().includes(q)
             || (emp.aws_email || '').toLowerCase().includes(q)
             || (emp.siprahub_email || '').toLowerCase().includes(q)
             || (emp.job_profile_name || '').toLowerCase().includes(q);
+
+        const matchesPayroll =
+            payrollFilter === 'ALL'
+                ? true
+                : (emp.source || '').trim() === payrollFilter;
+
+        const matchesSow =
+            sowFilter === 'ALL'
+                ? true
+                : (emp.sow_number || '').trim() === sowFilter;
+
+        return matchesSearch && matchesPayroll && matchesSow;
     });
 
     const toggleSort = (key: EmployeeSortKey) => {
@@ -626,9 +720,61 @@ export function Employees() {
                                 <tr className="bg-surface border-b border-border">
                                     <EmployeeSortTh label="Employee" columnKey="rms_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Client Name" columnKey="client_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">SOW</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">
+                                        <div className="inline-flex items-center gap-1.5">
+                                            <span>SOW</span>
+                                            <div className="relative">
+                                                <select
+                                                    className="absolute inset-0 w-5 h-5 opacity-0 cursor-pointer"
+                                                    value={sowFilter}
+                                                    onChange={(e) => setSowFilter(e.target.value)}
+                                                    title="Filter by SOW"
+                                                >
+                                                    <option value="ALL">All</option>
+                                                    {sowOptions.map((sow) => (
+                                                        <option key={sow} value={sow}>
+                                                            {sow}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown
+                                                    size={14}
+                                                    className={cn(
+                                                        'pointer-events-none',
+                                                        sowFilter === 'ALL' ? 'text-text-muted' : 'text-cta'
+                                                    )}
+                                                />
+                                            </div>
+                                        </div>
+                                    </th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted">Hiring Type</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">Payroll</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">
+                                        <div className="inline-flex items-center gap-1.5">
+                                            <span>Payroll</span>
+                                            <div className="relative">
+                                                <select
+                                                    className="absolute inset-0 w-5 h-5 opacity-0 cursor-pointer"
+                                                    value={payrollFilter}
+                                                    onChange={(e) => setPayrollFilter(e.target.value)}
+                                                    title="Filter by Payroll"
+                                                >
+                                                    <option value="ALL">All</option>
+                                                    {payrollOptions.map((payroll) => (
+                                                        <option key={payroll} value={payroll}>
+                                                            {payroll}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown
+                                                    size={14}
+                                                    className={cn(
+                                                        'pointer-events-none',
+                                                        payrollFilter === 'ALL' ? 'text-text-muted' : 'text-cta'
+                                                    )}
+                                                />
+                                            </div>
+                                        </div>
+                                    </th>
                                     <EmployeeSortTh label="Status" columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Start Date" columnKey="start_date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     {isAdmin && <th className="px-6 py-4 text-xs font-bold text-text-muted text-right">Actions</th>}
@@ -683,7 +829,7 @@ export function Employees() {
                                         <td className="px-6 py-4 text-sm text-text-muted whitespace-nowrap">
                                             <span>{emp.start_date || 'N/A'}</span>
                                             {emp.exit_date && (
-                                                <span className="text-danger"> → {emp.exit_date}</span>
+                                                <span className="text-text-muted"> → {emp.exit_date}</span>
                                             )}
                                         </td>
                                         {isAdmin && (
@@ -696,15 +842,6 @@ export function Employees() {
                                                     >
                                                         <Edit2 size={18} />
                                                     </button>
-                                                    {emp.status === 'EXITED' && emp.candidate_id && (
-                                                        <button
-                                                            onClick={() => handleRevertEmployee(emp)}
-                                                            className="p-2 hover:bg-success/10 rounded-lg text-text-muted hover:text-[var(--brand-green)] transition-colors"
-                                                            title="Revert to Active"
-                                                        >
-                                                            <RotateCcw size={18} />
-                                                        </button>
-                                                    )}
                                                 </div>
                                             </td>
                                         )}
@@ -724,6 +861,7 @@ export function Employees() {
                     onClose={() => setEditEmployee(null)}
                     onSuccess={fetchEmployees}
                     employee={editEmployee}
+                    payrollOptions={allPayrollOptions}
                 />
             )}
 

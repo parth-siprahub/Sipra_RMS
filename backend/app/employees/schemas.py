@@ -28,6 +28,8 @@ class EmployeeUpdate(BaseModel):
     siprahub_email: EmailStr | None = None
     github_id: str | None = None
     jira_username: str | None = None
+    # Payroll / vendor name
+    source: str | None = None
     start_date: date | None = None
     exit_date: date | None = None
     # Offboarding dates (set when employee is marked EXITED)
