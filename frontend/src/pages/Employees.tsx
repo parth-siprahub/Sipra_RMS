@@ -311,6 +311,23 @@ export function EditEmployeeForm({
                         </select>
                     </div>
                 </div>
+                <div>
+                    <label className="input-label" htmlFor="payroll_source">Payroll</label>
+                    <select
+                        id="payroll_source"
+                        title="Payroll"
+                        className="input-field"
+                        value={form.source || ''}
+                        onChange={e => setForm(p => ({ ...p, source: e.target.value }))}
+                    >
+                        <option value="">Select payroll...</option>
+                        {payrollOptions.map((payroll) => (
+                            <option key={payroll} value={payroll}>
+                                {payroll}
+                            </option>
+                        ))}
+                    </select>
+                </div>
                 <div className="card p-3 space-y-3 border border-border">
                     <div className="flex items-center justify-between gap-3">
                         <label className="input-label mb-0">Employment Status</label>
