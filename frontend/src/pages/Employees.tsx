@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { employeesApi, type Employee, type EmployeeUpdate } from '../api/employees';
 import { clientsApi, type Client } from '../api/clients';
 import { candidatesApi } from '../api/candidates';
@@ -156,16 +157,14 @@ function EmployeeSortTh({
     );
 }
 
-function EditEmployeeModal({
-    isOpen,
-    onClose,
-    onSuccess,
+export function EditEmployeeForm({
+    onSaved,
+    onCancel,
     employee,
     payrollOptions,
 }: {
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
+    onSaved: () => void;
+    onCancel: () => void;
     employee: Employee;
     payrollOptions: string[];
 }) {
@@ -247,8 +246,7 @@ function EditEmployeeModal({
                 }
             }
             toast.success('Employee updated');
-            onSuccess();
-            onClose();
+            onSaved();
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Failed to update employee');
         } finally {
@@ -257,42 +255,61 @@ function EditEmployeeModal({
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Edit Employee — Triad Mapping">
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label className="input-label" htmlFor="rms_name">RMS Name</label>
-                    <input id="rms_name" title="RMS Name" placeholder="Full Name" className="input-field" value={form.rms_name || ''} onChange={e => setForm(p => ({ ...p, rms_name: e.target.value }))} />
-                </div>
-                <div>
-                    <label className="input-label" htmlFor="client_name">Client Name</label>
-                    <select
-                        id="client_name"
-                        title="Client Name"
-                        className="input-field"
-                        value={form.client_name || ''}
-                        onChange={e => setForm(p => ({ ...p, client_name: e.target.value }))}
-                    >
-                        <option value="">Select client...</option>
-                        {clients.map(c => (
-                            <option key={c.id} value={c.client_name}>{c.client_name}</option>
-                        ))}
-                    </select>
-                </div>
-                <div>
-                    <label className="input-label" htmlFor="aws_email">AWS Email</label>
-                    <input id="aws_email" className="input-field" type="email" value={form.aws_email || ''} onChange={e => setForm(p => ({ ...p, aws_email: e.target.value }))} placeholder="user@client.awsapps.com" />
-                </div>
-                <div>
-                    <label className="input-label" htmlFor="siprahub_email">SipraHub Email</label>
-                    <input id="siprahub_email" className="input-field" type="email" value={form.siprahub_email || ''} onChange={e => setForm(p => ({ ...p, siprahub_email: e.target.value }))} placeholder="user@siprahub.com" />
-                </div>
-                <div>
-                    <label className="input-label" htmlFor="github_id">GitHub ID</label>
-                    <input id="github_id" className="input-field" value={form.github_id || ''} onChange={e => setForm(p => ({ ...p, github_id: e.target.value }))} placeholder="github-username" />
-                </div>
-                <div>
-                    <label className="input-label" htmlFor="jira_username">Jira Username</label>
-                    <input id="jira_username" className="input-field" value={form.jira_username || ''} onChange={e => setForm(p => ({ ...p, jira_username: e.target.value }))} placeholder="jira-username" />
+        <>
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+                    <div className="lg:col-span-2">
+                        <label className="input-label" htmlFor="rms_name">RMS Name</label>
+                        <input id="rms_name" title="RMS Name" placeholder="Full Name" className="input-field" value={form.rms_name || ''} onChange={e => setForm(p => ({ ...p, rms_name: e.target.value }))} />
+                    </div>
+                    <div className="lg:col-span-2">
+                        <label className="input-label" htmlFor="client_name">Client Name</label>
+                        <select
+                            id="client_name"
+                            title="Client Name"
+                            className="input-field"
+                            value={form.client_name || ''}
+                            onChange={e => setForm(p => ({ ...p, client_name: e.target.value }))}
+                        >
+                            <option value="">Select client...</option>
+                            {clients.map(c => (
+                                <option key={c.id} value={c.client_name}>{c.client_name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="input-label" htmlFor="aws_email">AWS Email</label>
+                        <input id="aws_email" className="input-field" type="email" value={form.aws_email || ''} onChange={e => setForm(p => ({ ...p, aws_email: e.target.value }))} placeholder="user@client.awsapps.com" />
+                    </div>
+                    <div>
+                        <label className="input-label" htmlFor="siprahub_email">SipraHub Email</label>
+                        <input id="siprahub_email" className="input-field" type="email" value={form.siprahub_email || ''} onChange={e => setForm(p => ({ ...p, siprahub_email: e.target.value }))} placeholder="user@siprahub.com" />
+                    </div>
+                    <div>
+                        <label className="input-label" htmlFor="github_id">GitHub ID</label>
+                        <input id="github_id" className="input-field" value={form.github_id || ''} onChange={e => setForm(p => ({ ...p, github_id: e.target.value }))} placeholder="github-username" />
+                    </div>
+                    <div>
+                        <label className="input-label" htmlFor="jira_username">Jira Username</label>
+                        <input id="jira_username" className="input-field" value={form.jira_username || ''} onChange={e => setForm(p => ({ ...p, jira_username: e.target.value }))} placeholder="jira-username" />
+                    </div>
+                    <div className="lg:col-span-2">
+                        <label className="input-label" htmlFor="payroll_source">Payroll</label>
+                        <select
+                            id="payroll_source"
+                            title="Payroll"
+                            className="input-field"
+                            value={form.source || ''}
+                            onChange={e => setForm(p => ({ ...p, source: e.target.value }))}
+                        >
+                            <option value="">Select payroll...</option>
+                            {payrollOptions.map((payroll) => (
+                                <option key={payroll} value={payroll}>
+                                    {payroll}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
                 <div>
                     <label className="input-label" htmlFor="payroll_source">Payroll</label>
@@ -394,9 +411,9 @@ function EditEmployeeModal({
                         </div>
                     )}
                 </div>
-                <div className="flex gap-3 pt-2">
-                    <button type="button" onClick={onClose} className="btn btn-secondary flex-1" disabled={submitting}>Cancel</button>
-                    <button type="submit" className="btn btn-cta flex-1" disabled={submitting}>
+                <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t border-border sm:justify-end">
+                    <button type="button" onClick={onCancel} className="btn btn-secondary w-full sm:w-auto min-w-[10rem]" disabled={submitting}>Cancel</button>
+                    <button type="submit" className="btn btn-cta w-full sm:w-auto min-w-[10rem]" disabled={submitting}>
                         {submitting ? <span className="spinner w-4 h-4" /> : 'Save Changes'}
                     </button>
                 </div>
@@ -440,7 +457,7 @@ function EditEmployeeModal({
                     </div>
                 </div>
             </Modal>
-        </Modal>
+        </>
     );
 }
 
@@ -547,6 +564,7 @@ function CreateUserModal({
 }
 
 export function Employees() {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
     const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
@@ -555,7 +573,6 @@ export function Employees() {
     const [statusFilter, setStatusFilter] = useState('ACTIVE');
     const [payrollFilter, setPayrollFilter] = useState('ALL');
     const [sowFilter, setSowFilter] = useState('ALL');
-    const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
     const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
     const [sortKey, setSortKey] = useState<EmployeeSortKey>('rms_name');
     const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -593,16 +610,6 @@ export function Employees() {
     const exitedCount = allEmployees.filter(e => e.status === 'EXITED').length;
 
     const employees = allEmployees.filter(e => e.status === statusFilter);
-
-    const allPayrollOptions = useMemo(() => {
-        const values = new Set<string>();
-        for (const emp of allEmployees) {
-            if (emp.source?.trim()) {
-                values.add(emp.source.trim());
-            }
-        }
-        return Array.from(values).sort((a, b) => a.localeCompare(b));
-    }, [allEmployees]);
 
     const payrollOptions = useMemo(() => {
         const values = new Set<string>();
@@ -984,7 +991,7 @@ export function Employees() {
                                             <td className="px-6 py-4">
                                                 <div className="flex justify-end gap-1">
                                                     <button
-                                                        onClick={() => setEditEmployee(emp)}
+                                                        onClick={() => navigate(`/employees/${emp.id}/edit`)}
                                                         className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors"
                                                         title="Edit Employee"
                                                     >
@@ -1002,16 +1009,6 @@ export function Employees() {
                     <EmptyState message="No employees found" />
                 )}
             </div>
-
-            {editEmployee && (
-                <EditEmployeeModal
-                    isOpen={!!editEmployee}
-                    onClose={() => setEditEmployee(null)}
-                    onSuccess={fetchEmployees}
-                    employee={editEmployee}
-                    payrollOptions={allPayrollOptions}
-                />
-            )}
 
         </div>
     );

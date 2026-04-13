@@ -1,4 +1,5 @@
 """Dashboard metrics — aligned with actual DB schema."""
+import re
 from datetime import datetime, timedelta
 from collections import defaultdict
 
@@ -199,6 +200,55 @@ async def get_metrics(current_user: dict = Depends(get_current_user)):
     all_employees = employees_raw.data or []
     active_employees = [e for e in all_employees if e.get("status") == "ACTIVE"]
 
+    # Active headcount by primary technology (job_profiles.technology), for dashboard drill-down
+    tech_counts: dict[str, int] = defaultdict(int)
+    cid_to_req: dict[int, object] = {}
+    req_to_jp_e: dict[int, object] = {}
+    jp_to_tech: dict[int, str] = {}
+    active_cand_ids = list({e.get("candidate_id") for e in active_employees if e.get("candidate_id")})
+    if active_cand_ids:
+        cands_e = await client.table("candidates").select("id,request_id").in_("id", active_cand_ids).execute()
+        cid_to_req = {c["id"]: c.get("request_id") for c in (cands_e.data or []) if c.get("id")}
+        req_ids_e = [r for r in cid_to_req.values() if r]
+        if req_ids_e:
+            rrs_e = await client.table("resource_requests").select("id,job_profile_id").in_("id", list(set(req_ids_e))).execute()
+            req_to_jp_e = {r["id"]: r.get("job_profile_id") for r in (rrs_e.data or []) if r.get("id")}
+            jp_ids_e = list({j for j in req_to_jp_e.values() if j})
+            if jp_ids_e:
+                jps_e = await client.table("job_profiles").select("id,technology").in_("id", jp_ids_e).execute()
+                jp_to_tech = {
+                    j["id"]: (j.get("technology") or "").strip()
+                    for j in (jps_e.data or [])
+                    if j.get("id") is not None
+                }
+
+    for emp in active_employees:
+        cid = emp.get("candidate_id")
+        if not cid:
+            tech_counts["Unspecified"] += 1
+            continue
+        rid = cid_to_req.get(cid)
+        if not rid:
+            tech_counts["Unspecified"] += 1
+            continue
+        jpid = req_to_jp_e.get(rid)
+        if not jpid:
+            tech_counts["Unspecified"] += 1
+            continue
+        raw = jp_to_tech.get(jpid) or ""
+        if not raw:
+            tech_counts["Unspecified"] += 1
+        else:
+            parts = [p.strip() for p in re.split(r"[/,]", raw) if p.strip()]
+            label = parts[0] if parts else "Unspecified"
+            tech_counts[label] += 1
+
+    active_employees_by_technology = sorted(
+        [{"technology": k, "count": v} for k, v in tech_counts.items()],
+        key=lambda x: x["count"],
+        reverse=True,
+    )
+
     # Compliance tracker: employees with missing triad identifiers
     missing_identifiers = []
     for emp in active_employees:
@@ -249,6 +299,7 @@ async def get_metrics(current_user: dict = Depends(get_current_user)):
         "candidates_by_skill": candidates_by_skill,
         "total_employees": len(all_employees),
         "active_employees": len(active_employees),
+        "active_employees_by_technology": active_employees_by_technology,
         "missing_identifiers": missing_identifiers,
         "triad_summary": triad_summary,
         "triad_billing_month": latest_month,

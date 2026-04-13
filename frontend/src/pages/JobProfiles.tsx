@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { jobProfileApi } from '../api/jobProfiles';
 import type { JobProfile } from '../api/jobProfiles';
 import { JobProfileModal } from '../components/jobProfiles/JobProfileModal';
@@ -13,6 +14,7 @@ import toast from 'react-hot-toast';
 import { useAuth, isAdminRole } from '../context/AuthContext';
 
 export function JobProfiles() {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
     const [profiles, setProfiles] = useState<JobProfile[]>([]);
@@ -45,8 +47,7 @@ export function JobProfiles() {
     );
 
     const handleEdit = (profile: JobProfile) => {
-        setSelectedProfile(profile);
-        setIsModalOpen(true);
+        navigate(`/job-profiles/${profile.id}/edit`);
     };
 
     const handleCreate = () => {
