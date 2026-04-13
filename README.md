@@ -231,29 +231,13 @@ pm2 restart rms-backend
 pm2 status
 ```
 
-### Nginx config (example)
+### Nginx config
 
-```nginx
-server {
-    listen 80;
-    server_name rms.siprahub.com;
+Use **`frontend/nginx.conf`** plus **`frontend/nginx.proxy-headers.inc`** (installed as `/etc/nginx/proxy_rms.inc` on the VM, or see the `include` path in the conf file).
 
-    root /home/neuroassist/RMS/frontend/dist;
-    index index.html;
+**Why PATCH can return 405 in production:** if the browser calls a path that does **not** match any API `location` block, the request falls through to the SPA `try_files` handler. Nginx only allows **GET/HEAD** for that static path, so **PATCH/POST/PUT/DELETE** get **405 Method Not Allowed** even though the same URL works locally against uvicorn.
 
-    # SPA fallback
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # API proxy
-    location /api/ {
-        proxy_pass http://localhost:8000/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
+**Align `VITE_API_URL` with Nginx:** either set it to `https://your-host/api` and use the `location /api/` block, or set it to `https://your-host` and rely on the root-level prefix locations (`/sows`, `/auth`, …) in `frontend/nginx.conf`.
 
 ---
 

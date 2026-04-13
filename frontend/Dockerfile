@@ -11,7 +11,8 @@ RUN npx vite build
 
 # Production stage
 FROM nginx:stable-alpine
-# Copy the custom Nginx configuration
+# Nginx: SPA + reverse proxy (shared proxy headers included from proxy_rms.inc)
+COPY nginx.proxy-headers.inc /etc/nginx/proxy_rms.inc
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 # Copy the build artifacts from the build stage
 COPY --from=build /app/dist /usr/share/nginx/html

@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     # Environment — set to "production" in hosting platform env vars
     ENVIRONMENT: str = "development"
 
+    # When True, log every request method + path at INFO (reverse-proxy / 405 debugging)
+    LOG_HTTP_REQUESTS: bool = False
+
     # CORS — add FRONTEND_URL in hosting platform to allow your deployed frontend
     FRONTEND_URL: Optional[str] = None
 
