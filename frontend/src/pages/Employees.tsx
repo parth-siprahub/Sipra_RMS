@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { employeesApi, type Employee, type EmployeeUpdate } from '../api/employees';
 import { clientsApi, type Client } from '../api/clients';
 import { candidatesApi } from '../api/candidates';
@@ -10,6 +10,7 @@ import { useAuth, isAdminRole } from '../context/AuthContext';
 import { exportEmployees } from '../api/exports';
 import { authApi, type UserCreate } from '../api/auth';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 import {
     Search,
     Edit2,
@@ -44,6 +45,80 @@ function sortValueForKey(emp: Employee, key: EmployeeSortKey): string {
         default:
             return '';
     }
+}
+
+function hiringTypeLabel(emp: Employee): string {
+    if (emp.is_backfill === true) return 'Backfill';
+    if (emp.is_backfill === false) return 'New';
+    return '';
+}
+
+function triggerDownload(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function exportVisibleEmployeesCsv(rows: Employee[], statusFilter: string) {
+    const headers = [
+        'Employee Name',
+        'Job Profile',
+        'Client Name',
+        'SOW',
+        'Hiring Type',
+        'Payroll',
+        'Status',
+        'Start Date',
+        'Exit Date',
+    ];
+    const lines = [
+        headers.join(','),
+        ...rows.map((emp) => {
+            const cells = [
+                emp.rms_name || '',
+                emp.job_profile_name || '',
+                emp.client_name || '',
+                emp.sow_number || '',
+                hiringTypeLabel(emp),
+                emp.source || '',
+                emp.status || '',
+                emp.start_date || '',
+                emp.exit_date || '',
+            ];
+            return cells
+                .map((c) => `"${String(c).replace(/"/g, '""')}"`)
+                .join(',');
+        }),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const stamp = new Date().toISOString().slice(0, 10);
+    triggerDownload(blob, `employees_${statusFilter.toLowerCase()}_${stamp}.csv`);
+}
+
+function exportVisibleEmployeesXlsx(rows: Employee[], statusFilter: string) {
+    const data = rows.map((emp) => ({
+        'Employee Name': emp.rms_name || '',
+        'Job Profile': emp.job_profile_name || '',
+        'Client Name': emp.client_name || '',
+        SOW: emp.sow_number || '',
+        'Hiring Type': hiringTypeLabel(emp),
+        Payroll: emp.source || '',
+        Status: emp.status || '',
+        'Start Date': emp.start_date || '',
+        'Exit Date': emp.exit_date || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+    const ab = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([ab], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const stamp = new Date().toISOString().slice(0, 10);
+    triggerDownload(blob, `employees_${statusFilter.toLowerCase()}_${stamp}.xlsx`);
 }
 
 function EmployeeSortTh({
@@ -484,6 +559,20 @@ export function Employees() {
     const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
     const [sortKey, setSortKey] = useState<EmployeeSortKey>('rms_name');
     const [sortDir, setSortDir] = useState<SortDir>('asc');
+    const [exportMenuOpen, setExportMenuOpen] = useState(false);
+    const exportMenuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!exportMenuOpen) return;
+        const onDoc = (e: MouseEvent) => {
+            if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+                setExportMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', onDoc);
+        return () => document.removeEventListener('mousedown', onDoc);
+    }, [exportMenuOpen]);
+
     const fetchEmployees = useCallback(async () => {
         setLoading(true);
         try {
@@ -651,15 +740,7 @@ export function Employees() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            {(user?.role as string) === 'SUPER_ADMIN' && (
-                <div className="flex justify-end">
-                    <button onClick={() => exportEmployees()} className="btn btn-secondary flex items-center gap-2">
-                        <Download size={18} /> Export CSV
-                    </button>
-                </div>
-            )}
-
-            <div className="card flex flex-col md:flex-row items-center gap-4 py-3 px-4">
+            <div className="card flex flex-col lg:flex-row items-stretch lg:items-center gap-4 py-3 px-4">
                 <div className="flex-1 w-full">
                     <input
                         type="search"
@@ -668,6 +749,73 @@ export function Employees() {
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                     />
+                </div>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <div className="relative" ref={exportMenuRef}>
+                        <button
+                            type="button"
+                            className="btn btn-secondary flex items-center gap-2"
+                            aria-expanded={exportMenuOpen}
+                            aria-haspopup="menu"
+                            onClick={() => setExportMenuOpen((o) => !o)}
+                        >
+                            <Download size={18} /> Export
+                            <ChevronDown
+                                size={16}
+                                className={cn('transition-transform', exportMenuOpen && 'rotate-180')}
+                                aria-hidden
+                            />
+                        </button>
+                        {exportMenuOpen && (
+                            <div
+                                role="menu"
+                                className="absolute right-0 top-full z-20 mt-1 min-w-[12rem] rounded-lg border border-border bg-surface py-1 shadow-lg"
+                            >
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="flex w-full items-center px-4 py-2.5 text-left text-sm text-text hover:bg-surface-hover"
+                                    onClick={() => {
+                                        setExportMenuOpen(false);
+                                        if (sortedRows.length === 0) {
+                                            toast.error('No rows to export');
+                                            return;
+                                        }
+                                        exportVisibleEmployeesCsv(sortedRows, statusFilter);
+                                        toast.success(`Exported ${sortedRows.length} row(s) as CSV`);
+                                    }}
+                                >
+                                    CSV (.csv)
+                                </button>
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="flex w-full items-center px-4 py-2.5 text-left text-sm text-text hover:bg-surface-hover"
+                                    onClick={() => {
+                                        setExportMenuOpen(false);
+                                        if (sortedRows.length === 0) {
+                                            toast.error('No rows to export');
+                                            return;
+                                        }
+                                        exportVisibleEmployeesXlsx(sortedRows, statusFilter);
+                                        toast.success(`Exported ${sortedRows.length} row(s) as Excel`);
+                                    }}
+                                >
+                                    Excel (.xlsx)
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                    {(user?.role as string) === 'SUPER_ADMIN' && (
+                        <button
+                            type="button"
+                            onClick={() => exportEmployees()}
+                            className="btn btn-secondary text-xs"
+                            title="Download full employee export from server (all records)"
+                        >
+                            Server CSV (all)
+                        </button>
+                    )}
                 </div>
                 <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
                     <button
