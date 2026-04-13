@@ -297,9 +297,10 @@ function KanbanBoard({ candidates, vendors, sows, requests, onStatusChange, onCa
                                 const sow = req ? sows.find(s => s.id === req.sow_id) : null;
                                 return sow ? (
                                     <p className="text-xs text-text-muted truncate mt-0.5">{sow.sow_number}</p>
-                                ) : (
+                                ) : status !== 'ONBOARDED' ? (
                                     <p className="text-xs text-text-muted truncate mt-0.5">{c.email}</p>
-                                );
+                                ) : null;
+                                
                             })()}
                             {c.current_company && (
                                 <p className="text-xs text-text-muted truncate">{c.current_company}</p>
