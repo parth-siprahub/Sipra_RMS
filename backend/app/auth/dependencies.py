@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 # Cache user profiles for 2 minutes by user_id (not token) to avoid stale role data
 user_cache = SimpleCache(ttl_seconds=120)

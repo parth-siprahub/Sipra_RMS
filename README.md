@@ -170,8 +170,8 @@ cd frontend
 # Install dependencies
 npm install
 
-# Create .env file
-echo "VITE_API_BASE_URL=http://localhost:8000" > .env
+# Create .env file (must include /api — matches FastAPI API_PREFIX and Nginx)
+echo "VITE_API_URL=http://localhost:8000/api" > .env
 
 # Run dev server
 npm run dev
@@ -191,7 +191,13 @@ ALLOWED_ORIGINS=http://localhost:5173
 
 **Frontend `.env`**
 ```env
-VITE_API_BASE_URL=http://localhost:8000
+VITE_API_URL=http://localhost:8000/api
+```
+
+Production (same origin behind Nginx):
+
+```env
+VITE_API_URL=https://rms.siprahub.com/api
 ```
 
 ---
@@ -233,11 +239,11 @@ pm2 status
 
 ### Nginx config
 
-Use **`frontend/nginx.conf`** plus **`frontend/nginx.proxy-headers.inc`** (installed as `/etc/nginx/proxy_rms.inc` on the VM, or see the `include` path in the conf file).
+Use **`frontend/nginx.conf`**: a single **`location ^~ /api/`** proxies all methods (GET, PATCH, etc.) to FastAPI at `http://127.0.0.1:8000/api/`. The SPA uses **`location /`** + `try_files` only for non-API paths.
 
-**Why PATCH can return 405 in production:** if the browser calls a path that does **not** match any API `location` block, the request falls through to the SPA `try_files` handler. Nginx only allows **GET/HEAD** for that static path, so **PATCH/POST/PUT/DELETE** get **405 Method Not Allowed** even though the same URL works locally against uvicorn.
+**405 on PATCH (fixed by this layout):** requests like `/sows/...` that never hit `/api/` used to fall through to the static/SPA handler, where only GET/HEAD are allowed. The frontend and backend now standardize on **`/api/...`**, so writes always hit the proxy.
 
-**Align `VITE_API_URL` with Nginx:** either set it to `https://your-host/api` and use the `location /api/` block, or set it to `https://your-host` and rely on the root-level prefix locations (`/sows`, `/auth`, …) in `frontend/nginx.conf`.
+**Health checks:** liveness is **`GET /api/health`** (through Nginx or directly on port 8000). Readiness: **`GET /api/ready`**.
 
 ---
 
@@ -281,33 +287,32 @@ Billing config edits are additionally restricted to a named allowlist (finance l
 
 ## API Overview
 
-All endpoints are prefixed and require a valid Supabase JWT in the `Authorization: Bearer` header.
+All HTTP routes live under **`/api/`** (see `backend/app/main.py` `API_PREFIX`). Requests require a valid Supabase JWT in the `Authorization: Bearer` header unless noted.
 
 ```
-GET/POST    /candidates/
-PATCH       /candidates/{id}/review          # Status transition
-PATCH       /candidates/{id}/exit            # Exit with LWD + reason
-PATCH       /candidates/{id}/revert-exit     # Undo exit
+GET/POST    /api/candidates/
+PATCH       /api/candidates/{id}/review          # Status transition
+PATCH       /api/candidates/{id}/exit            # Exit with LWD + reason
+PATCH       /api/candidates/{id}/revert-exit     # Undo exit
 
-GET/POST    /sows/
-GET/POST    /resource-requests/
-GET/POST    /job-profiles/
-GET/POST    /vendors/
-GET/POST    /employees/
+GET/POST    /api/sows/
+GET/POST    /api/requests/
+GET/POST    /api/job-profiles/
+GET/POST    /api/vendors/
+GET/POST    /api/employees/
 
-POST        /timesheets/upload/jira          # Ingest Jira Excel
-POST        /timesheets/upload/aws           # Ingest AWS Excel
-GET         /timesheets/comparison           # Jira vs AWS diff
+POST        /api/timesheets/...                # Jira/AWS ingest (see OpenAPI)
+GET         /api/timesheets/...                # comparison, etc.
 
-GET         /dashboard/overview              # KPIs + pipeline stats
-GET         /reports/comparison              # Monthly billing report
-POST        /reports/calculate               # Compute billing for month
+GET         /api/dashboard/...                 # KPIs + pipeline stats
+GET         /api/reports/...
+POST        /api/reports/...
 
-GET/POST    /billing-config/
-GET         /exports/candidates              # CSV download
+GET/POST    /api/billing-config/
+GET         /api/exports/...
 ```
 
-Full interactive docs available at `http://localhost:8000/docs` (Swagger UI).
+Full interactive docs (non-production `ENVIRONMENT`): `http://localhost:8000/api/docs` (Swagger UI).
 
 ---
 

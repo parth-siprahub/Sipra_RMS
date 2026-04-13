@@ -6,7 +6,8 @@ const API_URL = (() => {
     if (!url && import.meta.env.PROD) {
         throw new Error('VITE_API_URL environment variable is required in production');
     }
-    return url || 'http://localhost:8000';
+    // Local dev: backend serves under /api (see app.main.API_PREFIX)
+    return url || 'http://localhost:8000/api';
 })();
 
 interface RequestOptions extends RequestInit {

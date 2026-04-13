@@ -87,7 +87,7 @@ class TestBillingCalculationSetsProcessed:
             return mock_client
 
         with patch("app.billing.router.get_supabase_admin_async", new=_get_mock):
-            resp = await authed_client.post("/billing/calculate/2025-03")
+            resp = await authed_client.post("/api/billing/calculate/2025-03")
 
         assert resp.status_code == 200
         assert len(inserted_records) >= 1
@@ -123,7 +123,7 @@ class TestProcessedTimesheetImmutability:
 
         with patch("app.timesheets.router.get_supabase_admin_async", new=_get_mock):
             resp = await authed_client.put(
-                "/timesheets/99",
+                "/api/timesheets/99",
                 json={"hours_logged": 10.0},
             )
 
@@ -150,7 +150,7 @@ class TestFreezeEndpoint:
             return mock_client
 
         with patch("app.billing.router.get_supabase_admin_async", new=_get_mock):
-            resp = await authed_client.post("/billing/freeze/2025-03")
+            resp = await authed_client.post("/api/billing/freeze/2025-03")
 
         assert resp.status_code == 200
         body = resp.json()
@@ -167,7 +167,7 @@ class TestFreezeEndpoint:
             return mock_client
 
         with patch("app.billing.router.get_supabase_admin_async", new=_get_mock):
-            resp = await authed_client.post("/billing/freeze/2025-03")
+            resp = await authed_client.post("/api/billing/freeze/2025-03")
 
         assert resp.status_code == 200
 
@@ -179,7 +179,7 @@ class TestFreezeEndpoint:
             return mock_client
 
         with patch("app.billing.router.get_supabase_admin_async", new=_get_mock):
-            resp = await authed_client.post("/billing/freeze/March2025")
+            resp = await authed_client.post("/api/billing/freeze/March2025")
 
         assert resp.status_code == 400
 
@@ -200,7 +200,7 @@ class TestProcessedFilter:
             return mock_client
 
         with patch("app.billing.router.get_supabase_admin_async", new=_get_mock):
-            resp = await authed_client.get("/billing/?processed=false")
+            resp = await authed_client.get("/api/billing/?processed=false")
 
         assert resp.status_code == 200
 
@@ -215,7 +215,7 @@ class TestProcessedFilter:
             return mock_client
 
         with patch("app.billing.router.get_supabase_admin_async", new=_get_mock):
-            resp = await authed_client.get("/billing/?processed=true")
+            resp = await authed_client.get("/api/billing/?processed=true")
 
         assert resp.status_code == 200
 
@@ -242,7 +242,7 @@ class TestFrozenMonthConflict:
             return mock_client
 
         with patch("app.billing.router.get_supabase_admin_async", new=_get_mock):
-            resp = await authed_client.post("/billing/calculate/2025-03")
+            resp = await authed_client.post("/api/billing/calculate/2025-03")
 
         assert resp.status_code == 409
         assert "frozen" in resp.json()["detail"].lower()
@@ -260,7 +260,7 @@ class TestFrozenMonthConflict:
             return mock_client
 
         with patch("app.billing.router.get_supabase_admin_async", new=_get_mock):
-            resp = await authed_client.post("/billing/calculate/2025-04")
+            resp = await authed_client.post("/api/billing/calculate/2025-04")
 
         assert resp.status_code == 200
 
@@ -336,7 +336,7 @@ class TestTimesheetImportFrozenGuard:
         with patch("app.timesheets.router.get_supabase_admin_async", new=_get_mock), \
              patch("app.timesheets.router.parse_tempo_xls", return_value=parsed_entries):
             resp = await authed_client.post(
-                "/timesheets/import",
+                "/api/timesheets/import",
                 data={"import_month": "2025-03"},
                 files={"file": ("test.xls", b"fake", "application/vnd.ms-excel")},
             )
