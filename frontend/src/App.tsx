@@ -22,6 +22,13 @@ import { BillingConfig } from './pages/BillingConfig';
 import { TimesheetJiraDrillDown } from './pages/TimesheetJiraDrillDown';
 import { TimesheetAwsDrillDown } from './pages/TimesheetAwsDrillDown';
 import { BILLING_CONFIG_EMAILS } from './lib/accessControl';
+import { EmployeeEditPage } from './pages/EmployeeEditPage';
+import { CandidateEditPage } from './pages/CandidateEditPage';
+import { ResourceRequestEditPage } from './pages/ResourceRequestEditPage';
+import { SowEditPage } from './pages/SowEditPage';
+import { JobProfileEditPage } from './pages/JobProfileEditPage';
+import { VendorEditPage } from './pages/VendorEditPage';
+import { ClientEditPage } from './pages/ClientEditPage';
 
 const NotFound = () => <div className="p-10 text-center text-2xl text-text-muted font-medium">404 - Page Not Found</div>;
 
@@ -99,14 +106,21 @@ function App() {
                 </ProtectedRoute>
               } />
               <Route path="resource-requests" element={<ResourceRequests />} />
+              <Route path="resource-requests/:id/edit" element={<ResourceRequestEditPage />} />
               <Route path="candidates" element={<Candidates />} />
+              <Route path="candidates/:id/edit" element={<CandidateEditPage />} />
               <Route path="job-profiles" element={<JobProfiles />} />
+              <Route path="job-profiles/:id/edit" element={<JobProfileEditPage />} />
               <Route path="sows" element={<Sows />} />
+              <Route path="sows/:id/edit" element={<SowEditPage />} />
               <Route path="communication-logs" element={<CommunicationLogs />} />
               <Route path="vendors" element={<Vendors />} />
+              <Route path="vendors/:id/edit" element={<VendorEditPage />} />
               <Route path="employees" element={<Employees />} />
+              <Route path="employees/:id/edit" element={<EmployeeEditPage />} />
               <Route path="timesheets" element={<Timesheets />} />
               <Route path="clients" element={<Clients />} />
+              <Route path="clients/:id/edit" element={<ClientEditPage />} />
               <Route path="reports" element={<Reports />} />
               <Route path="reports/employee/:employeeId" element={<ReportEmployeeDrillDown />} />
               <Route path="billing-config" element={

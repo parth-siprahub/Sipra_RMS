@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, RefreshCw, LayoutGrid, List, Download, Edit2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { candidatesApi } from '../api/candidates';
@@ -68,7 +69,7 @@ const CLOSED_STAGES: CandidateStatus[] = [
 ];
 
 // Short label for kanban column headers
-const STAGE_LABELS: Record<CandidateStatus, string> = {
+export const STAGE_LABELS: Record<CandidateStatus, string> = {
     NEW: 'New',
     SCREENING: 'Screening',
     SUBMITTED_TO_ADMIN: 'Submitted',
@@ -374,11 +375,10 @@ function KanbanBoard({ candidates, vendors, sows, requests, onStatusChange, onCa
 
 // ─── Details Modal ──────────────────────────────────────────────────────────
 
-interface DetailsModalProps {
-    candidate: Candidate | null;
-    isOpen: boolean;
-    onClose: () => void;
+export interface CandidateDetailsPanelProps {
+    candidate: Candidate;
     onUpdated: () => void;
+    onDismiss: () => void;
     vendors: Vendor[];
     requests: ResourceRequest[];
     onStatusChange: (id: number, status: CandidateStatus) => void;
@@ -410,7 +410,14 @@ const NEXT_STEP_TRANSITIONS: Record<CandidateStatus, CandidateStatus[]> = {
     EXIT: [],
 };
 
-function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors, requests, onStatusChange }: DetailsModalProps) {
+export function CandidateDetailsPanel({
+    candidate,
+    onDismiss,
+    onUpdated,
+    vendors,
+    requests,
+    onStatusChange,
+}: CandidateDetailsPanelProps) {
     const [activeTab, setActiveTab] = useState<'info' | 'interview' | 'transition'>('info');
     const [submitting, setSubmitting] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Candidate>>({});
@@ -418,36 +425,7 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
     const [loadingLogs, setLoadingLogs] = useState(false);
     const [pendingStatus, setPendingStatus] = useState<CandidateStatus | null>(null);
 
-    useEffect(() => {
-        if (candidate && isOpen) {
-            setEditForm({
-                // Basic info — editable
-                first_name: candidate.first_name || '',
-                last_name: candidate.last_name || '',
-                phone: candidate.phone || '',
-                current_company: candidate.current_company || '',
-                current_location: candidate.current_location || '',
-                total_experience: candidate.total_experience ?? undefined,
-                relevant_experience: candidate.relevant_experience ?? undefined,
-                notice_period: candidate.notice_period ?? undefined,
-                skills: candidate.skills || '',
-                // Interview
-                l1_feedback: candidate.l1_feedback || '',
-                l1_score: candidate.l1_score || 0,
-                l2_feedback: candidate.l2_feedback || '',
-                l2_score: candidate.l2_score || 0,
-                overlap_until: candidate.overlap_until || null,
-                last_working_day: candidate.last_working_day || null,
-                exit_reason: candidate.exit_reason || '',
-                remarks: candidate.remarks || '',
-            });
-            setPendingStatus(null);
-            fetchLogs();
-        }
-    }, [candidate, isOpen]);
-
     const fetchLogs = async () => {
-        if (!candidate) return;
         setLoadingLogs(true);
         try {
             const data = await communicationLogApi.list({ candidate_id: candidate.id });
@@ -459,10 +437,33 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
         }
     };
 
-    if (!candidate) return null;
+    useEffect(() => {
+        setEditForm({
+            first_name: candidate.first_name || '',
+            last_name: candidate.last_name || '',
+            phone: candidate.phone || '',
+            current_company: candidate.current_company || '',
+            current_location: candidate.current_location || '',
+            total_experience: candidate.total_experience ?? undefined,
+            relevant_experience: candidate.relevant_experience ?? undefined,
+            notice_period: candidate.notice_period ?? undefined,
+            skills: candidate.skills || '',
+            l1_feedback: candidate.l1_feedback || '',
+            l1_score: candidate.l1_score || 0,
+            l2_feedback: candidate.l2_feedback || '',
+            l2_score: candidate.l2_score || 0,
+            overlap_until: candidate.overlap_until || null,
+            last_working_day: candidate.last_working_day || null,
+            exit_reason: candidate.exit_reason || '',
+            remarks: candidate.remarks || '',
+        });
+        setPendingStatus(null);
+        fetchLogs();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when switching candidate
+    }, [candidate.id]);
 
     const handleManualStatusChange = (newStatus: CandidateStatus) => {
-        if (!candidate || newStatus === candidate.status) return;
+        if (newStatus === candidate.status) return;
         setPendingStatus(newStatus);
     };
 
@@ -476,7 +477,7 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                 toast.success('Candidate updated');
             }
             onUpdated();
-            onClose();
+            onDismiss();
         } catch {
             // error
         } finally {
@@ -485,12 +486,6 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
     };
 
     return (
-        <Modal
-            isOpen={isOpen}
-            onClose={onClose}
-            title={formatCandidateFullName(candidate.first_name, candidate.last_name)}
-            maxWidth="max-w-2xl"
-        >
             <div className="space-y-6">
                 {/* Status Changer */}
                 <div className="flex items-center gap-3 px-1">
@@ -763,7 +758,7 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                         const isBackfill = linkedReq?.is_backfill === true;
 
                         return (
-                            <div className="space-y-4 max-w-sm">
+                            <div className="space-y-4">
                                 {isBackfill ? (
                                     <div className="space-y-3">
                                         <label className="input-label flex items-center gap-2" htmlFor="overlap-until">
@@ -853,8 +848,9 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
 
                 {/* Footer Actions */}
                 <div className="flex gap-3 pt-4 border-t border-border">
-                    <button onClick={onClose} className="btn btn-secondary flex-1">Close</button>
+                    <button type="button" onClick={onDismiss} className="btn btn-secondary flex-1">Close</button>
                     <button
+                        type="button"
                         onClick={handleUpdate}
                         className="btn btn-cta flex-1"
                         disabled={submitting}
@@ -863,7 +859,6 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                     </button>
                 </div>
             </div>
-        </Modal>
     );
 }
 
@@ -1367,14 +1362,13 @@ function CreateCandidateModal({ isOpen, onClose, onCreated, onViewDuplicate, req
 type ViewMode = 'table' | 'kanban';
 
 export function Candidates() {
+    const navigate = useNavigate();
     const [candidates, setCandidates] = useState<Candidate[]>([]);
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<ViewMode>('kanban'); // Default to kanban for better viz
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
-    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [statusFilter, setStatusFilter] = useState('');
     const [requests, setRequests] = useState<ResourceRequest[]>([]);
     const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -1427,10 +1421,6 @@ export function Candidates() {
         try {
             await candidatesApi.review(id, status);
             toast.success(`Moved to ${STAGE_LABELS[status]}`);
-            // Optimistically update the selected candidate so the details modal stays in sync
-            setSelectedCandidate(prev =>
-                prev && prev.id === id ? { ...prev, status } : prev
-            );
             fetchCandidates();
         } catch (err: unknown) {
             const msg =
@@ -1449,9 +1439,6 @@ export function Candidates() {
         try {
             await candidatesApi.exit(exitPendingId, payload);
             toast.success('Candidate exited successfully');
-            setSelectedCandidate(prev =>
-                prev && prev.id === exitPendingId ? { ...prev, status: 'EXIT' } : prev
-            );
             fetchCandidates();
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to process exit';
@@ -1472,11 +1459,6 @@ export function Candidates() {
         try {
             await candidatesApi.revertExit(revertPendingId, targetStatus);
             toast.success(`Exit reverted — candidate moved to ${STAGE_LABELS[targetStatus]}`);
-            setSelectedCandidate(prev =>
-                prev && prev.id === revertPendingId
-                    ? { ...prev, status: targetStatus, exit_reason: null, last_working_day: null }
-                    : prev
-            );
             fetchCandidates();
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to revert exit';
@@ -1656,7 +1638,7 @@ export function Candidates() {
                                         <tr
                                             key={c.id}
                                             className="cursor-pointer hover:bg-surface-hover transition-colors"
-                                            onClick={() => { setSelectedCandidate(c); setIsDetailsOpen(true); }}
+                                            onClick={() => navigate(`/candidates/${c.id}/edit`)}
                                         >
                                             <td>
                                                 <div className="font-semibold text-text">
@@ -1680,7 +1662,7 @@ export function Candidates() {
                                             <td className="text-text-muted text-sm">{formatDate(c.created_at)}</td>
                                             <td onClick={(e) => e.stopPropagation()}>
                                                 <button
-                                                    onClick={() => { setSelectedCandidate(c); setIsDetailsOpen(true); }}
+                                                    onClick={() => navigate(`/candidates/${c.id}/edit`)}
                                                     className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors"
                                                     title="Edit Candidate"
                                                 >
@@ -1704,7 +1686,7 @@ export function Candidates() {
                     sows={sows}
                     requests={requests}
                     onStatusChange={handleStatusChange}
-                    onCandidateClick={(c) => { setSelectedCandidate(c); setIsDetailsOpen(true); }}
+                    onCandidateClick={(c) => navigate(`/candidates/${c.id}/edit`)}
                     onExitRequest={handleExitRequest}
                     onRevertExit={handleRevertExit}
                 />
@@ -1715,22 +1697,11 @@ export function Candidates() {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onCreated={fetchCandidates}
-                onViewDuplicate={(c) => { setSelectedCandidate(c); setIsDetailsOpen(true); }}
+                onViewDuplicate={(c) => navigate(`/candidates/${c.id}/edit`)}
                 requests={requests}
                 vendors={vendors}
                 sows={sows}
                 jobProfiles={jobProfiles}
-            />
-
-            {/* Details Modal */}
-            <CandidateDetailsModal
-                candidate={selectedCandidate}
-                isOpen={isDetailsOpen}
-                onClose={() => { setIsDetailsOpen(false); setSelectedCandidate(null); }}
-                onUpdated={fetchCandidates}
-                vendors={vendors}
-                requests={requests}
-                onStatusChange={handleStatusChange}
             />
 
             {/* Revert Exit Modal */}
