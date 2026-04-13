@@ -309,7 +309,6 @@ export function Timesheets() {
                     onImport={() => setIsJiraImportOpen(true)}
                     empMap={empMap}
                     jiraEmpMap={jiraEmpMap}
-                    empMap={empMap}
                     navigateToDrillDown={(users, idx, month) => {
                         navigate('/timesheets/drill-down/jira', {
                             state: { users, currentIndex: idx, month },
@@ -413,7 +412,6 @@ function JiraTab({
     onImport: () => void;
     empMap: Record<number, Employee>;
     jiraEmpMap: Record<string, Employee>;
-    empMap: Record<number, Employee>;
     navigateToDrillDown: (users: UserSummary[], idx: number, month: string) => void;
     setUnmatchedModalOpen: (open: boolean) => void;
     setUnmatchedModalSource: (source: 'JIRA' | 'AWS') => void;
@@ -446,7 +444,7 @@ function JiraTab({
 
             summaries.push({
                 user,
-                employee_id: rows[0]?.employee_id ?? null,
+                employee_id: matchedEmpId,
                 rows,
                 totalHours: summaryRow?.logged ?? 0,
                 oooHours: oooRow?.logged ?? 0,
