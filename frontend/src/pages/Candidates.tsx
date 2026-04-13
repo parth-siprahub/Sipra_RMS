@@ -415,7 +415,6 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
     const [editForm, setEditForm] = useState<Partial<Candidate>>({});
     const [logs, setLogs] = useState<CommunicationLog[]>([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
-    const [changingStatus, setChangingStatus] = useState(false);
     const [pendingStatus, setPendingStatus] = useState<CandidateStatus | null>(null);
 
     useEffect(() => {

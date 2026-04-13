@@ -427,35 +427,6 @@ interface RowData {
 /** Sort: non-compliant first (red + legacy no_aws), then amber, then green */
 const FLAG_ORDER: Record<string, number> = { red: 0, no_aws: 0, amber: 1, green: 2 };
 
-function FlagBadge({ flag }: { flag: string }) {
-    if (flag === 'red') {
-        return (
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-danger/15" title="Non-compliant">
-                <span className="w-3 h-3 rounded-full bg-danger shadow-[0_0_6px_var(--color-danger)]" />
-            </span>
-        );
-    }
-    if (flag === 'amber') {
-        return (
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-warning/15" title="Needs review (30–50% discrepancy)">
-                <span className="w-3 h-3 rounded-full bg-warning shadow-[0_0_6px_var(--color-warning)]" />
-            </span>
-        );
-    }
-    if (flag === 'green') {
-        return (
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-success/15" title="Compliant (≤30% discrepancy)">
-                <span className="w-3 h-3 rounded-full bg-success shadow-[0_0_6px_var(--color-success)]" />
-            </span>
-        );
-    }
-    return (
-        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-surface-hover" title="Unknown status">
-            <span className="w-3 h-3 rounded-full bg-text-muted/40" />
-        </span>
-    );
-}
-
 // ──────────────────────────────────────────────
 // Shared Components
 // ──────────────────────────────────────────────
