@@ -149,7 +149,7 @@ async def test_rehire_warning_for_terminated_employee(override_auth):
 
     with patch("app.candidates.router.get_supabase_admin_async", new=_get):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            resp = await ac.post("/candidates/", json=_candidate_payload())
+            resp = await ac.post("/api/candidates/", json=_candidate_payload())
 
     assert resp.status_code == 201
     body = resp.json()
@@ -180,7 +180,7 @@ async def test_no_warning_for_active_employee(override_auth):
 
     with patch("app.candidates.router.get_supabase_admin_async", new=_get):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            resp = await ac.post("/candidates/", json=_candidate_payload(email="active@example.com"))
+            resp = await ac.post("/api/candidates/", json=_candidate_payload(email="active@example.com"))
 
     assert resp.status_code == 201
     body = resp.json()
@@ -207,7 +207,7 @@ async def test_no_warning_when_no_matching_employee(override_auth):
 
     with patch("app.candidates.router.get_supabase_admin_async", new=_get):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            resp = await ac.post("/candidates/", json=_candidate_payload(email="brand.new@example.com"))
+            resp = await ac.post("/api/candidates/", json=_candidate_payload(email="brand.new@example.com"))
 
     assert resp.status_code == 201
     body = resp.json()
@@ -238,7 +238,7 @@ async def test_rehire_warning_for_exited_employee(override_auth):
 
     with patch("app.candidates.router.get_supabase_admin_async", new=_get):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            resp = await ac.post("/candidates/", json=_candidate_payload(email="exited@example.com"))
+            resp = await ac.post("/api/candidates/", json=_candidate_payload(email="exited@example.com"))
 
     assert resp.status_code == 201
     body = resp.json()
@@ -268,7 +268,7 @@ async def test_existing_candidate_dedup_still_returns_409(override_auth):
 
     with patch("app.candidates.router.get_supabase_admin_async", new=_get):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            resp = await ac.post("/candidates/", json=_candidate_payload(email="duplicate@example.com"))
+            resp = await ac.post("/api/candidates/", json=_candidate_payload(email="duplicate@example.com"))
 
     assert resp.status_code == 409
     assert "Duplicate candidate" in resp.json()["detail"]
@@ -298,7 +298,7 @@ async def test_rehire_check_is_case_insensitive(override_auth):
 
     with patch("app.candidates.router.get_supabase_admin_async", new=_get):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            resp = await ac.post("/candidates/", json=_candidate_payload(email="JANE@EXAMPLE.COM"))
+            resp = await ac.post("/api/candidates/", json=_candidate_payload(email="JANE@EXAMPLE.COM"))
 
     assert resp.status_code == 201
     body = resp.json()

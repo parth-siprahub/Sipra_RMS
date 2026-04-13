@@ -7,7 +7,7 @@ SipraHub RMS is a Resource Management System (recruitment pipeline tracker) buil
 - **Frontend:** React + TypeScript, Vite, Recharts for charts, Tailwind-like design tokens in CSS
 - **Backend:** FastAPI + Python, Supabase (PostgreSQL) as the database
 - **Auth:** Supabase JWT auth, role-based (admin, hr, vendor)
-- **Dev servers:** Frontend on `localhost:5173`, Backend on `localhost:8000`
+- **Dev servers:** Frontend on `localhost:5173`, API on `localhost:8000/api` (FastAPI `API_PREFIX`; `VITE_API_URL` must include `/api`)
 
 ## Stack Specifics
 - Frontend source: `D:\RMS_Siprahub\frontend\src\`

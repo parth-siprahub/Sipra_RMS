@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Proactively refresh Supabase JWT before parallel API bursts (e.g. Timesheets) hit an expired access token
     useEffect(() => {
-        const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '');
+        const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000/api' : '');
         const tick = async () => {
             const token = localStorage.getItem('rms_access_token');
             const rt = localStorage.getItem('rms_refresh_token');
