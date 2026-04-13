@@ -139,6 +139,9 @@ async def add_request_id_and_timing(request: Request, call_next):
     rid = request.headers.get("X-Request-ID") or str(uuid.uuid4())
     request_id_ctx.set(rid)
 
+    if settings.LOG_HTTP_REQUESTS:
+        logger.info("HTTP %s %s [rid=%s]", request.method, request.url.path, rid)
+
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
