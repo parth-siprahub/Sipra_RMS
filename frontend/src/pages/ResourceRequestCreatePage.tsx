@@ -1,16 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ClipboardList } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { resourceRequestsApi, type ResourceRequest, type RequestPriority } from '../api/resourceRequests';
+import { resourceRequestsApi } from '../api/resourceRequests';
+import type { RequestPriority, CreateResourceRequestPayload } from '../api/resourceRequests';
 import { sowApi, type SOW } from '../api/sows';
 import { jobProfileApi, type JobProfile } from '../api/jobProfiles';
 import { FormPageLayout, FormPageLoadingCard } from '../components/layout/FormPageLayout';
 
-export function ResourceRequestEditPage() {
-    const { id } = useParams<{ id: string }>();
+export function ResourceRequestCreatePage() {
     const navigate = useNavigate();
-    const [request, setRequest] = useState<ResourceRequest | null>(null);
     const [sows, setSows] = useState<SOW[]>([]);
     const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
     const [sowId, setSowId] = useState<number | ''>('');
@@ -21,33 +20,16 @@ export function ResourceRequestEditPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const n = id ? parseInt(id, 10) : NaN;
-        if (Number.isNaN(n)) {
-            toast.error('Invalid request');
-            navigate('/resource-requests', { replace: true });
-            return;
-        }
         let cancelled = false;
         (async () => {
             try {
-                const [reqData, sowsRes, profilesRes] = await Promise.all([
-                    resourceRequestsApi.get(n),
-                    sowApi.list(),
-                    jobProfileApi.list(),
-                ]);
-                if (cancelled) return;
-                setRequest(reqData);
-                setSows(sowsRes.filter((s) => s.is_active !== false));
-                setJobProfiles(profilesRes);
-                setSowId(reqData.sow_id ?? '');
-                setJobProfileId(reqData.job_profile_id ?? '');
-                setPriority((reqData.priority as RequestPriority) ?? 'MEDIUM');
-                setIsBackfill(reqData.is_backfill ?? false);
-            } catch {
+                const [sowsRes, profilesRes] = await Promise.all([sowApi.list(), jobProfileApi.list()]);
                 if (!cancelled) {
-                    toast.error('Resource request not found');
-                    navigate('/resource-requests', { replace: true });
+                    setSows(sowsRes.filter((s) => s.is_active !== false));
+                    setJobProfiles(profilesRes);
                 }
+            } catch {
+                if (!cancelled) toast.error('Failed to load form data');
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -55,24 +37,24 @@ export function ResourceRequestEditPage() {
         return () => {
             cancelled = true;
         };
-    }, [id, navigate]);
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!request) return;
         if (!sowId || !jobProfileId) {
             toast.error('SOW and Job Profile are required');
             return;
         }
         setSubmitting(true);
         try {
-            await resourceRequestsApi.update(request.id, {
+            const payload: CreateResourceRequestPayload = {
                 priority,
                 is_backfill: isBackfill,
                 sow_id: Number(sowId),
                 job_profile_id: Number(jobProfileId),
-            });
-            toast.success('Resource request updated!');
+            };
+            await resourceRequestsApi.create(payload);
+            toast.success('Resource request created!');
             navigate('/resource-requests');
         } catch {
             // error toast handled by client.ts
@@ -82,27 +64,25 @@ export function ResourceRequestEditPage() {
     };
 
     if (loading) {
-        return <FormPageLoadingCard label="Loading request…" />;
+        return <FormPageLoadingCard label="Loading…" />;
     }
-
-    if (!request) return null;
 
     return (
         <FormPageLayout
             backHref="/resource-requests"
             backLabel="Back to Resource Requests"
-            title="Edit Resource Request"
-            description={request.request_display_id}
+            title="New Resource Request"
+            description="Link an active SOW and job profile, set priority, and mark backfill if applicable."
             icon={ClipboardList}
             contentWidth="comfortable"
         >
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <label className="input-label" htmlFor="edit-rr-sow">
+                    <label className="input-label" htmlFor="rr-sow">
                         Statement of Work (SOW) <span className="text-danger">*</span>
                     </label>
                     <select
-                        id="edit-rr-sow"
+                        id="rr-sow"
                         className="input-field"
                         value={sowId}
                         onChange={(e) => {
@@ -112,6 +92,8 @@ export function ResourceRequestEditPage() {
                                 const selectedSow = sows.find((s) => s.id === selectedSowId);
                                 if (selectedSow?.job_profile_id) {
                                     setJobProfileId(selectedSow.job_profile_id);
+                                } else if (jobProfiles.length > 0 && !jobProfileId) {
+                                    setJobProfileId(jobProfiles[0].id);
                                 }
                             }
                         }}
@@ -133,11 +115,11 @@ export function ResourceRequestEditPage() {
                 </div>
 
                 <div>
-                    <label className="input-label" htmlFor="edit-rr-profile">
+                    <label className="input-label" htmlFor="rr-profile">
                         Job Profile <span className="text-danger">*</span>
                     </label>
                     <select
-                        id="edit-rr-profile"
+                        id="rr-profile"
                         className="input-field"
                         value={jobProfileId}
                         onChange={(e) => setJobProfileId(e.target.value ? Number(e.target.value) : '')}
@@ -153,11 +135,11 @@ export function ResourceRequestEditPage() {
                 </div>
 
                 <div>
-                    <label className="input-label" htmlFor="edit-rr-priority">
+                    <label className="input-label" htmlFor="rr-priority">
                         Priority <span className="text-danger">*</span>
                     </label>
                     <select
-                        id="edit-rr-priority"
+                        id="rr-priority"
                         className="input-field"
                         value={priority}
                         onChange={(e) => setPriority(e.target.value as RequestPriority)}
@@ -173,13 +155,13 @@ export function ResourceRequestEditPage() {
 
                 <div className="flex items-center gap-3">
                     <input
-                        id="edit-rr-backfill"
+                        id="rr-backfill"
                         type="checkbox"
                         className="w-4 h-4 accent-cta cursor-pointer"
                         checked={isBackfill}
                         onChange={(e) => setIsBackfill(e.target.checked)}
                     />
-                    <label htmlFor="edit-rr-backfill" className="text-sm font-medium text-text cursor-pointer">
+                    <label htmlFor="rr-backfill" className="text-sm font-medium text-text cursor-pointer">
                         This is a backfill request
                     </label>
                 </div>
@@ -198,7 +180,7 @@ export function ResourceRequestEditPage() {
                         className="btn btn-cta w-full sm:w-auto min-h-[44px] min-w-[10rem]"
                         disabled={submitting}
                     >
-                        {submitting ? <span className="spinner w-4 h-4" /> : 'Save Changes'}
+                        {submitting ? <span className="spinner w-4 h-4" /> : 'Create Request'}
                     </button>
                 </div>
             </form>

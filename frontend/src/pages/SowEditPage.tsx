@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { FileText } from 'lucide-react';
 import { sowApi, type SOW } from '../api/sows';
 import { SowForm } from '../components/sows/SowForm';
 import toast from 'react-hot-toast';
+import { FormPageLayout, FormPageLoadingCard } from '../components/layout/FormPageLayout';
 
 export function SowEditPage() {
     const { id } = useParams<{ id: string }>();
@@ -37,31 +39,25 @@ export function SowEditPage() {
     }, [id, navigate]);
 
     if (loading) {
-        return (
-            <div className="card w-full py-20 flex flex-col items-center justify-center gap-4">
-                <div className="spinner w-8 h-8 border-cta" />
-                <p className="text-text-muted text-sm">Loading SOW…</p>
-            </div>
-        );
+        return <FormPageLoadingCard label="Loading SOW…" />;
     }
 
     if (!sow) return null;
 
     return (
-        <div className="space-y-6 animate-fade-in w-full">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <Link to="/sows" className="text-sm text-cta hover:underline">
-                    ← Back to SOWs
-                </Link>
-            </div>
-            <div className="card p-6 md:p-8 w-full">
-                <h1 className="text-xl md:text-2xl font-bold text-text mb-6">Edit SOW — {sow.sow_number}</h1>
-                <SowForm
-                    sow={sow}
-                    onSaved={() => navigate('/sows')}
-                    onCancel={() => navigate('/sows')}
-                />
-            </div>
-        </div>
+        <FormPageLayout
+            backHref="/sows"
+            backLabel="Back to SOWs"
+            title={`Edit SOW — ${sow.sow_number}`}
+            description="Update contract details, dates, and resource limits."
+            icon={FileText}
+            contentWidth="comfortable"
+        >
+            <SowForm
+                sow={sow}
+                onSaved={() => navigate('/sows')}
+                onCancel={() => navigate('/sows')}
+            />
+        </FormPageLayout>
     );
 }

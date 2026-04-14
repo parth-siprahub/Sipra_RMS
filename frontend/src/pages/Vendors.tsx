@@ -3,35 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { vendorsApi, type Vendor } from '../api/vendors';
 import { Plus, Search, Edit2, Building2, Mail, Phone, User } from 'lucide-react';
 import { EmptyState } from '../components/ui/EmptyState';
-import { Modal } from '../components/ui/Modal';
-import { VendorForm } from '../components/vendors/VendorForm';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
-
-interface VendorModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
-    vendor?: Vendor;
-}
-
-function VendorModal({ isOpen, onClose, onSuccess, vendor }: VendorModalProps) {
-    if (!isOpen) return null;
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={vendor ? 'Edit Vendor' : 'Add Vendor'} maxWidth="max-w-md">
-            <VendorForm
-                vendor={vendor}
-                onSaved={() => {
-                    onSuccess();
-                    onClose();
-                }}
-                onCancel={onClose}
-            />
-        </Modal>
-    );
-}
-
-// ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export function Vendors() {
     const navigate = useNavigate();
@@ -39,8 +12,6 @@ export function Vendors() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedVendor, setSelectedVendor] = useState<Vendor | undefined>();
 
     const fetchVendors = async () => {
         try {
@@ -73,7 +44,7 @@ export function Vendors() {
                     <p className="text-text-muted">Manage staffing vendors and their contact information</p>
                 </div>
                 <button
-                    onClick={() => { setSelectedVendor(undefined); setIsModalOpen(true); }}
+                    onClick={() => navigate('/vendors/create')}
                     className="btn btn-primary flex items-center gap-2 shadow-lg shadow-cta/20"
                 >
                     <Plus size={20} /> <span>New Vendor</span>
@@ -191,7 +162,7 @@ export function Vendors() {
                         message={searchQuery ? 'No vendors match your search' : 'Add your first vendor'}
                         action={
                             <button
-                                onClick={searchQuery ? () => setSearchQuery('') : () => { setSelectedVendor(undefined); setIsModalOpen(true); }}
+                                onClick={searchQuery ? () => setSearchQuery('') : () => navigate('/vendors/create')}
                                 className="btn btn-secondary btn-sm"
                             >
                                 {searchQuery ? 'Clear Search' : 'New Vendor'}
@@ -201,14 +172,6 @@ export function Vendors() {
                 )}
             </div>
 
-            {isModalOpen && (
-                <VendorModal
-                    isOpen={isModalOpen}
-                    onClose={() => { setIsModalOpen(false); setSelectedVendor(undefined); }}
-                    onSuccess={fetchVendors}
-                    vendor={selectedVendor}
-                />
-            )}
         </div>
     );
 }

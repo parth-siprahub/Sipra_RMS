@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { communicationLogApi } from '../api/communicationLogs';
 import type { CommunicationLog } from '../api/communicationLogs';
-import { LogModal } from '../components/logs/LogModal';
+import { useNavigate } from 'react-router-dom';
 import {
     MessageSquare,
     Plus,
@@ -17,10 +17,10 @@ import { EmptyState } from '../components/ui/EmptyState';
 import toast from 'react-hot-toast';
 
 export function CommunicationLogs() {
+    const navigate = useNavigate();
     const [logs, setLogs] = useState<CommunicationLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const fetchLogs = async () => {
         try {
@@ -59,7 +59,7 @@ export function CommunicationLogs() {
                     <p className="text-text-muted">Timeline of all candidate and client interactions</p>
                 </div>
                 <button
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={() => navigate('/communication-logs/create')}
                     className="btn btn-primary flex items-center gap-2 shadow-lg shadow-cta/20"
                 >
                     <Plus size={20} />
@@ -134,7 +134,7 @@ export function CommunicationLogs() {
                             message={searchQuery ? "No matching activity found" : "No communication history yet"}
                             action={
                                 <button
-                                    onClick={searchQuery ? () => setSearchQuery('') : () => setIsModalOpen(true)}
+                                    onClick={searchQuery ? () => setSearchQuery('') : () => navigate('/communication-logs/create')}
                                     className="btn btn-secondary btn-sm"
                                 >
                                     {searchQuery ? "Clear Search" : "Log Activity"}
@@ -145,11 +145,6 @@ export function CommunicationLogs() {
                 )}
             </div>
 
-            <LogModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSuccess={fetchLogs}
-            />
         </div>
     );
 }

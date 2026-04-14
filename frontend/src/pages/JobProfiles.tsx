@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { jobProfileApi } from '../api/jobProfiles';
 import type { JobProfile } from '../api/jobProfiles';
-import { JobProfileModal } from '../components/jobProfiles/JobProfileModal';
 import {
     Plus,
     Edit2,
@@ -21,8 +20,6 @@ export function JobProfiles() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedProfile, setSelectedProfile] = useState<JobProfile | undefined>();
 
     const fetchProfiles = async () => {
         try {
@@ -51,21 +48,7 @@ export function JobProfiles() {
     };
 
     const handleCreate = () => {
-        setSelectedProfile(undefined);
-        setIsModalOpen(true);
-    };
-
-    const handleDelete = async (id: number) => {
-        if (!window.confirm('Are you sure you want to delete this job profile?')) return;
-
-        try {
-            await jobProfileApi.delete(id);
-            toast.success('Job Profile deleted');
-            fetchProfiles();
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'An unexpected error occurred';
-            toast.error(message || 'Failed to delete Profile (it may be linked to requests)');
-        }
+        navigate('/job-profiles/create');
     };
 
     return (
@@ -193,18 +176,6 @@ export function JobProfiles() {
                 </div>
             )}
 
-            {isModalOpen && (
-                <JobProfileModal
-                    isOpen={isModalOpen}
-                    onClose={() => {
-                        setIsModalOpen(false);
-                        setSelectedProfile(undefined);
-                    }}
-                    onSuccess={fetchProfiles}
-                    jobProfile={selectedProfile}
-                    onDelete={isAdmin ? handleDelete : undefined}
-                />
-            )}
         </div>
     );
 }

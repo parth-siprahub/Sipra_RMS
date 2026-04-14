@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Briefcase } from 'lucide-react';
 import { jobProfileApi, type JobProfile } from '../api/jobProfiles';
 import { JobProfileForm } from '../components/jobProfiles/JobProfileForm';
 import { useAuth, isAdminRole } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { FormPageLayout, FormPageLoadingCard } from '../components/layout/FormPageLayout';
 
 export function JobProfileEditPage() {
     const { id } = useParams<{ id: string }>();
@@ -55,32 +57,26 @@ export function JobProfileEditPage() {
     );
 
     if (loading) {
-        return (
-            <div className="card w-full py-20 flex flex-col items-center justify-center gap-4">
-                <div className="spinner w-8 h-8 border-cta" />
-                <p className="text-text-muted text-sm">Loading job profile…</p>
-            </div>
-        );
+        return <FormPageLoadingCard label="Loading job profile…" />;
     }
 
     if (!profile) return null;
 
     return (
-        <div className="space-y-6 animate-fade-in w-full">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <Link to="/job-profiles" className="text-sm text-cta hover:underline">
-                    ← Back to Job Profiles
-                </Link>
-            </div>
-            <div className="card p-6 md:p-8 w-full">
-                <h1 className="text-xl md:text-2xl font-bold text-text mb-6">Edit Job Profile — {profile.role_name}</h1>
-                <JobProfileForm
-                    jobProfile={profile}
-                    onSaved={() => navigate('/job-profiles')}
-                    onCancel={() => navigate('/job-profiles')}
-                    onDelete={isAdmin ? handleDelete : undefined}
-                />
-            </div>
-        </div>
+        <FormPageLayout
+            backHref="/job-profiles"
+            backLabel="Back to Job Profiles"
+            title={`Edit Job Profile — ${profile.role_name}`}
+            description="Update role details and documents. Admins can delete when unused."
+            icon={Briefcase}
+            contentWidth="comfortable"
+        >
+            <JobProfileForm
+                jobProfile={profile}
+                onSaved={() => navigate('/job-profiles')}
+                onCancel={() => navigate('/job-profiles')}
+                onDelete={isAdmin ? handleDelete : undefined}
+            />
+        </FormPageLayout>
     );
 }

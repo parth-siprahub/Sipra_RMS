@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { UserCog } from 'lucide-react';
 import { employeesApi, type Employee } from '../api/employees';
 import { EditEmployeeForm } from './Employees';
 import toast from 'react-hot-toast';
+import { FormPageLayout, FormPageLoadingCard } from '../components/layout/FormPageLayout';
 
 export function EmployeeEditPage() {
     const { id } = useParams<{ id: string }>();
@@ -48,32 +50,26 @@ export function EmployeeEditPage() {
     }, [load]);
 
     if (loading) {
-        return (
-            <div className="card w-full py-20 flex flex-col items-center justify-center gap-4">
-                <div className="spinner w-8 h-8 border-cta" />
-                <p className="text-text-muted text-sm">Loading employee…</p>
-            </div>
-        );
+        return <FormPageLoadingCard label="Loading employee…" />;
     }
 
     if (!employee) return null;
 
     return (
-        <div className="space-y-6 animate-fade-in w-full">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <Link to="/employees" className="text-sm text-cta hover:underline">
-                    ← Back to Employees
-                </Link>
-            </div>
-            <div className="card p-6 md:p-8 w-full">
-                <h1 className="text-xl md:text-2xl font-bold text-text mb-6">Edit Employee — Triad Mapping</h1>
-                <EditEmployeeForm
-                    employee={employee}
-                    payrollOptions={payrollOptions}
-                    onSaved={() => navigate('/employees')}
-                    onCancel={() => navigate('/employees')}
-                />
-            </div>
-        </div>
+        <FormPageLayout
+            backHref="/employees"
+            backLabel="Back to Employees"
+            title={`Edit — ${employee.rms_name || 'Employee'}`}
+            description="Triad mapping: Jira, AWS, GitHub, payroll source, and identifiers."
+            icon={UserCog}
+            contentWidth="comfortable"
+        >
+            <EditEmployeeForm
+                employee={employee}
+                payrollOptions={payrollOptions}
+                onSaved={() => navigate('/employees')}
+                onCancel={() => navigate('/employees')}
+            />
+        </FormPageLayout>
     );
 }
