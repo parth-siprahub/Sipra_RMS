@@ -183,7 +183,7 @@ export const timesheetsApi = {
 
     // ── Unmatched records management ──────────────────────────────────────────
     getUnmatched: (billingMonth: string, sourceType: 'JIRA' | 'AWS') =>
-        api.get<{ unmatched: UnmatchedDetail[] }>('/timesheets/unmatched', {
+        api.get<{ billing_month: string; source_type: string; unmatched: UnmatchedDetail[] }>('/timesheets/unmatched', {
             billing_month: billingMonth,
             source_type: sourceType,
         }),

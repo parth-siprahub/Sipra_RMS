@@ -28,8 +28,13 @@ class EmployeeUpdate(BaseModel):
     siprahub_email: EmailStr | None = None
     github_id: str | None = None
     jira_username: str | None = None
+    # Payroll / vendor name
+    source: str | None = None
     start_date: date | None = None
     exit_date: date | None = None
+    # Offboarding dates (set when employee is marked EXITED)
+    client_offboarding_date: date | None = None    # Final billing date
+    siprahub_offboarding_date: date | None = None  # Final salary date
     status: EmployeeStatus | None = None
 
 
@@ -44,7 +49,15 @@ class EmployeeResponse(BaseModel):
     jira_username: str | None = None
     start_date: date | None = None
     exit_date: date | None = None
+    # Offboarding dates
+    client_offboarding_date: date | None = None    # Final billing date
+    siprahub_offboarding_date: date | None = None  # Final salary date
     status: EmployeeStatus | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     job_profile_name: str | None = None
+    # Enriched fields (not stored on employees table directly)
+    source: str | None = None        # payroll type: internal / vendor / contractor
+    vendor_name: str | None = None   # from candidate → vendor
+    sow_number: str | None = None    # from candidate → resource_request → sow
+    is_backfill: bool | None = None  # from candidate → resource_request → is_backfill

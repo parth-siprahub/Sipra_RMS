@@ -1,21 +1,17 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Plus, RefreshCw, LayoutGrid, List, Download, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, RefreshCw, LayoutGrid, List, Download, Edit2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { candidatesApi } from '../api/candidates';
 import { resourceRequestsApi } from '../api/resourceRequests';
 import type {
     Candidate,
     CandidateStatus,
-    CandidateSource,
-    CreateCandidatePayload,
     ExitPayload,
 } from '../api/candidates';
 import type { ResourceRequest } from '../api/resourceRequests';
 import { vendorsApi, type Vendor } from '../api/vendors';
 import { sowApi, type SOW } from '../api/sows';
-import { jobProfileApi, type JobProfile } from '../api/jobProfiles';
-
-import { Modal } from '../components/ui/Modal';
 import { ExitConfirmModal } from '../components/ui/ExitConfirmModal';
 import { RevertExitModal } from '../components/ui/RevertExitModal';
 import { StatusBadge } from '../components/ui/StatusBadge';
@@ -25,18 +21,7 @@ import { communicationLogApi, type CommunicationLog } from '../api/communication
 import { exportCandidates } from '../api/exports';
 import { cn } from '../lib/utils';
 import { formatCandidateFullName } from '../lib/personNames';
-import {
-    User,
-    Mail,
-    Phone,
-    Building2,
-    Briefcase,
-    Calendar,
-    MapPin,
-    MessageSquare,
-    Link as LinkIcon,
-    History
-} from 'lucide-react';
+import { Calendar, MessageSquare, History } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -68,7 +53,7 @@ const CLOSED_STAGES: CandidateStatus[] = [
 ];
 
 // Short label for kanban column headers
-const STAGE_LABELS: Record<CandidateStatus, string> = {
+export const STAGE_LABELS: Record<CandidateStatus, string> = {
     NEW: 'New',
     SCREENING: 'Screening',
     SUBMITTED_TO_ADMIN: 'Submitted',
@@ -118,16 +103,52 @@ const STAGE_COLORS: Record<string, string> = {
 interface KanbanBoardProps {
     candidates: Candidate[];
     vendors: Vendor[];
+    sows: SOW[];
+    requests: ResourceRequest[];
     onStatusChange: (id: number, status: CandidateStatus) => void;
     onCandidateClick: (candidate: Candidate) => void;
     onExitRequest: (id: number) => void;
     onRevertExit: (id: number) => void;
 }
 
-function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick, onExitRequest, onRevertExit }: KanbanBoardProps) {
+function useDragScroll() {
+    const ref = useRef<HTMLDivElement>(null);
+    const isDown = useRef(false);
+    const startX = useRef(0);
+    const scrollLeft = useRef(0);
+
+    const onMouseDown = (e: React.MouseEvent) => {
+        if (!ref.current) return;
+        isDown.current = true;
+        startX.current = e.pageX - ref.current.offsetLeft;
+        scrollLeft.current = ref.current.scrollLeft;
+        ref.current.style.cursor = 'grabbing';
+    };
+    const onMouseLeave = () => {
+        isDown.current = false;
+        if (ref.current) ref.current.style.cursor = '';
+    };
+    const onMouseUp = () => {
+        isDown.current = false;
+        if (ref.current) ref.current.style.cursor = '';
+    };
+    const onMouseMove = (e: React.MouseEvent) => {
+        if (!isDown.current || !ref.current) return;
+        e.preventDefault();
+        const x = e.pageX - ref.current.offsetLeft;
+        const walk = (x - startX.current) * 1.2;
+        ref.current.scrollLeft = scrollLeft.current - walk;
+    };
+
+    return { ref, onMouseDown, onMouseLeave, onMouseUp, onMouseMove };
+}
+
+function KanbanBoard({ candidates, vendors, sows, requests, onStatusChange, onCandidateClick, onExitRequest, onRevertExit }: KanbanBoardProps) {
     const draggingIdRef = useRef<number | null>(null);
     const [draggingId, setDraggingId] = useState<number | null>(null);
     const [dragOverStatus, setDragOverStatus] = useState<CandidateStatus | null>(null);
+    const pipelineScroll = useDragScroll();
+    const closedScroll = useDragScroll();
 
     const grouped = (stages: CandidateStatus[]) =>
         stages.reduce<Record<string, Candidate[]>>((acc, s) => {
@@ -256,7 +277,16 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick, on
                             <p className="text-sm font-semibold text-text truncate">
                                 {formatCandidateFullName(c.first_name, c.last_name)}
                             </p>
-                            <p className="text-xs text-text-muted truncate mt-0.5">{c.email}</p>
+                            {(() => {
+                                const req = requests.find(r => r.id === c.request_id);
+                                const sow = req ? sows.find(s => s.id === req.sow_id) : null;
+                                return sow ? (
+                                    <p className="text-xs text-text-muted truncate mt-0.5">{sow.sow_number}</p>
+                                ) : status !== 'ONBOARDED' ? (
+                                    <p className="text-xs text-text-muted truncate mt-0.5">{c.email}</p>
+                                ) : null;
+                                
+                            })()}
                             {c.current_company && (
                                 <p className="text-xs text-text-muted truncate">{c.current_company}</p>
                             )}
@@ -293,7 +323,15 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick, on
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
                     Active Pipeline
                 </p>
-                <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar">
+                <div
+                    ref={pipelineScroll.ref}
+                    className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar select-none"
+                    style={{ cursor: 'grab' }}
+                    onMouseDown={pipelineScroll.onMouseDown}
+                    onMouseLeave={pipelineScroll.onMouseLeave}
+                    onMouseUp={pipelineScroll.onMouseUp}
+                    onMouseMove={pipelineScroll.onMouseMove}
+                >
                     {PIPELINE_STAGES.map((s) => renderColumn(s, pipelineGroups[s]))}
                 </div>
             </div>
@@ -303,7 +341,15 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick, on
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
                     Closed / Inactive
                 </p>
-                <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar">
+                <div
+                    ref={closedScroll.ref}
+                    className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar select-none"
+                    style={{ cursor: 'grab' }}
+                    onMouseDown={closedScroll.onMouseDown}
+                    onMouseLeave={closedScroll.onMouseLeave}
+                    onMouseUp={closedScroll.onMouseUp}
+                    onMouseMove={closedScroll.onMouseMove}
+                >
                     {CLOSED_STAGES.map((s) => renderColumn(s, closedGroups[s]))}
                 </div>
             </div>
@@ -313,11 +359,10 @@ function KanbanBoard({ candidates, vendors, onStatusChange, onCandidateClick, on
 
 // ─── Details Modal ──────────────────────────────────────────────────────────
 
-interface DetailsModalProps {
-    candidate: Candidate | null;
-    isOpen: boolean;
-    onClose: () => void;
+export interface CandidateDetailsPanelProps {
+    candidate: Candidate;
     onUpdated: () => void;
+    onDismiss: () => void;
     vendors: Vendor[];
     requests: ResourceRequest[];
     onStatusChange: (id: number, status: CandidateStatus) => void;
@@ -349,41 +394,22 @@ const NEXT_STEP_TRANSITIONS: Record<CandidateStatus, CandidateStatus[]> = {
     EXIT: [],
 };
 
-function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors, requests, onStatusChange }: DetailsModalProps) {
+export function CandidateDetailsPanel({
+    candidate,
+    onDismiss,
+    onUpdated,
+    vendors,
+    requests,
+    onStatusChange,
+}: CandidateDetailsPanelProps) {
     const [activeTab, setActiveTab] = useState<'info' | 'interview' | 'transition'>('info');
     const [submitting, setSubmitting] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Candidate>>({});
     const [logs, setLogs] = useState<CommunicationLog[]>([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
-    const [changingStatus, setChangingStatus] = useState(false);
-
-    useEffect(() => {
-        if (candidate && isOpen) {
-            setEditForm({
-                // Basic info — editable
-                first_name: candidate.first_name || '',
-                last_name: candidate.last_name || '',
-                phone: candidate.phone || '',
-                current_company: candidate.current_company || '',
-                current_location: candidate.current_location || '',
-                total_experience: candidate.total_experience ?? undefined,
-                relevant_experience: candidate.relevant_experience ?? undefined,
-                notice_period: candidate.notice_period ?? undefined,
-                skills: candidate.skills || '',
-                // Interview
-                l1_feedback: candidate.l1_feedback || '',
-                l1_score: candidate.l1_score || 0,
-                l2_feedback: candidate.l2_feedback || '',
-                l2_score: candidate.l2_score || 0,
-                overlap_until: candidate.overlap_until || '',
-                remarks: candidate.remarks || '',
-            });
-            fetchLogs();
-        }
-    }, [candidate, isOpen]);
+    const [pendingStatus, setPendingStatus] = useState<CandidateStatus | null>(null);
 
     const fetchLogs = async () => {
-        if (!candidate) return;
         setLoadingLogs(true);
         try {
             const data = await communicationLogApi.list({ candidate_id: candidate.id });
@@ -395,25 +421,47 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
         }
     };
 
-    if (!candidate) return null;
+    useEffect(() => {
+        setEditForm({
+            first_name: candidate.first_name || '',
+            last_name: candidate.last_name || '',
+            phone: candidate.phone || '',
+            current_company: candidate.current_company || '',
+            current_location: candidate.current_location || '',
+            total_experience: candidate.total_experience ?? undefined,
+            relevant_experience: candidate.relevant_experience ?? undefined,
+            notice_period: candidate.notice_period ?? undefined,
+            skills: candidate.skills || '',
+            l1_feedback: candidate.l1_feedback || '',
+            l1_score: candidate.l1_score || 0,
+            l2_feedback: candidate.l2_feedback || '',
+            l2_score: candidate.l2_score || 0,
+            overlap_until: candidate.overlap_until || null,
+            last_working_day: candidate.last_working_day || null,
+            exit_reason: candidate.exit_reason || '',
+            remarks: candidate.remarks || '',
+        });
+        setPendingStatus(null);
+        fetchLogs();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when switching candidate
+    }, [candidate.id]);
 
-    const handleManualStatusChange = async (newStatus: CandidateStatus) => {
-        if (!candidate || newStatus === candidate.status) return;
-        setChangingStatus(true);
-        try {
-            await onStatusChange(candidate.id, newStatus);
-        } finally {
-            setChangingStatus(false);
-        }
+    const handleManualStatusChange = (newStatus: CandidateStatus) => {
+        if (newStatus === candidate.status) return;
+        setPendingStatus(newStatus);
     };
 
     const handleUpdate = async () => {
         setSubmitting(true);
         try {
             await candidatesApi.update(candidate.id, editForm);
-            toast.success('Candidate updated');
+            if (pendingStatus) {
+                await onStatusChange(candidate.id, pendingStatus);
+            } else {
+                toast.success('Candidate updated');
+            }
             onUpdated();
-            onClose();
+            onDismiss();
         } catch {
             // error
         } finally {
@@ -422,36 +470,45 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
     };
 
     return (
-        <Modal
-            isOpen={isOpen}
-            onClose={onClose}
-            title={formatCandidateFullName(candidate.first_name, candidate.last_name)}
-            maxWidth="max-w-2xl"
-        >
             <div className="space-y-6">
                 {/* Status Changer */}
                 <div className="flex items-center gap-3 px-1">
                     <span className="text-xs font-bold text-text-muted uppercase tracking-wider shrink-0">
                         Status
                     </span>
-                    <div className="flex items-center gap-2 flex-1">
+                    <div className="flex items-center gap-2 flex-1 flex-wrap">
                         <StatusBadge value={candidate.status} type="candidate" />
-                        <span className="text-text-muted text-xs">→</span>
-                        <select
-                            className="input-field text-sm py-1.5 flex-1 max-w-[220px]"
-                            value=""
-                            onChange={(e) => handleManualStatusChange(e.target.value as CandidateStatus)}
-                            disabled={changingStatus}
-                            aria-label="Change candidate status"
-                        >
-                            <option value="" disabled>Move to...</option>
-                            {(NEXT_STEP_TRANSITIONS[candidate.status as CandidateStatus] || []).map((s) => (
-                                <option key={s} value={s}>
-                                    {STAGE_LABELS[s]}
-                                </option>
-                            ))}
-                        </select>
-                        {changingStatus && <span className="spinner w-4 h-4" />}
+                        {pendingStatus ? (
+                            <>
+                                <span className="text-text-muted text-xs">→</span>
+                                <StatusBadge value={pendingStatus} type="candidate" />
+                                <button
+                                    type="button"
+                                    className="text-[10px] text-text-muted hover:text-danger transition-colors"
+                                    onClick={() => setPendingStatus(null)}
+                                    title="Clear staged status change"
+                                >
+                                    ✕ clear
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <span className="text-text-muted text-xs">→</span>
+                                <select
+                                    className="input-field text-sm py-1.5 flex-1 max-w-[220px]"
+                                    value=""
+                                    onChange={(e) => handleManualStatusChange(e.target.value as CandidateStatus)}
+                                    aria-label="Change candidate status"
+                                >
+                                    <option value="" disabled>Move to...</option>
+                                    {(NEXT_STEP_TRANSITIONS[candidate.status as CandidateStatus] || []).map((s) => (
+                                        <option key={s} value={s}>
+                                            {STAGE_LABELS[s]}
+                                        </option>
+                                    ))}
+                                </select>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -534,6 +591,32 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                 <label className="input-label">Skills</label>
                                 <input className="input-field mt-1" value={editForm.skills ?? ''} onChange={e => setEditForm(f => ({ ...f, skills: e.target.value }))} placeholder="e.g. React, Node.js, Python" />
                             </div>
+                            {/* Exit / Rejection Info — show only for terminal statuses */}
+                            {(['EXIT', 'REJECTED_BY_ADMIN', 'REJECTED_BY_CLIENT', 'L1_REJECT', 'SCREEN_REJECT', 'OFFER_BACK_OUT', 'INTERVIEW_BACK_OUT'] as CandidateStatus[]).includes(candidate.status as CandidateStatus) && (
+                                <div className="space-y-3 pt-3 border-t border-border">
+                                    <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Exit / Rejection Details</p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="input-label">Last Working Day</label>
+                                            <input
+                                                type="date"
+                                                className="input-field mt-1"
+                                                value={editForm.last_working_day || ''}
+                                                onChange={e => setEditForm(f => ({ ...f, last_working_day: e.target.value || null }))}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="input-label">Reason</label>
+                                            <input
+                                                className="input-field mt-1"
+                                                value={editForm.exit_reason ?? ''}
+                                                placeholder="e.g. Better offer, project end..."
+                                                onChange={e => setEditForm(f => ({ ...f, exit_reason: e.target.value }))}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             {/* Read-only fields */}
                             <div className="flex items-center gap-4 pt-1 text-sm text-text-muted border-t border-border">
                                 <span>Source: <span className="badge badge-neutral ml-1">{candidate.source?.replace(/_/g, ' ') || '—'}</span></span>
@@ -659,7 +742,7 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                         const isBackfill = linkedReq?.is_backfill === true;
 
                         return (
-                            <div className="space-y-4 max-w-sm">
+                            <div className="space-y-4">
                                 {isBackfill ? (
                                     <div className="space-y-3">
                                         <label className="input-label flex items-center gap-2" htmlFor="overlap-until">
@@ -671,7 +754,7 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                                             type="date"
                                             className="input-field"
                                             value={editForm.overlap_until || ''}
-                                            onChange={(e) => setEditForm(prev => ({ ...prev, overlap_until: e.target.value }))}
+                                            onChange={(e) => setEditForm(prev => ({ ...prev, overlap_until: e.target.value || null }))}
                                             title="Overlap Until"
                                         />
                                         <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/10">
@@ -749,8 +832,9 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
 
                 {/* Footer Actions */}
                 <div className="flex gap-3 pt-4 border-t border-border">
-                    <button onClick={onClose} className="btn btn-secondary flex-1">Close</button>
+                    <button type="button" onClick={onDismiss} className="btn btn-secondary flex-1">Close</button>
                     <button
+                        type="button"
                         onClick={handleUpdate}
                         className="btn btn-cta flex-1"
                         disabled={submitting}
@@ -759,523 +843,22 @@ function CandidateDetailsModal({ candidate, isOpen, onClose, onUpdated, vendors,
                     </button>
                 </div>
             </div>
-        </Modal>
     );
 }
-
-// ─── Create Candidate Modal ───────────────────────────────────────────────────
-
-interface CreateCandidateModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onCreated: () => void;
-    onViewDuplicate: (candidate: Candidate) => void;
-    requests: ResourceRequest[];
-    vendors: Vendor[];
-    sows: SOW[];
-    jobProfiles: JobProfile[];
-}
-
-const COUNTRY_CODES = [
-    { code: '+91', label: 'IN +91' },
-    { code: '+1', label: 'US +1' },
-    { code: '+44', label: 'UK +44' },
-    { code: '+61', label: 'AU +61' },
-    { code: '+971', label: 'AE +971' },
-    { code: '+65', label: 'SG +65' },
-    { code: '+49', label: 'DE +49' },
-    { code: '+33', label: 'FR +33' },
-    { code: '+81', label: 'JP +81' },
-    { code: '+86', label: 'CN +86' },
-];
-
-function CreateCandidateModal({ isOpen, onClose, onCreated, onViewDuplicate, requests, vendors, sows, jobProfiles }: CreateCandidateModalProps) {
-    const emptyForm = (): CreateCandidatePayload => ({
-        first_name: '',
-        last_name: '',
-        email: '',
-        vendor_id: undefined,
-        request_id: undefined,
-    });
-
-    const [form, setForm] = useState<CreateCandidatePayload>(emptyForm());
-    const [resumeFile, setResumeFile] = useState<File | null>(null);
-    const [submitting, setSubmitting] = useState(false);
-    const [countryCode, setCountryCode] = useState('+91');
-    const [phoneDigits, setPhoneDigits] = useState('');
-    const [phoneError, setPhoneError] = useState('');
-    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-    const [duplicateCandidate, setDuplicateCandidate] = useState<Candidate | null>(null);
-
-    const set = (field: keyof CreateCandidatePayload, value: unknown) =>
-        setForm((f) => ({ ...f, [field]: value }));
-
-    // Check for duplicate candidate
-    const checkDuplicate = useCallback(async (firstName: string, lastName: string, email: string, phone: string | undefined) => {
-        if (!firstName || !lastName || !email) return;
-        try {
-            const existing = await candidatesApi.list();
-            const normalizedEmail = email.toLowerCase().trim();
-            const normalizedFirst = firstName.toLowerCase().trim();
-            const normalizedLast = lastName.toLowerCase().trim();
-            const strippedPhone = phone ? phone.replace(/\D/g, '').slice(-10) : '';
-
-            const dup = existing.find(c => {
-                const matchName = c.first_name.toLowerCase().trim() === normalizedFirst
-                    && c.last_name.toLowerCase().trim() === normalizedLast;
-                const matchEmail = c.email.toLowerCase().trim() === normalizedEmail;
-                const matchPhone = strippedPhone && c.phone
-                    ? c.phone.replace(/\D/g, '').slice(-10) === strippedPhone
-                    : false;
-                return matchEmail || (matchName && matchPhone);
-            });
-            setDuplicateCandidate(dup || null);
-        } catch {
-            // silent
-        }
-    }, []);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const errors: Record<string, string> = {};
-
-        if (!form.first_name.trim()) errors.first_name = 'First name is required';
-        if (!form.last_name.trim()) errors.last_name = 'Last name is required';
-        if (!form.email.trim()) errors.email = 'Email is required';
-        if (!form.source) errors.source = 'Source is required';
-        if (form.source === 'VENDORS' && !form.vendor_id) errors.vendor_id = 'Vendor is required when source is Vendors';
-
-        // Phone validation: if provided, must be exactly 10 digits
-        if (phoneDigits) {
-            const digitsOnly = phoneDigits.replace(/\D/g, '');
-            if (digitsOnly.length !== 10) {
-                errors.phone = 'Phone number must be exactly 10 digits';
-            }
-        }
-
-        if (Object.keys(errors).length > 0) {
-            setValidationErrors(errors);
-            toast.error('Please fix the highlighted errors');
-            return;
-        }
-        setValidationErrors({});
-
-        if (duplicateCandidate) {
-            toast.error(`Duplicate candidate found: ${formatCandidateFullName(duplicateCandidate.first_name, duplicateCandidate.last_name)} (${duplicateCandidate.email})`);
-            return;
-        }
-
-        // Compose phone with country code
-        const fullPhone = phoneDigits ? `${countryCode}${phoneDigits.replace(/\D/g, '')}` : undefined;
-
-        setSubmitting(true);
-        try {
-            const payload = { ...form, phone: fullPhone };
-            const candidate = await candidatesApi.create(payload);
-
-            if (resumeFile && candidate.id) {
-                try {
-                    await candidatesApi.uploadResume(candidate.id, resumeFile);
-                    toast.success('Candidate and Resume added!');
-                } catch {
-                    toast.error('Candidate added, but resume upload failed.');
-                }
-            } else {
-                toast.success(`${formatCandidateFullName(form.first_name, form.last_name)} added!`);
-            }
-
-            onCreated();
-            onClose();
-            setForm(emptyForm());
-            setResumeFile(null);
-            setPhoneDigits('');
-            setCountryCode('+91');
-            setDuplicateCandidate(null);
-        } catch {
-            // toast handled by client.ts
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Add New Candidate" maxWidth="max-w-2xl">
-            <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Linked Request Selection - Top priority */}
-                <div className="bg-surface-active/30 p-4 rounded-xl border border-cta/10 space-y-3">
-                    <div className="flex items-center gap-2 mb-1">
-                        <Briefcase size={16} className="text-cta" />
-                        <span className="text-sm font-bold text-text">Staffing Connection</span>
-                    </div>
-                    <select
-                        id="c-request"
-                        className="input-field border-cta/20 focus:border-cta"
-                        value={form.request_id || ''}
-                        onChange={(e) => set('request_id', e.target.value ? parseInt(e.target.value) : undefined)}
-                        title="Select Request"
-                    >
-                        <option value="">Global Talent Pool (No specific request)</option>
-                        {requests.filter(r => r.status === 'OPEN').map(r => {
-                            const jp = jobProfiles.find(p => p.id === r.job_profile_id);
-                            return (
-                                <option key={r.id} value={r.id}>
-                                    {r.request_display_id} | Priority: {r.priority} | Role: {jp?.role_name || '—'}
-                                </option>
-                            );
-                        })}
-                    </select>
-                    {form.request_id && (() => {
-                        const selectedReq = requests.find(r => r.id === form.request_id);
-                        const linkedSow = selectedReq ? sows.find(s => s.id === selectedReq.sow_id) : null;
-                        const linkedJp = selectedReq ? jobProfiles.find(p => p.id === selectedReq.job_profile_id) : null;
-                        return (
-                            <div className="p-3 bg-surface-hover/50 rounded-lg border border-border space-y-1.5">
-                                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Request Context</p>
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
-                                    <span className="text-text-muted">SOW:</span>
-                                    <span className="text-text font-medium">{linkedSow ? `${linkedSow.sow_number} — ${linkedSow.client_name}` : '—'}</span>
-                                    <span className="text-text-muted">Job Profile:</span>
-                                    <span className="text-text font-medium">{linkedJp ? `${linkedJp.role_name} (${linkedJp.technology})` : '—'}</span>
-                                    <span className="text-text-muted">Max Resources:</span>
-                                    <span className="text-text font-medium">{linkedSow?.max_resources ?? '—'}</span>
-                                </div>
-                            </div>
-                        );
-                    })()}
-                    <p className="text-[10px] text-text-muted px-1">
-                        Linking a candidate to a request helps track pipeline metrics more accurately.
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-8">
-                    {/* Left Column: Personal Info */}
-                    <div className="space-y-5">
-                        <h4 className="flex items-center gap-2 text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
-                            <User size={14} className="text-text-muted" />
-                            Personal Information
-                        </h4>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-semibold text-text-muted px-1" htmlFor="c-first">
-                                    First Name <span className="text-danger">*</span>
-                                </label>
-                                <input
-                                    id="c-first"
-                                    className={cn("input-field", validationErrors.first_name && "border-danger")}
-                                    placeholder="e.g. Rahul"
-                                    required
-                                    value={form.first_name}
-                                    onChange={(e) => { set('first_name', e.target.value); setValidationErrors(p => ({ ...p, first_name: '' })); }}
-                                    onBlur={() => checkDuplicate(form.first_name, form.last_name, form.email, phoneDigits)}
-                                />
-                                {validationErrors.first_name && <p className="text-[10px] text-danger px-1">{validationErrors.first_name}</p>}
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-semibold text-text-muted px-1" htmlFor="c-last">
-                                    Last Name <span className="text-danger">*</span>
-                                </label>
-                                <input
-                                    id="c-last"
-                                    className={cn("input-field", validationErrors.last_name && "border-danger")}
-                                    placeholder="e.g. Sharma"
-                                    required
-                                    value={form.last_name}
-                                    onChange={(e) => { set('last_name', e.target.value); setValidationErrors(p => ({ ...p, last_name: '' })); }}
-                                    onBlur={() => checkDuplicate(form.first_name, form.last_name, form.email, phoneDigits)}
-                                />
-                                {validationErrors.last_name && <p className="text-[10px] text-danger px-1">{validationErrors.last_name}</p>}
-                            </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <label className="text-[11px] font-semibold text-text-muted px-1 flex items-center gap-1" htmlFor="c-email">
-                                <Mail size={12} /> Email Address <span className="text-danger">*</span>
-                            </label>
-                            <input
-                                id="c-email"
-                                type="email"
-                                className={cn("input-field", validationErrors.email && "border-danger")}
-                                placeholder="name@company.com"
-                                required
-                                value={form.email}
-                                onChange={(e) => { set('email', e.target.value); setValidationErrors(p => ({ ...p, email: '' })); }}
-                                onBlur={() => checkDuplicate(form.first_name, form.last_name, form.email, phoneDigits)}
-                            />
-                            {validationErrors.email && <p className="text-[10px] text-danger px-1">{validationErrors.email}</p>}
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <label className="text-[11px] font-semibold text-text-muted px-1 flex items-center gap-1" htmlFor="c-phone">
-                                <Phone size={12} /> Phone Number
-                            </label>
-                            <div className="flex gap-2">
-                                <select
-                                    className="input-field w-28 shrink-0"
-                                    value={countryCode}
-                                    onChange={(e) => setCountryCode(e.target.value)}
-                                    title="Country Code"
-                                >
-                                    {COUNTRY_CODES.map(cc => (
-                                        <option key={cc.code} value={cc.code}>{cc.label}</option>
-                                    ))}
-                                </select>
-                                <input
-                                    id="c-phone"
-                                    className={cn("input-field flex-1", (validationErrors.phone || phoneError) && "border-danger")}
-                                    placeholder="10-digit number"
-                                    maxLength={10}
-                                    value={phoneDigits}
-                                    onChange={(e) => {
-                                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
-                                        setPhoneDigits(digits);
-                                        setPhoneError(digits && digits.length !== 10 ? 'Must be 10 digits' : '');
-                                        setValidationErrors(p => ({ ...p, phone: '' }));
-                                    }}
-                                    onBlur={() => checkDuplicate(form.first_name, form.last_name, form.email, phoneDigits)}
-                                />
-                            </div>
-                            {(validationErrors.phone || phoneError) && (
-                                <p className="text-[10px] text-danger px-1">{validationErrors.phone || phoneError}</p>
-                            )}
-                        </div>
-
-                        {/* Duplicate Warning */}
-                        {duplicateCandidate && (
-                            <div className="p-3 bg-danger/10 border border-danger/30 rounded-lg">
-                                <p className="text-xs font-bold text-danger mb-1">Duplicate Candidate Found</p>
-                                <p className="text-[11px] text-text">
-                                    {formatCandidateFullName(duplicateCandidate.first_name, duplicateCandidate.last_name)} — {duplicateCandidate.email}
-                                    {duplicateCandidate.phone && ` — ${duplicateCandidate.phone}`}
-                                </p>
-                                <p className="text-[10px] text-text-muted mt-1">
-                                    Status: {STAGE_LABELS[duplicateCandidate.status as CandidateStatus] || duplicateCandidate.status}
-                                </p>
-                                <button
-                                    type="button"
-                                    className="mt-2 text-xs font-semibold text-cta hover:underline"
-                                    onClick={() => {
-                                        onClose();
-                                        onViewDuplicate(duplicateCandidate);
-                                    }}
-                                >
-                                    View Existing Candidate Details →
-                                </button>
-                            </div>
-                        )}
-
-                        <div className="space-y-1.5">
-                            <label className="text-[11px] font-semibold text-text-muted px-1 flex items-center gap-1" htmlFor="c-location">
-                                <MapPin size={12} /> Current Location
-                            </label>
-                            <input
-                                id="c-location"
-                                className="input-field"
-                                placeholder="e.g. Bengaluru, India"
-                                value={form.current_location ?? ''}
-                                onChange={(e) => set('current_location', e.target.value || undefined)}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Right Column: Professional Info */}
-                    <div className="space-y-5">
-                        <h4 className="flex items-center gap-2 text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
-                            <Building2 size={14} className="text-text-muted" />
-                            Professional Details
-                        </h4>
-
-                        <div className="space-y-1.5">
-                            <label className="text-[11px] font-semibold text-text-muted px-1 flex items-center gap-1" htmlFor="c-source">
-                                <LinkIcon size={12} /> Source <span className="text-danger">*</span>
-                            </label>
-                            <select
-                                id="c-source"
-                                className={cn("input-field", validationErrors.source && "border-danger")}
-                                value={form.source || ''}
-                                onChange={(e) => {
-                                    const val = e.target.value as CandidateSource | '';
-                                    set('source', val || undefined);
-                                    setValidationErrors(p => ({ ...p, source: '', vendor_id: '' }));
-                                    if (val !== 'VENDORS') {
-                                        set('vendor_id', undefined);
-                                    }
-                                }}
-                                required
-                                title="Select Source"
-                            >
-                                <option value="">— Select Source —</option>
-                                {(['PORTAL', 'JOB_BOARDS', 'NETWORK', 'VENDORS', 'LINKEDIN', 'INTERNAL'] as CandidateSource[]).map((s) => (
-                                    <option key={s} value={s}>
-                                        {s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
-                                    </option>
-                                ))}
-                            </select>
-                            {validationErrors.source && <p className="text-[10px] text-danger px-1">{validationErrors.source}</p>}
-                        </div>
-
-                        {form.source === 'VENDORS' && (
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-semibold text-text-muted px-1 flex items-center gap-1" htmlFor="c-vendor">
-                                    <Building2 size={12} /> Vendor
-                                </label>
-                                <select
-                                    id="c-vendor"
-                                    className="input-field"
-                                    value={form.vendor_id || ''}
-                                    onChange={(e) => set('vendor_id', e.target.value ? parseInt(e.target.value) : undefined)}
-                                    title="Select Vendor"
-                                >
-                                    <option value="">— Select Vendor —</option>
-                                    {vendors.filter(v => v.is_active).map((v) => (
-                                        <option key={v.id} value={v.id}>
-                                            {v.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
-
-                        <div className="space-y-1.5">
-                            <label className="text-[11px] font-semibold text-text-muted px-1" htmlFor="c-company">
-                                Current Organization
-                            </label>
-                            <input
-                                id="c-company"
-                                className="input-field"
-                                placeholder="e.g. Tech Solutions Inc."
-                                value={form.current_company ?? ''}
-                                onChange={(e) => set('current_company', e.target.value || undefined)}
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-semibold text-text-muted px-1" htmlFor="c-total-exp">
-                                    Total Exp (Yrs)
-                                </label>
-                                <input
-                                    id="c-total-exp"
-                                    type="number"
-                                    min={0}
-                                    step={0.5}
-                                    className="input-field"
-                                    value={form.total_experience ?? ''}
-                                    onChange={(e) =>
-                                        set('total_experience', e.target.value ? parseFloat(e.target.value) : undefined)
-                                    }
-                                    title="Total Exp"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-semibold text-text-muted px-1" htmlFor="c-rel-exp">
-                                    Relevant Exp
-                                </label>
-                                <input
-                                    id="c-rel-exp"
-                                    type="number"
-                                    min={0}
-                                    step={0.5}
-                                    className="input-field"
-                                    value={form.relevant_experience ?? ''}
-                                    onChange={(e) =>
-                                        set('relevant_experience', e.target.value ? parseFloat(e.target.value) : undefined)
-                                    }
-                                    title="Rel Exp"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <label className="text-[11px] font-semibold text-text-muted px-1" htmlFor="c-notice">
-                                Notice Period (Days)
-                            </label>
-                            <input
-                                id="c-notice"
-                                type="number"
-                                min={0}
-                                className="input-field"
-                                placeholder="e.g. 30"
-                                value={form.notice_period ?? ''}
-                                onChange={(e) =>
-                                    set('notice_period', e.target.value ? parseInt(e.target.value) : undefined)
-                                }
-                                title="Notice Period"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Skills & Resume - Full Width */}
-                <div className="space-y-4 pt-2">
-                    <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-text-muted px-1" htmlFor="c-skills">
-                            Core Skillset (Comma separated)
-                        </label>
-                        <textarea
-                            id="c-skills"
-                            className="input-field resize-none min-h-[60px]"
-                            rows={2}
-                            placeholder="React, TypeScript, Node.js, AWS..."
-                            value={form.skills ?? ''}
-                            onChange={(e) => set('skills', e.target.value || undefined)}
-                            title="Skills List"
-                        />
-                    </div>
-
-                    <div className="bg-surface p-4 rounded-xl border border-border group hover:border-cta/30 transition-all">
-                        <label className="text-[11px] font-semibold text-text-muted px-1 block mb-2" htmlFor="c-resume">
-                            Resume Attachment (PDF/DOCX)
-                        </label>
-                        <input
-                            id="c-resume"
-                            type="file"
-                            accept=".pdf,.doc,.docx"
-                            className="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-surface-hover file:text-cta hover:file:bg-cta/10 file:cursor-pointer transition-all"
-                            title="Upload Resume File"
-                            onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
-                        />
-                    </div>
-                </div>
-
-                {/* Submit Actions */}
-                <div className="flex gap-4 pt-4 border-t border-border">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="btn btn-secondary flex-1 py-3"
-                        disabled={submitting}
-                    >
-                        Cancel
-                    </button>
-                    <button type="submit" className="btn btn-cta flex-1 py-3 font-bold uppercase tracking-wider text-xs" disabled={submitting}>
-                        {submitting ? <span className="spinner w-4 h-4" /> : 'Create Candidate Profile'}
-                    </button>
-                </div>
-            </form>
-        </Modal>
-    );
-}
-
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
 
 type ViewMode = 'table' | 'kanban';
 
 export function Candidates() {
+    const navigate = useNavigate();
     const [candidates, setCandidates] = useState<Candidate[]>([]);
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<ViewMode>('kanban'); // Default to kanban for better viz
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
-    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [statusFilter, setStatusFilter] = useState('');
     const [requests, setRequests] = useState<ResourceRequest[]>([]);
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [sows, setSows] = useState<SOW[]>([]);
-    const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
     const [exitPendingId, setExitPendingId] = useState<number | null>(null);
     const [isExitModalOpen, setIsExitModalOpen] = useState(false);
     const [revertPendingId, setRevertPendingId] = useState<number | null>(null);
@@ -1292,7 +875,7 @@ export function Candidates() {
     const fetchCandidates = useCallback(async () => {
         setLoading(true);
         try {
-            const [cData, rData, vData, sowData, jpData] = await Promise.all([
+            const [cData, rData, vData, sowData] = await Promise.all([
                 candidatesApi.list({
                     ...(statusFilter && viewMode === 'table' ? { status: statusFilter } : {}),
                     ...(debouncedSearch ? { search: debouncedSearch } : {}),
@@ -1301,13 +884,11 @@ export function Candidates() {
                 resourceRequestsApi.list(),
                 vendorsApi.list(),
                 sowApi.list(),
-                jobProfileApi.list()
             ]);
             setCandidates(cData);
             setRequests(rData);
             setVendors(vData || []);
             setSows(sowData || []);
-            setJobProfiles(jpData || []);
         } catch {
             // handled globally
         } finally {
@@ -1323,10 +904,6 @@ export function Candidates() {
         try {
             await candidatesApi.review(id, status);
             toast.success(`Moved to ${STAGE_LABELS[status]}`);
-            // Optimistically update the selected candidate so the details modal stays in sync
-            setSelectedCandidate(prev =>
-                prev && prev.id === id ? { ...prev, status } : prev
-            );
             fetchCandidates();
         } catch (err: unknown) {
             const msg =
@@ -1345,9 +922,6 @@ export function Candidates() {
         try {
             await candidatesApi.exit(exitPendingId, payload);
             toast.success('Candidate exited successfully');
-            setSelectedCandidate(prev =>
-                prev && prev.id === exitPendingId ? { ...prev, status: 'EXIT' } : prev
-            );
             fetchCandidates();
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to process exit';
@@ -1368,11 +942,6 @@ export function Candidates() {
         try {
             await candidatesApi.revertExit(revertPendingId, targetStatus);
             toast.success(`Exit reverted — candidate moved to ${STAGE_LABELS[targetStatus]}`);
-            setSelectedCandidate(prev =>
-                prev && prev.id === revertPendingId
-                    ? { ...prev, status: targetStatus, exit_reason: null, last_working_day: null }
-                    : prev
-            );
             fetchCandidates();
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to revert exit';
@@ -1408,7 +977,7 @@ export function Candidates() {
                         <Download size={18} /> Export CSV
                     </button>
                     <button
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={() => navigate('/candidates/create')}
                         className="btn btn-cta"
                         id="add-candidate-btn"
                     >
@@ -1448,18 +1017,15 @@ export function Candidates() {
                 </div>
 
                 {/* Search Bar */}
-                <div className="flex-1 min-w-[250px] relative">
+                <div className="flex-1 min-w-[250px]">
                     <input
                         type="text"
-                        className="input-field pl-9"
+                        className="input-field w-full"
                         placeholder="Search candidates..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         aria-label="Search candidates"
                     />
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
-                        <Search size={14} />
-                    </div>
                 </div>
 
                 {/* Status filter (table view only) */}
@@ -1527,7 +1093,7 @@ export function Candidates() {
                         message="Start by adding candidates to your pipeline or moving them from the global pool."
                         action={
                             <button
-                                onClick={() => setIsModalOpen(true)}
+                                onClick={() => navigate('/candidates/create')}
                                 className="btn btn-cta btn-sm"
                             >
                                 <Plus size={14} /> Add your first candidate
@@ -1546,8 +1112,6 @@ export function Candidates() {
                                         <th>Email</th>
                                         <th>Vendor</th>
                                         <th>Status</th>
-                                        <th>Company</th>
-                                        <th>Exp (yrs)</th>
                                         <th>Added</th>
                                         <th>Actions</th>
                                     </tr>
@@ -1557,7 +1121,7 @@ export function Candidates() {
                                         <tr
                                             key={c.id}
                                             className="cursor-pointer hover:bg-surface-hover transition-colors"
-                                            onClick={() => { setSelectedCandidate(c); setIsDetailsOpen(true); }}
+                                            onClick={() => navigate(`/candidates/${c.id}/edit`)}
                                         >
                                             <td>
                                                 <div className="font-semibold text-text">
@@ -1567,7 +1131,9 @@ export function Candidates() {
                                                     <div className="text-xs text-text-muted">{c.current_location}</div>
                                                 )}
                                             </td>
-                                            <td className="text-text-muted text-sm">{c.email}</td>
+                                            <td className="text-text-muted text-sm">
+                                                {c.status === 'ONBOARDED' ? '—' : c.email}
+                                            </td>
                                             <td>
                                                 <span className="badge badge-neutral">
                                                     {vendors.find(v => v.id === c.vendor_id)?.name || c.vendor || '—'}
@@ -1576,21 +1142,15 @@ export function Candidates() {
                                             <td>
                                                 <StatusBadge value={c.status} type="candidate" />
                                             </td>
-                                            <td className="text-text-muted text-sm">{c.current_company ?? '—'}</td>
-                                            <td className="text-text-muted text-sm">
-                                                {c.total_experience != null ? `${c.total_experience}y` : '—'}
-                                            </td>
                                             <td className="text-text-muted text-sm">{formatDate(c.created_at)}</td>
                                             <td onClick={(e) => e.stopPropagation()}>
-                                                {c.status === 'EXIT' && (
-                                                    <button
-                                                        onClick={() => handleRevertExit(c.id)}
-                                                        className="text-xs font-semibold text-warning hover:text-warning/70 transition-colors whitespace-nowrap"
-                                                        title="Revert exit — move back to pipeline"
-                                                    >
-                                                        ↩ Revert
-                                                    </button>
-                                                )}
+                                                <button
+                                                    onClick={() => navigate(`/candidates/${c.id}/edit`)}
+                                                    className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors"
+                                                    title="Edit Candidate"
+                                                >
+                                                    <Edit2 size={16} />
+                                                </button>
                                             </td>
                                         </tr>
                                     ))}
@@ -1606,35 +1166,14 @@ export function Candidates() {
                 <KanbanBoard
                     candidates={candidates}
                     vendors={vendors}
+                    sows={sows}
+                    requests={requests}
                     onStatusChange={handleStatusChange}
-                    onCandidateClick={(c) => { setSelectedCandidate(c); setIsDetailsOpen(true); }}
+                    onCandidateClick={(c) => navigate(`/candidates/${c.id}/edit`)}
                     onExitRequest={handleExitRequest}
                     onRevertExit={handleRevertExit}
                 />
             )}
-
-            {/* Create Modal */}
-            <CreateCandidateModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onCreated={fetchCandidates}
-                onViewDuplicate={(c) => { setSelectedCandidate(c); setIsDetailsOpen(true); }}
-                requests={requests}
-                vendors={vendors}
-                sows={sows}
-                jobProfiles={jobProfiles}
-            />
-
-            {/* Details Modal */}
-            <CandidateDetailsModal
-                candidate={selectedCandidate}
-                isOpen={isDetailsOpen}
-                onClose={() => { setIsDetailsOpen(false); setSelectedCandidate(null); }}
-                onUpdated={fetchCandidates}
-                vendors={vendors}
-                requests={requests}
-                onStatusChange={handleStatusChange}
-            />
 
             {/* Revert Exit Modal */}
             <RevertExitModal

@@ -104,7 +104,12 @@ async def update_sow(
     data = payload.model_dump(exclude_none=True, mode="json")
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
-    result = await client.table("sows").update(data).eq("id", sow_id).execute()
+    logger.info("SOW update sow_id=%s payload=%s", sow_id, data)
+    try:
+        result = await client.table("sows").update(data).eq("id", sow_id).execute()
+    except Exception as exc:
+        logger.error("SOW update DB error sow_id=%s: %s", sow_id, exc, exc_info=True)
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Database error: {exc}")
     if not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "SOW not found")
     api_cache.clear_prefix("sows_")

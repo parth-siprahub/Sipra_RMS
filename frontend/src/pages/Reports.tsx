@@ -121,6 +121,13 @@ function ReportsToolbar({
     );
 }
 
+function flagColor(flag: string): string {
+    if (flag === 'red' || flag === 'no_aws') return 'text-danger';
+    if (flag === 'amber') return 'text-warning';
+    if (flag === 'green') return 'text-success';
+    return 'text-text-muted';
+}
+
 // ──────────────────────────────────────────────
 // Comparison "tab" — main reports body
 // ──────────────────────────────────────────────
@@ -218,6 +225,7 @@ function ComparisonTab({
             difference: c.difference,
             difference_pct: c.difference_pct,
             flag: c.flag,
+            source: c.source ?? null,
         }))
         : (report?.comparisons || []).map(c => ({
             employee_id: c.employee_id,
@@ -231,6 +239,7 @@ function ComparisonTab({
             difference: c.difference,
             difference_pct: c.difference_pct,
             flag: c.flag,
+            source: c.source ?? null,
         }));
 
     if (rows.length === 0) {
@@ -318,13 +327,13 @@ function ComparisonTab({
                         <thead>
                             <tr className="bg-surface-hover/50 border-b border-border">
                                 <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase tracking-wide">Employee</th>
+                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase tracking-wide">Payroll</th>
                                 <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">Billable Target</th>
                                 <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">Jira Hrs</th>
                                 <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">AWS Hrs</th>
                                 <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-center">OOO</th>
                                 <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">Diff</th>
                                 <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-right">%</th>
-                                <th className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase text-center">Flag</th>
                                 <th className="px-2 py-2 w-9"></th>
                             </tr>
                         </thead>
@@ -339,6 +348,15 @@ function ComparisonTab({
                                         <p className="font-medium text-text leading-tight">{formatPersonName(row.rms_name)}</p>
                                         <p className="text-xs text-text-muted leading-tight mt-0.5">{row.jira_username || row.aws_email || '—'}</p>
                                     </td>
+                                    <td className="px-3 py-2">
+                                        {row.source ? (
+                                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-surface-hover text-text-muted">
+                                                {row.source}
+                                            </span>
+                                        ) : (
+                                            <span className="text-text-muted text-xs">—</span>
+                                        )}
+                                    </td>
                                     <td className="px-3 py-2 text-right text-text-muted tabular-nums">
                                         {row.billable_hours != null ? `${row.billable_hours}h` : '—'}
                                     </td>
@@ -351,13 +369,13 @@ function ComparisonTab({
                                         )}
                                     </td>
                                     <td className="px-3 py-2 text-center tabular-nums">
-                                        <span className={cn("font-medium", row.ooo_days > 0 ? "text-warning" : "text-text-muted")}>
+                                        <span className="font-medium text-text">
                                             {row.ooo_days}
                                         </span>
                                     </td>
                                     <td className="px-3 py-2 text-right tabular-nums">
                                         {row.difference != null ? (
-                                            <span className={cn("font-medium", row.difference > 0 ? "text-success" : row.difference < -10 ? "text-danger" : "text-text")}>
+                                            <span className={cn("font-semibold", flagColor(row.flag))}>
                                                 {row.difference > 0 ? '+' : ''}{row.difference.toFixed(1)}
                                             </span>
                                         ) : (
@@ -366,13 +384,12 @@ function ComparisonTab({
                                     </td>
                                     <td className="px-3 py-2 text-right tabular-nums">
                                         {row.difference_pct != null ? (
-                                            <span className="text-text-muted">{row.difference_pct.toFixed(1)}%</span>
+                                            <span className={cn("font-semibold", flagColor(row.flag))}>
+                                                {row.difference_pct.toFixed(1)}%
+                                            </span>
                                         ) : (
                                             <span className="text-text-muted">—</span>
                                         )}
-                                    </td>
-                                    <td className="px-3 py-2 text-center">
-                                        <FlagBadge flag={row.flag === 'no_aws' ? 'red' : row.flag} />
                                     </td>
                                     <td className="px-1.5 py-2 text-center">
                                         <ExternalLink size={14} className="text-text-muted" />
@@ -397,6 +414,7 @@ interface RowData {
     rms_name: string;
     jira_username: string | null;
     aws_email: string | null;
+    source: string | null;
     jira_hours: number;
     billable_hours: number | null;
     ooo_days: number;
@@ -408,35 +426,6 @@ interface RowData {
 
 /** Sort: non-compliant first (red + legacy no_aws), then amber, then green */
 const FLAG_ORDER: Record<string, number> = { red: 0, no_aws: 0, amber: 1, green: 2 };
-
-function FlagBadge({ flag }: { flag: string }) {
-    if (flag === 'red') {
-        return (
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-danger/15" title="Non-compliant">
-                <span className="w-3 h-3 rounded-full bg-danger shadow-[0_0_6px_var(--color-danger)]" />
-            </span>
-        );
-    }
-    if (flag === 'amber') {
-        return (
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-warning/15" title="Needs review (30–50% discrepancy)">
-                <span className="w-3 h-3 rounded-full bg-warning shadow-[0_0_6px_var(--color-warning)]" />
-            </span>
-        );
-    }
-    if (flag === 'green') {
-        return (
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-success/15" title="Compliant (≤30% discrepancy)">
-                <span className="w-3 h-3 rounded-full bg-success shadow-[0_0_6px_var(--color-success)]" />
-            </span>
-        );
-    }
-    return (
-        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-surface-hover" title="Unknown status">
-            <span className="w-3 h-3 rounded-full bg-text-muted/40" />
-        </span>
-    );
-}
 
 // ──────────────────────────────────────────────
 // Shared Components

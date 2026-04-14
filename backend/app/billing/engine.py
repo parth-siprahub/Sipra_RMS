@@ -4,6 +4,7 @@ Implements:
   - The 8/40 Cap: billable units capped at 8h/day and 40h/week
   - The 75% Rule: AWS active occupancy >= 75% of Jira logged time
   - Exit Logic: immediate termination of billing upon exit_date
+  - Early Exit Rule: employees who exit within 15 days of joining are not billed
 """
 import logging
 from datetime import date, timedelta
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 MAX_DAILY_HOURS = 8.0
 MAX_WEEKLY_HOURS = 40.0
 AWS_COMPLIANCE_THRESHOLD = 0.75  # 75% rule
+EARLY_EXIT_DAYS = 15             # Employees exiting before this tenure (days) are not billed
 
 
 def cap_daily_and_weekly(entries: list[dict]) -> tuple[float, float]:
@@ -67,6 +69,7 @@ def check_75_percent_rule(jira_hours: float, aws_hours: float | None) -> bool | 
 def calculate_billing(
     entries: list[dict],
     employee_exit_date: date | None = None,
+    employee_start_date: date | None = None,
     aws_active_hours: float | None = None,
 ) -> dict:
     """
@@ -75,6 +78,7 @@ def calculate_billing(
     Args:
         entries: list of timesheet entries for a single month
         employee_exit_date: if set, entries after this date are excluded
+        employee_start_date: used for the early exit rule (< 15 days tenure → not billed)
         aws_active_hours: optional AWS active hours for compliance check
 
     Returns:
@@ -97,6 +101,18 @@ def calculate_billing(
         is_billable = False
     if capped_hours == 0:
         is_billable = False
+
+    # Early exit rule: if the employee exited within EARLY_EXIT_DAYS of joining,
+    # they are not billed regardless of logged hours.
+    if employee_exit_date and employee_start_date:
+        tenure_days = (employee_exit_date - employee_start_date).days
+        if tenure_days < EARLY_EXIT_DAYS:
+            logger.info(
+                "Early exit rule applied: tenure=%d days (<%d) → is_billable=False",
+                tenure_days,
+                EARLY_EXIT_DAYS,
+            )
+            is_billable = False
 
     return {
         "total_logged_hours": round(total_logged, 2),

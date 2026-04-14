@@ -70,6 +70,17 @@ async def get_timesheet_comparison(
     emp_ids = [e["id"] for e in employees]
     emp_map = {e["id"]: e for e in employees}
 
+    # Fetch vendor names via candidate linkage
+    vendor_name_map: dict[int, str | None] = {}
+    candidate_ids = [e["candidate_id"] for e in employees if e.get("candidate_id")]
+    if candidate_ids:
+        cands_raw = await client.table("candidates").select("id,vendor").in_("id", candidate_ids).execute()
+        cand_vendor = {c["id"]: c.get("vendor") for c in (cands_raw.data or []) if c.get("id")}
+        for e in employees:
+            cid = e.get("candidate_id")
+            if cid and cid in cand_vendor:
+                vendor_name_map[e["id"]] = cand_vendor[cid]
+
     # Fetch Jira data from jira_timesheet_raw (new table mirroring Excel)
     jira_all: list = []
     chunk_off = 0
@@ -177,6 +188,8 @@ async def get_timesheet_comparison(
             difference=difference,
             difference_pct=difference_pct,
             flag=flag,
+            source=emp.get("source"),
+            vendor_name=vendor_name_map.get(emp_id),
         ))
 
     flag_rank = {"red": 0, "amber": 1, "green": 2, "no_aws": 0}
@@ -516,6 +529,7 @@ async def calculate_billing(
             rms_name=_display_rms_optional(emp.get("rms_name")),
             jira_username=emp.get("jira_username"),
             aws_email=emp.get("aws_email"),
+            source=emp.get("source"),
         ))
 
     # Sort: red first (includes legacy no_aws), then amber, then green
@@ -546,8 +560,19 @@ async def get_computed_reports(
 
     # Join employee names
     emp_ids = list({r["employee_id"] for r in rows})
-    emp_res = await client.table("employees").select("id, rms_name, jira_username, aws_email").in_("id", emp_ids).execute()
+    emp_res = await client.table("employees").select("id, rms_name, jira_username, aws_email, source, candidate_id").in_("id", emp_ids).execute()
     emp_map = {e["id"]: e for e in (emp_res.data or [])}
+
+    # Fetch vendor names via candidate linkage
+    computed_vendor_map: dict[int, str | None] = {}
+    cand_ids = [e["candidate_id"] for e in (emp_res.data or []) if e.get("candidate_id")]
+    if cand_ids:
+        cands_raw = await client.table("candidates").select("id,vendor").in_("id", cand_ids).execute()
+        cand_vendor = {c["id"]: c.get("vendor") for c in (cands_raw.data or []) if c.get("id")}
+        for e in (emp_res.data or []):
+            cid = e.get("candidate_id")
+            if cid and cid in cand_vendor:
+                computed_vendor_map[e["id"]] = cand_vendor[cid]
 
     result = []
     for r in rows:
@@ -573,6 +598,8 @@ async def get_computed_reports(
             rms_name=_display_rms_optional(emp.get("rms_name")),
             jira_username=emp.get("jira_username"),
             aws_email=emp.get("aws_email"),
+            source=emp.get("source"),
+            vendor_name=computed_vendor_map.get(r["employee_id"]),
         ))
 
     flag_order = {"red": 0, "no_aws": 0, "amber": 1, "green": 2}

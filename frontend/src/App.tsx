@@ -19,9 +19,25 @@ import { Clients } from './pages/Clients';
 import { Reports } from './pages/Reports';
 import { ReportEmployeeDrillDown } from './pages/ReportEmployeeDrillDown';
 import { BillingConfig } from './pages/BillingConfig';
+import { BillingConfigCreatePage } from './pages/BillingConfigCreatePage';
 import { TimesheetJiraDrillDown } from './pages/TimesheetJiraDrillDown';
 import { TimesheetAwsDrillDown } from './pages/TimesheetAwsDrillDown';
 import { BILLING_CONFIG_EMAILS } from './lib/accessControl';
+import { EmployeeEditPage } from './pages/EmployeeEditPage';
+import { EmployeeUserCreatePage } from './pages/EmployeeUserCreatePage';
+import { CandidateEditPage } from './pages/CandidateEditPage';
+import { CandidateCreatePage } from './pages/CandidateCreatePage';
+import { ResourceRequestEditPage } from './pages/ResourceRequestEditPage';
+import { ResourceRequestCreatePage } from './pages/ResourceRequestCreatePage';
+import { SowEditPage } from './pages/SowEditPage';
+import { SowCreatePage } from './pages/SowCreatePage';
+import { JobProfileEditPage } from './pages/JobProfileEditPage';
+import { JobProfileCreatePage } from './pages/JobProfileCreatePage';
+import { VendorEditPage } from './pages/VendorEditPage';
+import { VendorCreatePage } from './pages/VendorCreatePage';
+import { ClientEditPage } from './pages/ClientEditPage';
+import { ClientCreatePage } from './pages/ClientCreatePage';
+import { CommunicationLogCreatePage } from './pages/CommunicationLogCreatePage';
 
 const NotFound = () => <div className="p-10 text-center text-2xl text-text-muted font-medium">404 - Page Not Found</div>;
 
@@ -99,19 +115,39 @@ function App() {
                 </ProtectedRoute>
               } />
               <Route path="resource-requests" element={<ResourceRequests />} />
+              <Route path="resource-requests/create" element={<ResourceRequestCreatePage />} />
+              <Route path="resource-requests/:id/edit" element={<ResourceRequestEditPage />} />
               <Route path="candidates" element={<Candidates />} />
+              <Route path="candidates/create" element={<CandidateCreatePage />} />
+              <Route path="candidates/:id/edit" element={<CandidateEditPage />} />
               <Route path="job-profiles" element={<JobProfiles />} />
+              <Route path="job-profiles/create" element={<JobProfileCreatePage />} />
+              <Route path="job-profiles/:id/edit" element={<JobProfileEditPage />} />
               <Route path="sows" element={<Sows />} />
+              <Route path="sows/create" element={<SowCreatePage />} />
+              <Route path="sows/:id/edit" element={<SowEditPage />} />
               <Route path="communication-logs" element={<CommunicationLogs />} />
+              <Route path="communication-logs/create" element={<CommunicationLogCreatePage />} />
               <Route path="vendors" element={<Vendors />} />
+              <Route path="vendors/create" element={<VendorCreatePage />} />
+              <Route path="vendors/:id/edit" element={<VendorEditPage />} />
               <Route path="employees" element={<Employees />} />
+              <Route path="employees/users/create" element={<EmployeeUserCreatePage />} />
+              <Route path="employees/:id/edit" element={<EmployeeEditPage />} />
               <Route path="timesheets" element={<Timesheets />} />
               <Route path="clients" element={<Clients />} />
+              <Route path="clients/create" element={<ClientCreatePage />} />
+              <Route path="clients/:id/edit" element={<ClientEditPage />} />
               <Route path="reports" element={<Reports />} />
               <Route path="reports/employee/:employeeId" element={<ReportEmployeeDrillDown />} />
               <Route path="billing-config" element={
                 <BillingConfigGuard>
                   <BillingConfig />
+                </BillingConfigGuard>
+              } />
+              <Route path="billing-config/create" element={
+                <BillingConfigGuard>
+                  <BillingConfigCreatePage />
                 </BillingConfigGuard>
               } />
               <Route path="timesheets/drill-down/jira" element={<TimesheetJiraDrillDown />} />

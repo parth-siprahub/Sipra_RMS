@@ -11,10 +11,17 @@ export interface Employee {
     jira_username: string | null;
     start_date: string | null;
     exit_date: string | null;
+    /** Final billing date — last day billed to the client */
+    client_offboarding_date: string | null;
+    /** Final salary date — last day on Siprahub payroll */
+    siprahub_offboarding_date: string | null;
     status: 'ACTIVE' | 'EXITED' | 'TERMINATED' | null;
     created_at: string | null;
     updated_at: string | null;
     job_profile_name: string | null;
+    source: string | null;         // payroll type: internal / vendor / contractor
+    sow_number: string | null;     // from resource_request → sow
+    is_backfill?: boolean | null;  // from resource_request → is_backfill
 }
 
 export interface EmployeeCreate {
@@ -35,8 +42,14 @@ export interface EmployeeUpdate {
     siprahub_email?: string;
     github_id?: string;
     jira_username?: string;
+    /** Payroll / vendor name */
+    source?: string;
     start_date?: string;
-    exit_date?: string;
+    exit_date?: string | null;
+    /** Final billing date — last day billed to the client */
+    client_offboarding_date?: string | null;
+    /** Final salary date — last day on Siprahub payroll */
+    siprahub_offboarding_date?: string | null;
     status?: 'ACTIVE' | 'EXITED' | 'TERMINATED';
 }
 

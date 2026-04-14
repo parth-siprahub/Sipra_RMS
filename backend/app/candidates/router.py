@@ -404,6 +404,23 @@ async def admin_review_candidate(
             except Exception as rr_err:
                 logger.warning("RR auto-close failed for request %s: %s", request_id, rr_err)
 
+    # Safeguard: if status is moved to EXIT via review/manual path, keep employee in sync.
+    # (The dedicated /exit endpoint already performs this sync, but review flow can also
+    # transition ONBOARDED -> EXIT.)
+    if payload.status == CandidateStatus.EXIT:
+        try:
+            emp_result = await client.table("employees").select("id").eq("candidate_id", candidate_id).execute()
+            if emp_result.data:
+                emp_id = emp_result.data[0]["id"]
+                await client.table("employees").update({
+                    "status": "EXITED",
+                    "exit_date": refreshed.data.get("last_working_day"),
+                }).eq("id", emp_id).execute()
+                api_cache.clear_prefix("employees_")
+                logger.info("Synced employee %s to EXITED for candidate %s (review flow)", emp_id, candidate_id)
+        except Exception as emp_err:
+            logger.warning("Employee EXIT sync failed for candidate %s (review flow): %s", candidate_id, emp_err)
+
 
     api_cache.clear_prefix("candidates_")
     api_cache.clear_prefix("dashboard_")

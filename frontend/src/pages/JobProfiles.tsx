@@ -1,14 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { jobProfileApi } from '../api/jobProfiles';
 import type { JobProfile } from '../api/jobProfiles';
-import { JobProfileModal } from '../components/jobProfiles/JobProfileModal';
 import {
     Plus,
-    Search,
     Edit2,
-    Trash2,
-    Code,
-    Layers,
     LayoutGrid,
     Table2
 } from 'lucide-react';
@@ -17,14 +13,13 @@ import toast from 'react-hot-toast';
 import { useAuth, isAdminRole } from '../context/AuthContext';
 
 export function JobProfiles() {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
     const [profiles, setProfiles] = useState<JobProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedProfile, setSelectedProfile] = useState<JobProfile | undefined>();
 
     const fetchProfiles = async () => {
         try {
@@ -49,26 +44,11 @@ export function JobProfiles() {
     );
 
     const handleEdit = (profile: JobProfile) => {
-        setSelectedProfile(profile);
-        setIsModalOpen(true);
+        navigate(`/job-profiles/${profile.id}/edit`);
     };
 
     const handleCreate = () => {
-        setSelectedProfile(undefined);
-        setIsModalOpen(true);
-    };
-
-    const handleDelete = async (id: number) => {
-        if (!window.confirm('Are you sure you want to delete this job profile?')) return;
-
-        try {
-            await jobProfileApi.delete(id);
-            toast.success('Job Profile deleted');
-            fetchProfiles();
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'An unexpected error occurred';
-            toast.error(message || 'Failed to delete Profile (it may be linked to requests)');
-        }
+        navigate('/job-profiles/create');
     };
 
     return (
@@ -91,12 +71,11 @@ export function JobProfiles() {
 
             {/* Filter Bar */}
             <div className="card flex flex-col md:flex-row items-center gap-4 py-3 px-4">
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+                <div className="flex-1 w-full">
                     <input
                         type="search"
                         placeholder="Search by role or tech..."
-                        className="input-field pl-10 h-10"
+                        className="input-field h-10 w-full"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -131,25 +110,16 @@ export function JobProfiles() {
                                 <div className="flex items-start justify-between mb-3">
                                     <h3 className="text-lg font-bold text-text">{profile.role_name}</h3>
                                     <div className="flex gap-1">
-                                        {isAdmin && (
                                         <button onClick={() => handleEdit(profile)} className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors" title="Edit" aria-label="Edit">
                                             <Edit2 size={16} />
                                         </button>
-                                        )}
-                                        {isAdmin && (
-                                        <button onClick={() => handleDelete(profile.id)} className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-danger transition-colors" title="Delete" aria-label="Delete">
-                                            <Trash2 size={16} />
-                                        </button>
-                                        )}
                                     </div>
                                 </div>
                                 <div className="space-y-3 mt-2">
-                                    <div className="flex items-center gap-2 text-sm text-text-muted">
-                                        <Code size={16} className="text-cta" />
+                                    <div className="text-sm text-text-muted">
                                         <span>{profile.technology}</span>
                                     </div>
-                                    <div className="flex items-center gap-2 text-sm text-text-muted">
-                                        <Layers size={16} className="text-info" />
+                                    <div className="text-sm text-text-muted">
                                         <span className="font-medium">{profile.experience_level || 'Not Specified'}</span>
                                     </div>
                                 </div>
@@ -164,12 +134,12 @@ export function JobProfiles() {
                     <div className="card overflow-hidden">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b border-border text-xs font-bold text-text-muted uppercase">
+                                <tr className="border-b border-border text-xs font-bold text-text-muted">
                                     <th className="text-left py-3 px-4">Role Name</th>
                                     <th className="text-left py-3 px-4">Technology</th>
                                     <th className="text-left py-3 px-4">Experience Level</th>
                                     <th className="text-left py-3 px-4">Created</th>
-                                    {isAdmin && <th className="text-right py-3 px-4">Actions</th>}
+                                    <th className="text-right py-3 px-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -179,18 +149,11 @@ export function JobProfiles() {
                                         <td className="py-3 px-4 text-text-muted">{profile.technology}</td>
                                         <td className="py-3 px-4 text-text-muted">{profile.experience_level || '—'}</td>
                                         <td className="py-3 px-4 text-text-muted">{new Date(profile.created_at || '').toLocaleDateString()}</td>
-                                        {isAdmin && (
-                                            <td className="py-3 px-4 text-right">
-                                                <div className="flex gap-1 justify-end">
-                                                    <button onClick={() => handleEdit(profile)} className="p-1.5 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors" title="Edit">
-                                                        <Edit2 size={14} />
-                                                    </button>
-                                                    <button onClick={() => handleDelete(profile.id)} className="p-1.5 hover:bg-surface-hover rounded-lg text-text-muted hover:text-danger transition-colors" title="Delete">
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        )}
+                                        <td className="py-3 px-4 text-right">
+                                            <button onClick={() => handleEdit(profile)} className="p-1.5 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors" title="Edit">
+                                                <Edit2 size={14} />
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -213,17 +176,6 @@ export function JobProfiles() {
                 </div>
             )}
 
-            {isModalOpen && (
-                <JobProfileModal
-                    isOpen={isModalOpen}
-                    onClose={() => {
-                        setIsModalOpen(false);
-                        setSelectedProfile(undefined);
-                    }}
-                    onSuccess={fetchProfiles}
-                    jobProfile={selectedProfile}
-                />
-            )}
         </div>
     );
 }

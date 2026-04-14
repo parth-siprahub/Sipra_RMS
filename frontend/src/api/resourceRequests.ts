@@ -30,6 +30,8 @@ export const resourceRequestsApi = {
     list: (filters?: { status?: string; priority?: string; search?: string }) =>
         api.get<ResourceRequest[]>('/requests/', filters),
 
+    get: (id: number) => api.get<ResourceRequest>(`/requests/${id}`),
+
     create: (payload: CreateResourceRequestPayload) =>
         api.post<ResourceRequest>('/requests/', payload),
 

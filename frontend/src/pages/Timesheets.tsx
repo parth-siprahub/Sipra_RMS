@@ -17,16 +17,11 @@ import { UnmatchedRecordsModal } from '../components/timesheets/UnmatchedRecords
 import {
     Upload,
     Download,
-    Clock,
     AlertTriangle,
     CheckCircle,
     Calculator,
     Monitor,
     FileSpreadsheet,
-    Search,
-    Coffee,
-    FileText,
-    ExternalLink,
     ArrowUpDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -158,7 +153,7 @@ export function Timesheets() {
             const [jiraRaw, awsRaw, empData, counts] = await Promise.all([
                 timesheetsApi.listJiraRaw(month),
                 timesheetsApi.listAwsV2(month),
-                employees.length ? Promise.resolve(employees) : employeesApi.list({ page_size: 200 }),
+                employees.length ? Promise.resolve(employees) : employeesApi.list({ page_size: 1000 }),
                 timesheetsApi.getUnmatchedCount(month),
             ]);
             setJiraEntries(jiraRaw || []);
@@ -312,6 +307,7 @@ export function Timesheets() {
                     importResult={jiraImportResult}
                     isAdmin={isAdmin}
                     onImport={() => setIsJiraImportOpen(true)}
+                    empMap={empMap}
                     jiraEmpMap={jiraEmpMap}
                     navigateToDrillDown={(users, idx, month) => {
                         navigate('/timesheets/drill-down/jira', {
@@ -396,6 +392,7 @@ type SortDir = 'asc' | 'desc';
 
 interface UserSummary {
     user: string;
+    employee_id: number | null;
     rows: JiraRawEntry[];
     totalHours: number;
     oooHours: number;
@@ -403,7 +400,7 @@ interface UserSummary {
 }
 
 function JiraTab({
-    jiraEntries, jiraLoading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport, jiraEmpMap,
+    jiraEntries, jiraLoading, selectedMonth, setSelectedMonth, importResult, isAdmin, onImport, empMap, jiraEmpMap,
     navigateToDrillDown, setUnmatchedModalOpen, setUnmatchedModalSource, setUnmatchedDetails
 }: {
     jiraEntries: JiraRawEntry[];
@@ -413,6 +410,7 @@ function JiraTab({
     importResult: JiraRawImportResult | null;
     isAdmin: boolean;
     onImport: () => void;
+    empMap: Record<number, Employee>;
     jiraEmpMap: Record<string, Employee>;
     navigateToDrillDown: (users: UserSummary[], idx: number, month: string) => void;
     setUnmatchedModalOpen: (open: boolean) => void;
@@ -441,8 +439,12 @@ function JiraTab({
             const oooRow = rows.find(r => r.is_ooo);
             const issueRows = rows.filter(r => !r.is_summary_row && !r.is_ooo);
 
+            // Use employee_id from the first row that has it (set during import matching)
+            const matchedEmpId = rows.find(r => r.employee_id)?.employee_id ?? null;
+
             summaries.push({
                 user,
+                employee_id: matchedEmpId,
                 rows,
                 totalHours: summaryRow?.logged ?? 0,
                 oooHours: oooRow?.logged ?? 0,
@@ -495,12 +497,11 @@ function JiraTab({
                 </div>
 
                 {/* Search */}
-                <div className="relative flex-1 max-w-xs">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+                <div className="flex-1 max-w-xs">
                     <input
                         type="text"
                         placeholder="Search by name..."
-                        className="input-field pl-9 w-full text-sm"
+                        className="input-field w-full text-sm"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                     />
@@ -552,7 +553,8 @@ function JiraTab({
                 ) : filteredSummaries.length > 0 ? (
                     <>
                         {/* Column header */}
-                        <div className="grid grid-cols-[1fr_90px_80px_80px_44px] sm:grid-cols-[1fr_100px_90px_90px_48px] items-center px-4 py-2.5 border-b border-border bg-surface-hover/30 text-xs font-bold text-text-muted uppercase">
+                        <div className="grid grid-cols-[90px_1fr_200px_90px_70px_110px] items-center px-6 py-3 border-b border-border bg-surface-hover/30 text-xs font-semibold text-text-muted uppercase tracking-wide">
+                            <span>SOW</span>
                             <button
                                 onClick={() => toggleSort('name')}
                                 className="flex items-center gap-1 cursor-pointer hover:text-text transition-colors text-left"
@@ -560,86 +562,86 @@ function JiraTab({
                                 Employee
                                 {sortField === 'name' && <ArrowUpDown size={12} className="text-cta" />}
                             </button>
+                            <span>Job Profile</span>
                             <button
                                 onClick={() => toggleSort('hours')}
                                 className="flex items-center gap-1 cursor-pointer hover:text-text transition-colors justify-end"
                             >
-                                Hours
+                                Total JIRA Hours
                                 {sortField === 'hours' && <ArrowUpDown size={12} className="text-cta" />}
                             </button>
                             <span className="text-center">OOO</span>
-                            <button
-                                onClick={() => toggleSort('issues')}
-                                className="flex items-center gap-1 cursor-pointer hover:text-text transition-colors justify-center"
-                            >
-                                Issues
-                                {sortField === 'issues' && <ArrowUpDown size={12} className="text-cta" />}
-                            </button>
-                            <span />
+                            <span className="text-right">Total Billable Hours</span>
                         </div>
 
                         {/* Rows */}
                         <div className="divide-y divide-border/50 max-h-[65vh] overflow-y-auto">
-                            {filteredSummaries.map((summary, idx) => (
-                                <button
-                                    key={summary.user}
-                                    onClick={() => navigateToDrillDown(filteredSummaries, idx, selectedMonth)}
-                                    className="grid grid-cols-[1fr_90px_80px_80px_44px] sm:grid-cols-[1fr_100px_90px_90px_48px] items-center w-full px-4 py-3 text-left hover:bg-surface-hover/40 transition-colors cursor-pointer group"
-                                >
-                                    {/* Name */}
-                                    <div className="min-w-0">
-                                        {(() => {
-                                            const mappedEmployee = jiraEmpMap[summary.user];
-                                            const displayName = formatPersonName(mappedEmployee?.rms_name || '') || summary.user;
-                                            const showSecondary = Boolean(mappedEmployee && !sameText(summary.user, displayName));
-                                            return (
-                                                <>
-                                                    <p className="font-semibold text-sm text-text truncate group-hover:text-cta transition-colors">
-                                                        {displayName}
-                                                    </p>
-                                                    {showSecondary && (
-                                                        <p className="text-xs text-text-muted truncate">{summary.user}</p>
-                                                    )}
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
+                            {filteredSummaries.map((summary, idx) => {
+                                const mappedEmployee = (summary.employee_id ? empMap[summary.employee_id] : null) ?? jiraEmpMap[summary.user];
+                                const displayName = formatPersonName(mappedEmployee?.rms_name || '') || summary.user;
+                                const showSecondary = Boolean(mappedEmployee && !sameText(summary.user, displayName));
+                                const billableHours = Math.max(0, 176 - (summary.oooHours ?? 0));
+                                return (
+                                    <button
+                                        key={summary.user}
+                                        onClick={() => navigateToDrillDown(filteredSummaries, idx, selectedMonth)}
+                                        className="grid grid-cols-[90px_1fr_200px_90px_70px_110px] items-center w-full px-6 py-3.5 text-left hover:bg-surface-hover/40 transition-colors cursor-pointer group"
+                                    >
+                                        {/* SOW */}
+                                        <div>
+                                            {mappedEmployee?.sow_number
+                                                ? <span className="inline-block text-xs font-medium text-text-muted bg-surface-hover px-2 py-0.5 rounded-full">
+                                                    {mappedEmployee.sow_number}
+                                                  </span>
+                                                : <span className="text-xs text-text-muted/30">—</span>
+                                            }
+                                        </div>
 
-                                    {/* Total hours */}
-                                    <div className="flex items-center justify-end gap-1.5">
-                                        <Clock size={13} className="text-cta shrink-0" />
-                                        <span className="font-bold text-sm text-text tabular-nums">
-                                            {summary.totalHours}h
-                                        </span>
-                                    </div>
+                                        {/* Employee */}
+                                        <div className="min-w-0 pr-4">
+                                            <p className="font-semibold text-sm text-text truncate group-hover:text-cta transition-colors">
+                                                {displayName}
+                                            </p>
+                                            {showSecondary && (
+                                                <p className="text-xs text-text-muted truncate mt-0.5">{summary.user}</p>
+                                            )}
+                                        </div>
 
-                                    {/* OOO */}
-                                    <div className="flex items-center justify-center">
-                                        {summary.oooHours > 0 ? (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-warning/10 text-warning text-xs font-medium">
-                                                <Coffee size={11} />
-                                                {summary.oooHours}h
+                                        {/* Job Profile */}
+                                        <div className="pr-4">
+                                            {mappedEmployee?.job_profile_name
+                                                ? <span className="text-xs text-text-muted truncate block">{mappedEmployee.job_profile_name}</span>
+                                                : <span className="text-xs text-text-muted/30">—</span>
+                                            }
+                                        </div>
+
+                                        {/* Total JIRA hours */}
+                                        <div className="text-right">
+                                            <span className="font-semibold text-sm text-text tabular-nums">
+                                                {summary.totalHours}h
                                             </span>
-                                        ) : (
-                                            <span className="text-xs text-text-muted/40">—</span>
-                                        )}
-                                    </div>
+                                        </div>
 
-                                    {/* Issues count */}
-                                    <div className="flex items-center justify-center gap-1">
-                                        <FileText size={13} className="text-text-muted shrink-0" />
-                                        <span className="text-sm text-text-muted tabular-nums">{summary.issueCount}</span>
-                                    </div>
+                                        {/* OOO */}
+                                        <div className="flex justify-center">
+                                            {summary.oooHours > 0 ? (
+                                                <span className="px-2 py-0.5 rounded-full bg-warning/10 text-warning text-xs font-medium tabular-nums">
+                                                    {summary.oooHours}h
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-text-muted/30">—</span>
+                                            )}
+                                        </div>
 
-                                    {/* Expand icon */}
-                                    <div className="flex items-center justify-center">
-                                        <ExternalLink
-                                            size={15}
-                                            className="text-text-muted/40 group-hover:text-cta transition-colors"
-                                        />
-                                    </div>
-                                </button>
-                            ))}
+                                        {/* Billable hours */}
+                                        <div className="text-right">
+                                            <span className="font-semibold text-sm text-cta tabular-nums">
+                                                {billableHours}h
+                                            </span>
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </>
                 ) : (
@@ -736,12 +738,11 @@ function AwsV2Tab({
                 </div>
 
                 {/* Search */}
-                <div className="relative flex-1 max-w-xs">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+                <div className="flex-1 max-w-xs">
                     <input
                         type="text"
                         placeholder="Search by name or email..."
-                        className="input-field pl-9 w-full text-sm"
+                        className="input-field w-full text-sm"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                     />
@@ -791,11 +792,11 @@ function AwsV2Tab({
                 ) : filteredEntries.length > 0 ? (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr className="bg-surface-hover/50 border-b border-border">
-                                    <th className="sticky left-0 z-10 bg-surface-hover/50 px-4 py-3 text-xs font-bold text-text-muted uppercase min-w-[200px]">User / Email</th>
+                            <thead className="sticky top-0 z-10">
+                                <tr className="bg-surface border-b border-border">
+                                    <th className="sticky left-0 z-20 bg-surface px-4 py-3 text-xs font-bold text-text-muted min-w-[200px]">User / Email</th>
                                     {AWS_DISPLAY_COLS.map(col => (
-                                        <th key={col.label} className="px-3 py-3 text-xs font-bold text-text-muted uppercase text-center min-w-[110px]">
+                                        <th key={col.label} className="px-3 py-3 text-xs font-bold text-text-muted text-center min-w-[110px]">
                                             {col.label}
                                         </th>
                                     ))}
@@ -882,8 +883,6 @@ function JiraRawImportModal({
                 toast.success('Upload sent — processing may still be running. Refreshing data...', { duration: 5000 });
                 onClose();
                 setTimeout(() => onSuccess({ month, total_rows_processed: 0, employees_matched: 0, employees_unmatched: [], entries_inserted: 0 }), 3000);
-            } else {
-                toast.error(msg);
             }
         } finally {
             setUploading(false);
@@ -957,8 +956,6 @@ function AwsV2ImportModal({
                 toast.success('Upload sent — processing may still be running. Refreshing data...', { duration: 5000 });
                 onClose();
                 setTimeout(() => onSuccess({ month, total_rows: 0, employees_matched: 0, employees_unmatched: 0, entries_inserted: 0, unmatched_emails: [] }), 3000);
-            } else {
-                toast.error(msg);
             }
         } finally {
             setUploading(false);
@@ -990,8 +987,8 @@ function AwsV2ImportModal({
                     />
                 </div>
                 <div className="text-xs text-text-muted space-y-1">
-                    <p><Monitor size={12} className="inline text-cta mr-1" />Monthly export from AWS ActiveTrack</p>
-                    <p><CheckCircle size={12} className="inline text-success mr-1" />All h:mm:ss and seconds values stored as-is</p>
+                    <p><Monitor size={12} className="inline text-cta mr-1" />Export from AWS ActiveTrack — single or multi-month CSV supported</p>
+                    <p><CheckCircle size={12} className="inline text-success mr-1" />Only rows matching the selected billing month are imported</p>
                     <p><CheckCircle size={12} className="inline text-info mr-1" />Re-uploading same month replaces previous data</p>
                 </div>
                 <div className="flex gap-3 pt-2">

@@ -24,6 +24,12 @@ export interface SkillEntry {
     count: number;
 }
 
+/** Active employees grouped by primary job profile technology (dashboard drill-down). */
+export interface TechnologyBreakdownEntry {
+    technology: string;
+    count: number;
+}
+
 export interface MissingIdentifier {
     employee_id: number;
     rms_name: string;
@@ -53,6 +59,7 @@ export interface DashboardMetrics {
     candidates_by_skill: SkillEntry[];
     total_employees?: number;
     active_employees?: number;
+    active_employees_by_technology?: TechnologyBreakdownEntry[];
     missing_identifiers?: MissingIdentifier[];
     triad_summary?: TriadEntry[];
     triad_billing_month?: string;

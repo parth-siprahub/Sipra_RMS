@@ -19,13 +19,6 @@ class SowCreate(BaseModel):
             raise ValueError("Max resources cannot exceed 100")
         return v
 
-    @field_validator("start_date")
-    @classmethod
-    def start_not_in_past(cls, v: date | None) -> date | None:
-        if v is not None and v < date.today():
-            raise ValueError("Start date cannot be in the past")
-        return v
-
     @model_validator(mode="after")
     def start_before_target(self) -> "SowCreate":
         if self.start_date and self.target_date and self.start_date > self.target_date:
@@ -80,3 +73,4 @@ class SowResponse(BaseModel):
     job_profile_id: int | None = None
     is_active: bool | None = None
     created_at: datetime | None = None
+    updated_at: datetime | None = None

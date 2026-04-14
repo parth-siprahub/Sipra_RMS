@@ -1,14 +1,16 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { employeesApi, type Employee, type EmployeeUpdate } from '../api/employees';
 import { clientsApi, type Client } from '../api/clients';
+import { candidatesApi } from '../api/candidates';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { cn } from '../lib/utils';
 import { formatPersonName } from '../lib/personNames';
 import { useAuth, isAdminRole } from '../context/AuthContext';
 import { exportEmployees } from '../api/exports';
-import { authApi, type UserCreate } from '../api/auth';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 import {
     Search,
     Edit2,
@@ -17,10 +19,17 @@ import {
     ArrowUp,
     ArrowDown,
     ArrowUpDown,
+    ChevronDown,
+    RotateCcw,
+    X,
 } from 'lucide-react';
 
-type EmployeeSortKey = 'rms_name' | 'job_profile_name' | 'client_name' | 'ids' | 'status' | 'start_date';
+type EmployeeSortKey = 'rms_name' | 'job_profile_name' | 'client_name' | 'status' | 'start_date';
 type SortDir = 'asc' | 'desc';
+
+function todayIsoDate(): string {
+    return new Date().toISOString().slice(0, 10);
+}
 
 function sortValueForKey(emp: Employee, key: EmployeeSortKey): string {
     switch (key) {
@@ -30,8 +39,6 @@ function sortValueForKey(emp: Employee, key: EmployeeSortKey): string {
             return (emp.job_profile_name || '').toLowerCase();
         case 'client_name':
             return (emp.client_name || '').toLowerCase();
-        case 'ids':
-            return `${emp.aws_email || ''} ${emp.siprahub_email || ''}`.toLowerCase();
         case 'status':
             return (emp.status || '').toLowerCase();
         case 'start_date':
@@ -39,6 +46,80 @@ function sortValueForKey(emp: Employee, key: EmployeeSortKey): string {
         default:
             return '';
     }
+}
+
+function hiringTypeLabel(emp: Employee): string {
+    if (emp.is_backfill === true) return 'Backfill';
+    if (emp.is_backfill === false) return 'New';
+    return '';
+}
+
+function triggerDownload(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function exportVisibleEmployeesCsv(rows: Employee[], statusFilter: string) {
+    const headers = [
+        'Employee Name',
+        'Job Profile',
+        'Client Name',
+        'SOW',
+        'Hiring Type',
+        'Payroll',
+        'Status',
+        'Start Date',
+        'Exit Date',
+    ];
+    const lines = [
+        headers.join(','),
+        ...rows.map((emp) => {
+            const cells = [
+                emp.rms_name || '',
+                emp.job_profile_name || '',
+                emp.client_name || '',
+                emp.sow_number || '',
+                hiringTypeLabel(emp),
+                emp.source || '',
+                emp.status || '',
+                emp.start_date || '',
+                emp.exit_date || '',
+            ];
+            return cells
+                .map((c) => `"${String(c).replace(/"/g, '""')}"`)
+                .join(',');
+        }),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const stamp = new Date().toISOString().slice(0, 10);
+    triggerDownload(blob, `employees_${statusFilter.toLowerCase()}_${stamp}.csv`);
+}
+
+function exportVisibleEmployeesXlsx(rows: Employee[], statusFilter: string) {
+    const data = rows.map((emp) => ({
+        'Employee Name': emp.rms_name || '',
+        'Job Profile': emp.job_profile_name || '',
+        'Client Name': emp.client_name || '',
+        SOW: emp.sow_number || '',
+        'Hiring Type': hiringTypeLabel(emp),
+        Payroll: emp.source || '',
+        Status: emp.status || '',
+        'Start Date': emp.start_date || '',
+        'Exit Date': emp.exit_date || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+    const ab = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([ab], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const stamp = new Date().toISOString().slice(0, 10);
+    triggerDownload(blob, `employees_${statusFilter.toLowerCase()}_${stamp}.xlsx`);
 }
 
 function EmployeeSortTh({
@@ -58,7 +139,7 @@ function EmployeeSortTh({
 }) {
     const active = sortKey === columnKey;
     return (
-        <th className={cn('px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider', className)}>
+        <th className={cn('px-6 py-4 text-xs font-bold text-text-muted', className)}>
             <button
                 type="button"
                 onClick={() => onSort(columnKey)}
@@ -76,17 +157,18 @@ function EmployeeSortTh({
     );
 }
 
-function EditEmployeeModal({
-    isOpen,
-    onClose,
-    onSuccess,
+export function EditEmployeeForm({
+    onSaved,
+    onCancel,
     employee,
+    payrollOptions,
 }: {
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
+    onSaved: () => void;
+    onCancel: () => void;
     employee: Employee;
+    payrollOptions: string[];
 }) {
+    const initiallyExited = employee.status === 'EXITED';
     const [form, setForm] = useState<EmployeeUpdate>({
         rms_name: employee.rms_name,
         client_name: employee.client_name || '',
@@ -94,7 +176,16 @@ function EditEmployeeModal({
         siprahub_email: employee.siprahub_email || '',
         github_id: employee.github_id || '',
         jira_username: employee.jira_username || '',
+        source: employee.source || '',
     });
+    const [employmentStatus, setEmploymentStatus] = useState<'ACTIVE' | 'EXITED'>(
+        initiallyExited ? 'EXITED' : 'ACTIVE'
+    );
+    const [exitDate, setExitDate] = useState<string>(employee.exit_date || todayIsoDate());
+    const [exitReason, setExitReason] = useState<string>('');
+    const [clientOffboardingDate, setClientOffboardingDate] = useState<string>(employee.client_offboarding_date || '');
+    const [siprahubOffboardingDate, setSiprahubOffboardingDate] = useState<string>(employee.siprahub_offboarding_date || '');
+    const [showRevertConfirm, setShowRevertConfirm] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [clients, setClients] = useState<Client[]>([]);
     useEffect(() => {
@@ -105,6 +196,17 @@ function EditEmployeeModal({
         e.preventDefault();
         setSubmitting(true);
         try {
+            if (employmentStatus === 'EXITED' && !exitReason.trim()) {
+                toast.error('Please provide an exit reason');
+                setSubmitting(false);
+                return;
+            }
+            if (employmentStatus === 'EXITED' && !exitDate) {
+                toast.error('Please select an exit date');
+                setSubmitting(false);
+                return;
+            }
+
             const payload: EmployeeUpdate = {};
             if (form.rms_name && form.rms_name !== employee.rms_name) payload.rms_name = form.rms_name;
             if (form.client_name !== undefined) payload.client_name = form.client_name || undefined;
@@ -112,11 +214,39 @@ function EditEmployeeModal({
             if (form.siprahub_email !== undefined) payload.siprahub_email = form.siprahub_email || undefined;
             if (form.github_id !== undefined) payload.github_id = form.github_id || undefined;
             if (form.jira_username !== undefined) payload.jira_username = form.jira_username || undefined;
+            if (form.source !== undefined) payload.source = form.source || undefined;
+            payload.status = employmentStatus;
+            payload.exit_date = employmentStatus === 'EXITED' ? exitDate : null;
+            payload.client_offboarding_date = employmentStatus === 'EXITED' ? (clientOffboardingDate || null) : null;
+            payload.siprahub_offboarding_date = employmentStatus === 'EXITED' ? (siprahubOffboardingDate || null) : null;
 
             await employeesApi.update(employee.id, payload);
+            // Persist exit details on linked candidate record and sync status.
+            if (employee.candidate_id && employmentStatus === 'EXITED') {
+                try {
+                    // Use the proper exit endpoint to sync candidate.status → EXIT
+                    await candidatesApi.exit(employee.candidate_id, {
+                        last_working_day: exitDate,
+                        ...(exitReason.trim() ? { exit_reason: exitReason.trim() } : {}),
+                    });
+                } catch {
+                    // Candidate may already be EXIT or not ONBOARDED — fallback to field update only
+                    await candidatesApi.update(employee.candidate_id, {
+                        exit_reason: exitReason.trim() || undefined,
+                        last_working_day: exitDate,
+                    });
+                }
+            }
+            // Sync candidate back to ONBOARDED if reverting employee to ACTIVE
+            if (employee.candidate_id && employmentStatus === 'ACTIVE' && initiallyExited) {
+                try {
+                    await candidatesApi.revertExit(employee.candidate_id);
+                } catch {
+                    // Already active or not in EXIT state — ignore
+                }
+            }
             toast.success('Employee updated');
-            onSuccess();
-            onClose();
+            onSaved();
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Failed to update employee');
         } finally {
@@ -125,173 +255,228 @@ function EditEmployeeModal({
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Edit Employee — Triad Mapping">
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label className="input-label" htmlFor="rms_name">RMS Name</label>
-                    <input id="rms_name" title="RMS Name" placeholder="Full Name" className="input-field" value={form.rms_name || ''} onChange={e => setForm(p => ({ ...p, rms_name: e.target.value }))} />
+        <>
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+                    <div className="lg:col-span-2">
+                        <label className="input-label" htmlFor="rms_name">RMS Name</label>
+                        <input id="rms_name" title="RMS Name" placeholder="Full Name" className="input-field" value={form.rms_name || ''} onChange={e => setForm(p => ({ ...p, rms_name: e.target.value }))} />
+                    </div>
+                    <div className="lg:col-span-2">
+                        <label className="input-label" htmlFor="client_name">Client Name</label>
+                        <select
+                            id="client_name"
+                            title="Client Name"
+                            className="input-field"
+                            value={form.client_name || ''}
+                            onChange={e => setForm(p => ({ ...p, client_name: e.target.value }))}
+                        >
+                            <option value="">Select client...</option>
+                            {clients.map(c => (
+                                <option key={c.id} value={c.client_name}>{c.client_name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="input-label" htmlFor="aws_email">AWS Email</label>
+                        <input id="aws_email" className="input-field" type="email" value={form.aws_email || ''} onChange={e => setForm(p => ({ ...p, aws_email: e.target.value }))} placeholder="user@client.awsapps.com" />
+                    </div>
+                    <div>
+                        <label className="input-label" htmlFor="siprahub_email">SipraHub Email</label>
+                        <input id="siprahub_email" className="input-field" type="email" value={form.siprahub_email || ''} onChange={e => setForm(p => ({ ...p, siprahub_email: e.target.value }))} placeholder="user@siprahub.com" />
+                    </div>
+                    <div>
+                        <label className="input-label" htmlFor="github_id">GitHub ID</label>
+                        <input id="github_id" className="input-field" value={form.github_id || ''} onChange={e => setForm(p => ({ ...p, github_id: e.target.value }))} placeholder="github-username" />
+                    </div>
+                    <div>
+                        <label className="input-label" htmlFor="jira_username">Jira Username</label>
+                        <input id="jira_username" className="input-field" value={form.jira_username || ''} onChange={e => setForm(p => ({ ...p, jira_username: e.target.value }))} placeholder="jira-username" />
+                    </div>
+                    <div className="lg:col-span-2">
+                        <label className="input-label" htmlFor="payroll_source">Payroll</label>
+                        <select
+                            id="payroll_source"
+                            title="Payroll"
+                            className="input-field"
+                            value={form.source || ''}
+                            onChange={e => setForm(p => ({ ...p, source: e.target.value }))}
+                        >
+                            <option value="">Select payroll...</option>
+                            {payrollOptions.map((payroll) => (
+                                <option key={payroll} value={payroll}>
+                                    {payroll}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
-                <div>
-                    <label className="input-label" htmlFor="client_name">Client Name</label>
-                    <select
-                        id="client_name"
-                        title="Client Name"
-                        className="input-field"
-                        value={form.client_name || ''}
-                        onChange={e => setForm(p => ({ ...p, client_name: e.target.value }))}
-                    >
-                        <option value="">Select client...</option>
-                        {clients.map(c => (
-                            <option key={c.id} value={c.client_name}>{c.client_name}</option>
-                        ))}
-                    </select>
+                <div className="card p-3 space-y-3 border border-border">
+                    <div className="flex items-center justify-between gap-3">
+                        <label className="input-label mb-0">Employment Status</label>
+                        <div className="flex items-center gap-2">
+                            {(initiallyExited || employmentStatus === 'EXITED') && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowRevertConfirm(true)}
+                                    className={cn(
+                                        'btn btn-sm',
+                                        employmentStatus === 'ACTIVE' ? 'btn-secondary' : 'btn-ghost'
+                                    )}
+                                >
+                                    Revert to Active
+                                </button>
+                            )}
+                            {employmentStatus !== 'EXITED' && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEmploymentStatus('EXITED');
+                                        if (!exitDate) setExitDate(todayIsoDate());
+                                    }}
+                                    className="btn btn-sm btn-ghost"
+                                >
+                                    Mark as Exited
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    {employmentStatus === 'EXITED' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="md:col-span-2">
+                                <label className="input-label" htmlFor="exit_reason">Exit Reason *</label>
+                                <textarea
+                                    id="exit_reason"
+                                    className="input-field min-h-[80px]"
+                                    value={exitReason}
+                                    onChange={e => setExitReason(e.target.value)}
+                                    placeholder="Enter reason for exit"
+                                />
+                            </div>
+                            <div>
+                                <label className="input-label" htmlFor="exit_date">Exit Date *</label>
+                                <input
+                                    id="exit_date"
+                                    type="date"
+                                    className="input-field"
+                                    value={exitDate}
+                                    onChange={e => setExitDate(e.target.value)}
+                                    onFocus={(e) => e.currentTarget.showPicker?.()}
+                                    onClick={(e) => e.currentTarget.showPicker?.()}
+                                />
+                            </div>
+                            <div>
+                                <label className="input-label" htmlFor="client_offboarding_date">
+                                    Client Offboarding Date
+                                </label>
+                                <input
+                                    id="client_offboarding_date"
+                                    type="date"
+                                    className="input-field"
+                                    value={clientOffboardingDate}
+                                    onChange={e => setClientOffboardingDate(e.target.value)}
+                                    onFocus={(e) => e.currentTarget.showPicker?.()}
+                                    onClick={(e) => e.currentTarget.showPicker?.()}
+                                />
+                            </div>
+                            <div>
+                                <label className="input-label" htmlFor="siprahub_offboarding_date">
+                                    Siprahub Offboarding Date
+                                </label>
+                                <input
+                                    id="siprahub_offboarding_date"
+                                    type="date"
+                                    className="input-field"
+                                    value={siprahubOffboardingDate}
+                                    onChange={e => setSiprahubOffboardingDate(e.target.value)}
+                                    onFocus={(e) => e.currentTarget.showPicker?.()}
+                                    onClick={(e) => e.currentTarget.showPicker?.()}
+                                />
+                            </div>
+                        </div>
+                    )}
                 </div>
-                <div>
-                    <label className="input-label" htmlFor="aws_email">AWS Email</label>
-                    <input id="aws_email" className="input-field" type="email" value={form.aws_email || ''} onChange={e => setForm(p => ({ ...p, aws_email: e.target.value }))} placeholder="user@client.awsapps.com" />
-                </div>
-                <div>
-                    <label className="input-label" htmlFor="siprahub_email">SipraHub Email</label>
-                    <input id="siprahub_email" className="input-field" type="email" value={form.siprahub_email || ''} onChange={e => setForm(p => ({ ...p, siprahub_email: e.target.value }))} placeholder="user@siprahub.com" />
-                </div>
-                <div>
-                    <label className="input-label" htmlFor="github_id">GitHub ID</label>
-                    <input id="github_id" className="input-field" value={form.github_id || ''} onChange={e => setForm(p => ({ ...p, github_id: e.target.value }))} placeholder="github-username" />
-                </div>
-                <div>
-                    <label className="input-label" htmlFor="jira_username">Jira Username</label>
-                    <input id="jira_username" className="input-field" value={form.jira_username || ''} onChange={e => setForm(p => ({ ...p, jira_username: e.target.value }))} placeholder="jira-username" />
-                </div>
-                <div className="flex gap-3 pt-2">
-                    <button type="button" onClick={onClose} className="btn btn-secondary flex-1" disabled={submitting}>Cancel</button>
-                    <button type="submit" className="btn btn-cta flex-1" disabled={submitting}>
-                        {submitting ? <span className="spinner w-4 h-4" /> : 'Save'}
+                <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t border-border sm:justify-end">
+                    <button type="button" onClick={onCancel} className="btn btn-secondary w-full sm:w-auto min-w-[10rem]" disabled={submitting}>Cancel</button>
+                    <button type="submit" className="btn btn-cta w-full sm:w-auto min-w-[10rem]" disabled={submitting}>
+                        {submitting ? <span className="spinner w-4 h-4" /> : 'Save Changes'}
                     </button>
                 </div>
             </form>
-        </Modal>
-    );
-}
 
-function CreateUserModal({
-    isOpen,
-    onClose,
-    onSuccess,
-}: {
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
-}) {
-    const [form, setForm] = useState<UserCreate>({
-        email: '',
-        password: '',
-        full_name: '',
-        role: 'MANAGER',
-    });
-    const [submitting, setSubmitting] = useState(false);
+            <Modal
+                isOpen={showRevertConfirm}
+                onClose={() => setShowRevertConfirm(false)}
+                title="Revert Exit"
+                maxWidth="max-w-md"
+            >
+                <div className="space-y-5">
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-warning/10 border border-warning/20">
+                        <RotateCcw size={18} className="text-warning shrink-0 mt-0.5" />
+                        <p className="text-sm text-text">
+                            Revert <span className="font-semibold">{formatPersonName(employee.rms_name)}</span> from{' '}
+                            <span className="font-semibold text-danger">Exit</span>? Their employee record
+                            will be restored to <span className="font-semibold">Active</span> and the
+                            exit date will be cleared.
+                        </p>
+                    </div>
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!form.password || form.password.length < 6) {
-            return toast.error('Password must be at least 6 characters');
-        }
-        setSubmitting(true);
-        try {
-            await authApi.createUser(form);
-            toast.success('User created successfully');
-            onSuccess();
-            onClose();
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to create user');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Add New User Account">
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label className="input-label text-xs uppercase tracking-wider font-bold text-text-muted mb-1" htmlFor="full_name_input">Full Name</label>
-                    <input 
-                        id="full_name_input"
-                        className="input-field" 
-                        required
-                        value={form.full_name} 
-                        onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} 
-                        placeholder="e.g. John Doe"
-                        title="Full Name"
-                    />
+                    <div className="flex gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowRevertConfirm(false)}
+                            className="btn btn-secondary flex-1"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setEmploymentStatus('ACTIVE');
+                                setShowRevertConfirm(false);
+                            }}
+                            className="btn btn-cta flex-1 font-semibold"
+                        >
+                            Revert Exit
+                        </button>
+                    </div>
                 </div>
-                <div>
-                    <label className="input-label text-xs uppercase tracking-wider font-bold text-text-muted mb-1" htmlFor="email_input">Email Address</label>
-                    <input 
-                        id="email_input"
-                        className="input-field" 
-                        type="email" 
-                        required
-                        value={form.email} 
-                        onChange={e => setForm(p => ({ ...p, email: e.target.value }))} 
-                        placeholder="user@siprahub.com"
-                        title="Email Address"
-                    />
-                </div>
-                <div>
-                    <label className="input-label text-xs uppercase tracking-wider font-bold text-text-muted mb-1" htmlFor="password_input">Temporary Password</label>
-                    <input 
-                        id="password_input"
-                        className="input-field" 
-                        type="password" 
-                        required
-                        value={form.password} 
-                        onChange={e => setForm(p => ({ ...p, password: e.target.value }))} 
-                        placeholder="Min 6 characters"
-                        title="Temporary Password"
-                    />
-                </div>
-                <div>
-                    <label className="input-label text-xs uppercase tracking-wider font-bold text-text-muted mb-1" htmlFor="sys_role">System Role</label>
-                    <select
-                        id="sys_role"
-                        title="System Role"
-                        className="input-field"
-                        value={form.role}
-                        onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
-                    >
-                        <option value="MANAGER">MANAGER</option>
-                        <option value="ADMIN">ADMIN</option>
-                        <option value="RECRUITER">RECRUITER</option>
-                        <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-                    </select>
-                </div>
-                <div className="flex gap-3 pt-4 border-t border-border mt-6">
-                    <button type="button" onClick={onClose} className="btn btn-secondary flex-1" disabled={submitting}>Cancel</button>
-                    <button type="submit" className="btn btn-cta flex-1" disabled={submitting}>
-                        {submitting ? <span className="spinner w-4 h-4" /> : 'Create User'}
-                    </button>
-                </div>
-            </form>
-        </Modal>
+            </Modal>
+        </>
     );
 }
 
 export function Employees() {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
     const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('ACTIVE');
-    const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
-    const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+    const [payrollFilter, setPayrollFilter] = useState('ALL');
+    const [sowFilter, setSowFilter] = useState('ALL');
     const [sortKey, setSortKey] = useState<EmployeeSortKey>('rms_name');
     const [sortDir, setSortDir] = useState<SortDir>('asc');
+    const [exportMenuOpen, setExportMenuOpen] = useState(false);
+    const exportMenuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!exportMenuOpen) return;
+        const onDoc = (e: MouseEvent) => {
+            if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+                setExportMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', onDoc);
+        return () => document.removeEventListener('mousedown', onDoc);
+    }, [exportMenuOpen]);
 
     const fetchEmployees = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await employeesApi.list({ page_size: 500 });
-            setAllEmployees(data || []);
+            const employeesData = await employeesApi.list({ page_size: 500 });
+            setAllEmployees(employeesData || []);
         } catch {
             toast.error('Failed to load employees');
         } finally {
@@ -308,15 +493,71 @@ export function Employees() {
 
     const employees = allEmployees.filter(e => e.status === statusFilter);
 
+    const payrollOptions = useMemo(() => {
+        const values = new Set<string>();
+        for (const emp of employees) {
+            if (emp.source?.trim()) {
+                values.add(emp.source.trim());
+            }
+        }
+        return Array.from(values).sort((a, b) => a.localeCompare(b));
+    }, [employees]);
+
+    const sowOptions = useMemo(() => {
+        const values = new Set<string>();
+        for (const emp of employees) {
+            if (emp.sow_number?.trim()) {
+                values.add(emp.sow_number.trim());
+            }
+        }
+        return Array.from(values).sort((a, b) => a.localeCompare(b));
+    }, [employees]);
+
     const filtered = employees.filter(emp => {
-        const q = searchQuery.toLowerCase();
-        return (emp.rms_name || '').toLowerCase().includes(q)
-            || (emp.client_name || '').toLowerCase().includes(q)
-            || (emp.jira_username || '').toLowerCase().includes(q)
-            || (emp.aws_email || '').toLowerCase().includes(q)
-            || (emp.siprahub_email || '').toLowerCase().includes(q)
-            || (emp.job_profile_name || '').toLowerCase().includes(q);
+        const q = searchQuery.trim().toLowerCase();
+        const searchableFields = [
+            emp.rms_name || '',
+            emp.client_name || '',
+            emp.job_profile_name || '',
+            emp.sow_number || '',
+            hiringTypeLabel(emp),
+            emp.source || '',
+            emp.status || '',
+            emp.start_date || '',
+            emp.exit_date || '',
+            emp.jira_username || '',
+            emp.aws_email || '',
+            emp.siprahub_email || '',
+        ];
+        const matchesSearch = q.length === 0
+            || searchableFields.some((value) => value.toLowerCase().includes(q));
+
+        const matchesPayroll =
+            payrollFilter === 'ALL'
+                ? true
+                : (emp.source || '').trim() === payrollFilter;
+
+        const matchesSow =
+            sowFilter === 'ALL'
+                ? true
+                : (emp.sow_number || '').trim() === sowFilter;
+
+        return matchesSearch && matchesPayroll && matchesSow;
     });
+
+    const hasActiveFilters =
+        searchQuery.trim().length > 0 || payrollFilter !== 'ALL' || sowFilter !== 'ALL';
+
+    const clearFilters = () => {
+        setSearchQuery('');
+        setPayrollFilter('ALL');
+        setSowFilter('ALL');
+    };
+
+    const handleStatusChange = (nextStatus: 'ACTIVE' | 'EXITED') => {
+        setStatusFilter(nextStatus);
+        clearFilters();
+    };
 
     const toggleSort = (key: EmployeeSortKey) => {
         if (sortKey === key) {
@@ -340,6 +581,7 @@ export function Employees() {
         return rows;
     }, [filtered, sortKey, sortDir]);
 
+
     if (user?.role === 'SUPER_ADMIN') {
         return (
             <div className="space-y-8 animate-fade-in py-4">
@@ -360,8 +602,8 @@ export function Employees() {
 
                     {/* Action Card */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div 
-                            onClick={() => setIsCreateUserModalOpen(true)}
+                        <div
+                            onClick={() => navigate('/employees/users/create')}
                             className="card p-8 border-2 border-dashed border-border hover:border-cta/50 hover:bg-cta/5 transition-all cursor-pointer group flex flex-col items-center text-center gap-4"
                         >
                             <div className="w-16 h-16 rounded-2xl bg-cta/10 text-cta flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -398,41 +640,92 @@ export function Employees() {
                     </div>
                 </div>
 
-                {isCreateUserModalOpen && (
-                    <CreateUserModal
-                        isOpen={isCreateUserModalOpen}
-                        onClose={() => setIsCreateUserModalOpen(false)}
-                        onSuccess={fetchEmployees}
-                    />
-                )}
             </div>
         );
     }
 
     return (
         <div className="space-y-6 animate-fade-in">
-            {(user?.role as string) === 'SUPER_ADMIN' && (
-                <div className="flex justify-end">
-                    <button onClick={() => exportEmployees()} className="btn btn-secondary flex items-center gap-2">
-                        <Download size={18} /> Export CSV
-                    </button>
-                </div>
-            )}
-
-            <div className="card flex flex-col md:flex-row items-center gap-4 py-3 px-4">
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+            <div className="card flex flex-col lg:flex-row items-stretch lg:items-center gap-4 py-3 px-4">
+                <div className="flex-1 w-full">
                     <input
                         type="search"
-                        placeholder="Search employees..."
-                        className="input-field pl-10 h-10"
+                        placeholder="Search employee, client, SOW, payroll, status..."
+                        className="input-field h-10 w-full"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                     />
                 </div>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <div className="relative" ref={exportMenuRef}>
+                        <button
+                            type="button"
+                            className="btn btn-secondary flex items-center gap-2"
+                            aria-expanded={exportMenuOpen}
+                            aria-haspopup="menu"
+                            onClick={() => setExportMenuOpen((o) => !o)}
+                        >
+                            <Download size={18} /> Export
+                            <ChevronDown
+                                size={16}
+                                className={cn('transition-transform', exportMenuOpen && 'rotate-180')}
+                                aria-hidden
+                            />
+                        </button>
+                        {exportMenuOpen && (
+                            <div
+                                role="menu"
+                                className="absolute right-0 top-full z-20 mt-1 min-w-[12rem] rounded-lg border border-border bg-surface py-1 shadow-lg"
+                            >
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="flex w-full items-center px-4 py-2.5 text-left text-sm text-text hover:bg-surface-hover"
+                                    onClick={() => {
+                                        setExportMenuOpen(false);
+                                        if (sortedRows.length === 0) {
+                                            toast.error('No rows to export');
+                                            return;
+                                        }
+                                        exportVisibleEmployeesCsv(sortedRows, statusFilter);
+                                        toast.success(`Exported ${sortedRows.length} row(s) as CSV`);
+                                    }}
+                                >
+                                    CSV (.csv)
+                                </button>
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="flex w-full items-center px-4 py-2.5 text-left text-sm text-text hover:bg-surface-hover"
+                                    onClick={() => {
+                                        setExportMenuOpen(false);
+                                        if (sortedRows.length === 0) {
+                                            toast.error('No rows to export');
+                                            return;
+                                        }
+                                        exportVisibleEmployeesXlsx(sortedRows, statusFilter);
+                                        toast.success(`Exported ${sortedRows.length} row(s) as Excel`);
+                                    }}
+                                >
+                                    Excel (.xlsx)
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                    {(user?.role as string) === 'SUPER_ADMIN' && (
+                        <button
+                            type="button"
+                            onClick={() => exportEmployees()}
+                            className="btn btn-secondary text-xs"
+                            title="Download full employee export from server (all records)"
+                        >
+                            Server CSV (all)
+                        </button>
+                    )}
+                </div>
                 <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
                     <button
-                        onClick={() => setStatusFilter('ACTIVE')}
+                        onClick={() => handleStatusChange('ACTIVE')}
                         className={cn(
                             'px-4 py-2 text-sm font-medium transition-colors flex items-center gap-2',
                             statusFilter === 'ACTIVE'
@@ -449,7 +742,7 @@ export function Employees() {
                         </span>
                     </button>
                     <button
-                        onClick={() => setStatusFilter('EXITED')}
+                        onClick={() => handleStatusChange('EXITED')}
                         className={cn(
                             'px-4 py-2 text-sm font-medium transition-colors flex items-center gap-2 border-l border-border',
                             statusFilter === 'EXITED'
@@ -468,6 +761,64 @@ export function Employees() {
                 </div>
             </div>
 
+            {hasActiveFilters && (
+                <div className="card flex flex-wrap items-center justify-between gap-3 py-2.5 px-4 border border-cta/20 bg-surface-hover/50">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="font-semibold text-text">Active Filters:</span>
+                        {searchQuery.trim() && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-surface text-text">
+                                <span>Search: {searchQuery.trim()}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchQuery('')}
+                                    className="p-0.5 rounded-sm text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
+                                    title="Remove search filter"
+                                    aria-label="Remove search filter"
+                                >
+                                    <X size={12} />
+                                </button>
+                            </span>
+                        )}
+                        {sowFilter !== 'ALL' && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-surface text-text">
+                                <span>SOW: {sowFilter}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setSowFilter('ALL')}
+                                    className="p-0.5 rounded-sm text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
+                                    title="Remove SOW filter"
+                                    aria-label="Remove SOW filter"
+                                >
+                                    <X size={12} />
+                                </button>
+                            </span>
+                        )}
+                        {payrollFilter !== 'ALL' && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-surface text-text">
+                                <span>Payroll: {payrollFilter}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setPayrollFilter('ALL')}
+                                    className="p-0.5 rounded-sm text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
+                                    title="Remove payroll filter"
+                                    aria-label="Remove payroll filter"
+                                >
+                                    <X size={12} />
+                                </button>
+                            </span>
+                        )}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="text-xs min-h-[36px] px-3 rounded-md font-medium text-white bg-[var(--brand-green)] hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-green)]/40 transition-colors"
+                        title="Clear search and table filters"
+                    >
+                        Clear Filters
+                    </button>
+                </div>
+            )}
+
             <div className="card overflow-hidden">
                 {loading ? (
                     <div className="py-20 flex flex-col items-center justify-center gap-4">
@@ -477,15 +828,62 @@ export function Employees() {
                 ) : sortedRows.length > 0 ? (
                     <div className="overflow-auto max-h-[70vh] custom-scrollbar">
                         <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-surface-hover/50 border-b border-border">
+                            <thead className="sticky top-0 z-10">
+                                <tr className="bg-surface border-b border-border">
                                     <EmployeeSortTh label="Employee" columnKey="rms_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    <EmployeeSortTh label="Job Profile" columnKey="job_profile_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                     <EmployeeSortTh label="Client Name" columnKey="client_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    <EmployeeSortTh label="IDs" columnKey="ids" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">
+                                        <div className="inline-flex items-center gap-1.5">
+                                            <span>SOW</span>
+                                            <div className="relative">
+                                                <select
+                                                    className="h-7 min-w-[5.25rem] rounded-md border border-border bg-white text-xs font-semibold text-black pl-2 pr-7 appearance-none cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cta/35"
+                                                    value={sowFilter}
+                                                    onChange={(e) => setSowFilter(e.target.value)}
+                                                    title="Filter by SOW"
+                                                >
+                                                    <option value="ALL">All</option>
+                                                    {sowOptions.map((sow) => (
+                                                        <option key={sow} value={sow}>
+                                                            {sow}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown
+                                                    size={14}
+                                                    className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 z-10 text-text-muted"
+                                                />
+                                            </div>
+                                        </div>
+                                    </th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">Hiring Type</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-text-muted">
+                                        <div className="inline-flex items-center gap-1.5">
+                                            <span>Payroll</span>
+                                            <div className="relative">
+                                                <select
+                                                    className="h-7 min-w-[6.25rem] rounded-md border border-border bg-white text-xs font-semibold text-black pl-2 pr-7 appearance-none cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cta/35"
+                                                    value={payrollFilter}
+                                                    onChange={(e) => setPayrollFilter(e.target.value)}
+                                                    title="Filter by Payroll"
+                                                >
+                                                    <option value="ALL">All</option>
+                                                    {payrollOptions.map((payroll) => (
+                                                        <option key={payroll} value={payroll}>
+                                                            {payroll}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown
+                                                    size={14}
+                                                    className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 z-10 text-text-muted"
+                                                />
+                                            </div>
+                                        </div>
+                                    </th>
                                     <EmployeeSortTh label="Status" columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    <EmployeeSortTh label="Dates" columnKey="start_date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    {isAdmin && <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider text-right">Actions</th>}
+                                    <EmployeeSortTh label="Start Date" columnKey="start_date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                    {isAdmin && <th className="px-6 py-4 text-xs font-bold text-text-muted text-right">Actions</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
@@ -494,20 +892,29 @@ export function Employees() {
                                         <td className="px-6 py-4">
                                             <div>
                                                 <p className="font-bold text-text">{formatPersonName(emp.rms_name)}</p>
+                                                <p className="text-xs text-text-muted mt-0.5">
+                                                    {emp.job_profile_name || '—'}
+                                                </p>
                                             </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-text">
-                                            {emp.job_profile_name || <span className="text-text-muted italic">—</span>}
                                         </td>
                                         <td className="px-6 py-4 text-sm text-text">
                                             {emp.client_name ? emp.client_name.toUpperCase() : '—'}
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="space-y-1 text-xs">
-                                                <span className={emp.aws_email ? 'text-text' : 'text-text-muted italic'}>{emp.aws_email || 'Missing DCLI Email'}</span>
-                                                <br />
-                                                <span className={emp.siprahub_email ? 'text-text' : 'text-text-muted italic'}>{emp.siprahub_email || 'Missing SipraHub'}</span>
-                                            </div>
+                                        <td className="px-6 py-4 text-sm text-text-muted">
+                                            {emp.sow_number || <span className="italic">—</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-text">
+                                            {emp.is_backfill === true
+                                                ? 'Backfill'
+                                                : emp.is_backfill === false
+                                                    ? 'New'
+                                                    : <span className="text-text-muted italic">—</span>
+                                            }
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-text">
+                                            {emp.source
+                                                ? emp.source
+                                                : <span className="text-text-muted italic">—</span>}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
@@ -528,14 +935,14 @@ export function Employees() {
                                         <td className="px-6 py-4 text-sm text-text-muted whitespace-nowrap">
                                             <span>{emp.start_date || 'N/A'}</span>
                                             {emp.exit_date && (
-                                                <span className="text-danger"> → {emp.exit_date}</span>
+                                                <span className="text-text-muted"> → {emp.exit_date}</span>
                                             )}
                                         </td>
                                         {isAdmin && (
                                             <td className="px-6 py-4">
                                                 <div className="flex justify-end gap-1">
                                                     <button
-                                                        onClick={() => setEditEmployee(emp)}
+                                                        onClick={() => navigate(`/employees/${emp.id}/edit`)}
                                                         className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-cta transition-colors"
                                                         title="Edit Employee"
                                                     >
@@ -554,14 +961,6 @@ export function Employees() {
                 )}
             </div>
 
-            {editEmployee && (
-                <EditEmployeeModal
-                    isOpen={!!editEmployee}
-                    onClose={() => setEditEmployee(null)}
-                    onSuccess={fetchEmployees}
-                    employee={editEmployee}
-                />
-            )}
         </div>
     );
 }

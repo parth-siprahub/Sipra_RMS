@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { sowApi } from '../api/sows';
 import { type SOW } from '../api/sows';
-import { SowModal } from '../components/sows/SowModal';
 import {
     Plus,
-    Search,
     Edit2,
-    Calendar,
     Download,
     ChevronDown
 } from 'lucide-react';
@@ -21,14 +19,13 @@ import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 
 export function Sows() {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const isAdmin = isAdminRole(user?.role);
     const [sows, setSows] = useState<SOW[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ACTIVE');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedSow, setSelectedSow] = useState<SOW | undefined>();
     const [onboardedCounts, setOnboardedCounts] = useState<Record<number, number>>({});
     const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
     const [isExportOpen, setIsExportOpen] = useState(false);
@@ -37,27 +34,35 @@ export function Sows() {
     const fetchSows = async () => {
         try {
             setLoading(true);
-            const [sowsRes, reqsRes, candidatesRes, profilesRes] = await Promise.all([
+            const [sowsResult, reqsResult, candidatesResult, profilesResult] = await Promise.allSettled([
                 sowApi.list(),
                 resourceRequestsApi.list(),
                 candidatesApi.list(),
                 jobProfileApi.list()
             ]);
 
-            setSows(sowsRes || []);
-            setJobProfiles(profilesRes || []);
+            const sowsRes = sowsResult.status === 'fulfilled' ? (sowsResult.value || []) : [];
+            const reqsRes = reqsResult.status === 'fulfilled' ? (reqsResult.value || []) : [];
+            const candidatesRes = candidatesResult.status === 'fulfilled' ? (candidatesResult.value || []) : [];
+            const profilesRes = profilesResult.status === 'fulfilled' ? (profilesResult.value || []) : [];
+
+            setSows(sowsRes);
+            setJobProfiles(profilesRes);
 
             const counts: Record<number, number> = {};
-            const onboardedCandidates = (candidatesRes || []).filter(c => c.status === 'ONBOARDED');
+            const onboardedCandidates = candidatesRes.filter(c => c.status === 'ONBOARDED');
 
             onboardedCandidates.forEach(c => {
-                const request = (reqsRes || []).find(r => r.id === c.request_id);
+                const request = reqsRes.find(r => r.id === c.request_id);
                 if (request && request.sow_id) {
                     counts[request.sow_id] = (counts[request.sow_id] || 0) + 1;
                 }
             });
 
             setOnboardedCounts(counts);
+            if (sowsResult.status === 'rejected') {
+                throw sowsResult.reason;
+            }
         } catch (error) {
             console.error('Failed to fetch SOW data Bundle:', error);
             toast.error('Failed to load SOW data');
@@ -128,13 +133,11 @@ export function Sows() {
     };
 
     const handleEdit = (sow: SOW) => {
-        setSelectedSow(sow);
-        setIsModalOpen(true);
+        navigate(`/sows/${sow.id}/edit`);
     };
 
     const handleCreate = () => {
-        setSelectedSow(undefined);
-        setIsModalOpen(true);
+        navigate('/sows/create');
     };
 
     return (
@@ -189,12 +192,11 @@ export function Sows() {
 
             {/* Filter Bar */}
             <div className="card flex flex-col md:flex-row items-center gap-4 py-3 px-4">
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
+                <div className="flex-1 w-full">
                     <input
                         type="search"
                         placeholder="Search SOWs..."
-                        className="input-field pl-10 h-10"
+                        className="input-field h-10 w-full"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -225,10 +227,10 @@ export function Sows() {
                         <p className="text-text-muted text-sm animate-pulse">Loading SOWs...</p>
                     </div>
                 ) : filteredSows.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-auto max-h-[70vh] custom-scrollbar">
                         <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-surface-hover/50 border-b border-border">
+                            <thead className="sticky top-0 z-10">
+                                <tr className="bg-surface border-b border-border">
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">SOW Details</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider">Job Profile</th>
                                     <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-wider whitespace-nowrap" style={{ minWidth: '220px' }}>Duration</th>
@@ -265,7 +267,6 @@ export function Sows() {
                                         </td>
                                         <td className="px-6 py-4 text-sm whitespace-nowrap">
                                             <div className="flex items-center gap-2 text-text-muted">
-                                                <Calendar size={14} />
                                                 <span>{sow.start_date || 'N/A'}</span>
                                                 <span>→</span>
                                                 <span className={cn(
@@ -338,17 +339,6 @@ export function Sows() {
                 )}
             </div>
 
-            {isModalOpen && (
-                <SowModal
-                    isOpen={isModalOpen}
-                    onClose={() => {
-                        setIsModalOpen(false);
-                        setSelectedSow(undefined);
-                    }}
-                    onSuccess={fetchSows}
-                    sow={selectedSow}
-                />
-            )}
         </div>
     );
 }
