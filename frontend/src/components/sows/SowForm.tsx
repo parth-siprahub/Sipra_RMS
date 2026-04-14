@@ -107,7 +107,7 @@ export function SowForm({ sow, onSaved, onCancel }: SowFormProps) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                     <label className="input-label" htmlFor="sow_number">

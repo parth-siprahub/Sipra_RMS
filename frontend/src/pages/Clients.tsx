@@ -3,36 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { clientsApi, type Client } from '../api/clients';
 import { Plus, Search, Edit2, Building2, Mail, Phone, Globe, Shield } from 'lucide-react';
 import { EmptyState } from '../components/ui/EmptyState';
-import { Modal } from '../components/ui/Modal';
-import { ClientForm } from '../components/clients/ClientForm';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
 import { useAuth, isAdminRole } from '../context/AuthContext';
-
-interface ClientModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
-    client?: Client;
-}
-
-function ClientModal({ isOpen, onClose, onSuccess, client }: ClientModalProps) {
-    if (!isOpen) return null;
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={client ? 'Edit Client' : 'Add Client'} maxWidth="max-w-md">
-            <ClientForm
-                client={client}
-                onSaved={() => {
-                    onSuccess();
-                    onClose();
-                }}
-                onCancel={onClose}
-            />
-        </Modal>
-    );
-}
-
-// ─── Main Page ───────────────────────────────────────────────────────────────
 
 export function Clients() {
     const navigate = useNavigate();
@@ -43,8 +16,6 @@ export function Clients() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedClient, setSelectedClient] = useState<Client | undefined>();
 
     const fetchClients = async () => {
         try {
@@ -86,7 +57,7 @@ export function Clients() {
                 </div>
                 {canManage && (
                     <button
-                        onClick={() => { setSelectedClient(undefined); setIsModalOpen(true); }}
+                        onClick={() => navigate('/clients/create')}
                         className="btn btn-primary flex items-center gap-2 shadow-lg shadow-cta/20"
                     >
                         <Plus size={20} /> <span>New Client</span>
@@ -214,7 +185,7 @@ export function Clients() {
                         action={
                             canManage ? (
                                 <button
-                                    onClick={searchQuery ? () => setSearchQuery('') : () => { setSelectedClient(undefined); setIsModalOpen(true); }}
+                                    onClick={searchQuery ? () => setSearchQuery('') : () => navigate('/clients/create')}
                                     className="btn btn-secondary btn-sm"
                                 >
                                     {searchQuery ? 'Clear Search' : 'New Client'}
@@ -232,14 +203,6 @@ export function Clients() {
                 </p>
             )}
 
-            {isModalOpen && (
-                <ClientModal
-                    isOpen={isModalOpen}
-                    onClose={() => { setIsModalOpen(false); setSelectedClient(undefined); }}
-                    onSuccess={fetchClients}
-                    client={selectedClient}
-                />
-            )}
         </div>
     );
 }

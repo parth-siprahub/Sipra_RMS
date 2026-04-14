@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { candidatesApi } from '../api/candidates';
 import type { Candidate, CandidateStatus } from '../api/candidates';
@@ -7,6 +8,7 @@ import { resourceRequestsApi } from '../api/resourceRequests';
 import type { ResourceRequest } from '../api/resourceRequests';
 import { vendorsApi, type Vendor } from '../api/vendors';
 import { CandidateDetailsPanel, STAGE_LABELS } from './Candidates';
+import { FormPageLayout, FormPageLoadingCard } from '../components/layout/FormPageLayout';
 
 export function CandidateEditPage() {
     const { id } = useParams<{ id: string }>();
@@ -59,36 +61,30 @@ export function CandidateEditPage() {
     };
 
     if (loading) {
-        return (
-            <div className="card w-full py-20 flex flex-col items-center justify-center gap-4">
-                <div className="spinner w-8 h-8 border-cta" />
-                <p className="text-text-muted text-sm">Loading candidate…</p>
-            </div>
-        );
+        return <FormPageLoadingCard label="Loading candidate…" />;
     }
 
     if (!candidate) return null;
 
+    const displayName = `${candidate.first_name} ${candidate.last_name}`.trim();
+
     return (
-        <div className="space-y-6 animate-fade-in w-full">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <Link to="/candidates" className="text-sm text-cta hover:underline">
-                    ← Back to Candidates
-                </Link>
-            </div>
-            <div className="card p-6 md:p-8 w-full">
-                <h1 className="text-xl md:text-2xl font-bold text-text mb-6">
-                    {candidate.first_name} {candidate.last_name}
-                </h1>
-                <CandidateDetailsPanel
-                    candidate={candidate}
-                    vendors={vendors}
-                    requests={requests}
-                    onStatusChange={handleStatusChange}
-                    onUpdated={() => {}}
-                    onDismiss={() => navigate('/candidates')}
-                />
-            </div>
-        </div>
+        <FormPageLayout
+            backHref="/candidates"
+            backLabel="Back to Candidates"
+            title={displayName || 'Candidate'}
+            description="Pipeline details, interviews, logs, and status transitions."
+            icon={User}
+            contentWidth="full"
+        >
+            <CandidateDetailsPanel
+                candidate={candidate}
+                vendors={vendors}
+                requests={requests}
+                onStatusChange={handleStatusChange}
+                onUpdated={() => {}}
+                onDismiss={() => navigate('/candidates')}
+            />
+        </FormPageLayout>
     );
 }

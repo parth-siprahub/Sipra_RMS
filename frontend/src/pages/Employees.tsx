@@ -9,7 +9,6 @@ import { cn } from '../lib/utils';
 import { formatPersonName } from '../lib/personNames';
 import { useAuth, isAdminRole } from '../context/AuthContext';
 import { exportEmployees } from '../api/exports';
-import { authApi, type UserCreate } from '../api/auth';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import {
@@ -22,6 +21,7 @@ import {
     ArrowUpDown,
     ChevronDown,
     RotateCcw,
+    X,
 } from 'lucide-react';
 
 type EmployeeSortKey = 'rms_name' | 'job_profile_name' | 'client_name' | 'status' | 'start_date';
@@ -311,23 +311,6 @@ export function EditEmployeeForm({
                         </select>
                     </div>
                 </div>
-                <div>
-                    <label className="input-label" htmlFor="payroll_source">Payroll</label>
-                    <select
-                        id="payroll_source"
-                        title="Payroll"
-                        className="input-field"
-                        value={form.source || ''}
-                        onChange={e => setForm(p => ({ ...p, source: e.target.value }))}
-                    >
-                        <option value="">Select payroll...</option>
-                        {payrollOptions.map((payroll) => (
-                            <option key={payroll} value={payroll}>
-                                {payroll}
-                            </option>
-                        ))}
-                    </select>
-                </div>
                 <div className="card p-3 space-y-3 border border-border">
                     <div className="flex items-center justify-between gap-3">
                         <label className="input-label mb-0">Employment Status</label>
@@ -378,6 +361,8 @@ export function EditEmployeeForm({
                                     className="input-field"
                                     value={exitDate}
                                     onChange={e => setExitDate(e.target.value)}
+                                    onFocus={(e) => e.currentTarget.showPicker?.()}
+                                    onClick={(e) => e.currentTarget.showPicker?.()}
                                 />
                             </div>
                             <div>
@@ -461,108 +446,6 @@ export function EditEmployeeForm({
     );
 }
 
-function CreateUserModal({
-    isOpen,
-    onClose,
-    onSuccess,
-}: {
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
-}) {
-    const [form, setForm] = useState<UserCreate>({
-        email: '',
-        password: '',
-        full_name: '',
-        role: 'MANAGER',
-    });
-    const [submitting, setSubmitting] = useState(false);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!form.password || form.password.length < 6) {
-            return toast.error('Password must be at least 6 characters');
-        }
-        setSubmitting(true);
-        try {
-            await authApi.createUser(form);
-            toast.success('User created successfully');
-            onSuccess();
-            onClose();
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to create user');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Add New User Account">
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label className="input-label text-xs uppercase tracking-wider font-bold text-text-muted mb-1" htmlFor="full_name_input">Full Name</label>
-                    <input 
-                        id="full_name_input"
-                        className="input-field" 
-                        required
-                        value={form.full_name} 
-                        onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} 
-                        placeholder="e.g. John Doe"
-                        title="Full Name"
-                    />
-                </div>
-                <div>
-                    <label className="input-label text-xs uppercase tracking-wider font-bold text-text-muted mb-1" htmlFor="email_input">Email Address</label>
-                    <input 
-                        id="email_input"
-                        className="input-field" 
-                        type="email" 
-                        required
-                        value={form.email} 
-                        onChange={e => setForm(p => ({ ...p, email: e.target.value }))} 
-                        placeholder="user@siprahub.com"
-                        title="Email Address"
-                    />
-                </div>
-                <div>
-                    <label className="input-label text-xs uppercase tracking-wider font-bold text-text-muted mb-1" htmlFor="password_input">Temporary Password</label>
-                    <input 
-                        id="password_input"
-                        className="input-field" 
-                        type="password" 
-                        required
-                        value={form.password} 
-                        onChange={e => setForm(p => ({ ...p, password: e.target.value }))} 
-                        placeholder="Min 6 characters"
-                        title="Temporary Password"
-                    />
-                </div>
-                <div>
-                    <label className="input-label text-xs uppercase tracking-wider font-bold text-text-muted mb-1" htmlFor="sys_role">System Role</label>
-                    <select
-                        id="sys_role"
-                        title="System Role"
-                        className="input-field"
-                        value={form.role}
-                        onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
-                    >
-                        <option value="MANAGER">MANAGER</option>
-                        <option value="ADMIN">ADMIN</option>
-                        <option value="RECRUITER">RECRUITER</option>
-                        <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-                    </select>
-                </div>
-                <div className="flex gap-3 pt-4 border-t border-border mt-6">
-                    <button type="button" onClick={onClose} className="btn btn-secondary flex-1" disabled={submitting}>Cancel</button>
-                    <button type="submit" className="btn btn-cta flex-1" disabled={submitting}>
-                        {submitting ? <span className="spinner w-4 h-4" /> : 'Create User'}
-                    </button>
-                </div>
-            </form>
-        </Modal>
-    );
-}
-
 export function Employees() {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -573,7 +456,6 @@ export function Employees() {
     const [statusFilter, setStatusFilter] = useState('ACTIVE');
     const [payrollFilter, setPayrollFilter] = useState('ALL');
     const [sowFilter, setSowFilter] = useState('ALL');
-    const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
     const [sortKey, setSortKey] = useState<EmployeeSortKey>('rms_name');
     const [sortDir, setSortDir] = useState<SortDir>('asc');
     const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -632,13 +514,23 @@ export function Employees() {
     }, [employees]);
 
     const filtered = employees.filter(emp => {
-        const q = searchQuery.toLowerCase();
-        const matchesSearch = (emp.rms_name || '').toLowerCase().includes(q)
-            || (emp.client_name || '').toLowerCase().includes(q)
-            || (emp.jira_username || '').toLowerCase().includes(q)
-            || (emp.aws_email || '').toLowerCase().includes(q)
-            || (emp.siprahub_email || '').toLowerCase().includes(q)
-            || (emp.job_profile_name || '').toLowerCase().includes(q);
+        const q = searchQuery.trim().toLowerCase();
+        const searchableFields = [
+            emp.rms_name || '',
+            emp.client_name || '',
+            emp.job_profile_name || '',
+            emp.sow_number || '',
+            hiringTypeLabel(emp),
+            emp.source || '',
+            emp.status || '',
+            emp.start_date || '',
+            emp.exit_date || '',
+            emp.jira_username || '',
+            emp.aws_email || '',
+            emp.siprahub_email || '',
+        ];
+        const matchesSearch = q.length === 0
+            || searchableFields.some((value) => value.toLowerCase().includes(q));
 
         const matchesPayroll =
             payrollFilter === 'ALL'
@@ -652,6 +544,20 @@ export function Employees() {
 
         return matchesSearch && matchesPayroll && matchesSow;
     });
+
+    const hasActiveFilters =
+        searchQuery.trim().length > 0 || payrollFilter !== 'ALL' || sowFilter !== 'ALL';
+
+    const clearFilters = () => {
+        setSearchQuery('');
+        setPayrollFilter('ALL');
+        setSowFilter('ALL');
+    };
+
+    const handleStatusChange = (nextStatus: 'ACTIVE' | 'EXITED') => {
+        setStatusFilter(nextStatus);
+        clearFilters();
+    };
 
     const toggleSort = (key: EmployeeSortKey) => {
         if (sortKey === key) {
@@ -696,8 +602,8 @@ export function Employees() {
 
                     {/* Action Card */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div 
-                            onClick={() => setIsCreateUserModalOpen(true)}
+                        <div
+                            onClick={() => navigate('/employees/users/create')}
                             className="card p-8 border-2 border-dashed border-border hover:border-cta/50 hover:bg-cta/5 transition-all cursor-pointer group flex flex-col items-center text-center gap-4"
                         >
                             <div className="w-16 h-16 rounded-2xl bg-cta/10 text-cta flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -734,13 +640,6 @@ export function Employees() {
                     </div>
                 </div>
 
-                {isCreateUserModalOpen && (
-                    <CreateUserModal
-                        isOpen={isCreateUserModalOpen}
-                        onClose={() => setIsCreateUserModalOpen(false)}
-                        onSuccess={fetchEmployees}
-                    />
-                )}
             </div>
         );
     }
@@ -751,7 +650,7 @@ export function Employees() {
                 <div className="flex-1 w-full">
                     <input
                         type="search"
-                        placeholder="Search employees..."
+                        placeholder="Search employee, client, SOW, payroll, status..."
                         className="input-field h-10 w-full"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
@@ -826,7 +725,7 @@ export function Employees() {
                 </div>
                 <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
                     <button
-                        onClick={() => setStatusFilter('ACTIVE')}
+                        onClick={() => handleStatusChange('ACTIVE')}
                         className={cn(
                             'px-4 py-2 text-sm font-medium transition-colors flex items-center gap-2',
                             statusFilter === 'ACTIVE'
@@ -843,7 +742,7 @@ export function Employees() {
                         </span>
                     </button>
                     <button
-                        onClick={() => setStatusFilter('EXITED')}
+                        onClick={() => handleStatusChange('EXITED')}
                         className={cn(
                             'px-4 py-2 text-sm font-medium transition-colors flex items-center gap-2 border-l border-border',
                             statusFilter === 'EXITED'
@@ -861,6 +760,64 @@ export function Employees() {
                     </button>
                 </div>
             </div>
+
+            {hasActiveFilters && (
+                <div className="card flex flex-wrap items-center justify-between gap-3 py-2.5 px-4 border border-cta/20 bg-surface-hover/50">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="font-semibold text-text">Active Filters:</span>
+                        {searchQuery.trim() && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-surface text-text">
+                                <span>Search: {searchQuery.trim()}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchQuery('')}
+                                    className="p-0.5 rounded-sm text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
+                                    title="Remove search filter"
+                                    aria-label="Remove search filter"
+                                >
+                                    <X size={12} />
+                                </button>
+                            </span>
+                        )}
+                        {sowFilter !== 'ALL' && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-surface text-text">
+                                <span>SOW: {sowFilter}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setSowFilter('ALL')}
+                                    className="p-0.5 rounded-sm text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
+                                    title="Remove SOW filter"
+                                    aria-label="Remove SOW filter"
+                                >
+                                    <X size={12} />
+                                </button>
+                            </span>
+                        )}
+                        {payrollFilter !== 'ALL' && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-surface text-text">
+                                <span>Payroll: {payrollFilter}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setPayrollFilter('ALL')}
+                                    className="p-0.5 rounded-sm text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
+                                    title="Remove payroll filter"
+                                    aria-label="Remove payroll filter"
+                                >
+                                    <X size={12} />
+                                </button>
+                            </span>
+                        )}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="text-xs min-h-[36px] px-3 rounded-md font-medium text-white bg-[var(--brand-green)] hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-green)]/40 transition-colors"
+                        title="Clear search and table filters"
+                    >
+                        Clear Filters
+                    </button>
+                </div>
+            )}
 
             <div className="card overflow-hidden">
                 {loading ? (
@@ -880,7 +837,7 @@ export function Employees() {
                                             <span>SOW</span>
                                             <div className="relative">
                                                 <select
-                                                    className="absolute inset-0 w-5 h-5 opacity-0 cursor-pointer"
+                                                    className="h-7 min-w-[5.25rem] rounded-md border border-border bg-white text-xs font-semibold text-black pl-2 pr-7 appearance-none cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cta/35"
                                                     value={sowFilter}
                                                     onChange={(e) => setSowFilter(e.target.value)}
                                                     title="Filter by SOW"
@@ -894,10 +851,7 @@ export function Employees() {
                                                 </select>
                                                 <ChevronDown
                                                     size={14}
-                                                    className={cn(
-                                                        'pointer-events-none',
-                                                        sowFilter === 'ALL' ? 'text-text-muted' : 'text-cta'
-                                                    )}
+                                                    className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 z-10 text-text-muted"
                                                 />
                                             </div>
                                         </div>
@@ -908,7 +862,7 @@ export function Employees() {
                                             <span>Payroll</span>
                                             <div className="relative">
                                                 <select
-                                                    className="absolute inset-0 w-5 h-5 opacity-0 cursor-pointer"
+                                                    className="h-7 min-w-[6.25rem] rounded-md border border-border bg-white text-xs font-semibold text-black pl-2 pr-7 appearance-none cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cta/35"
                                                     value={payrollFilter}
                                                     onChange={(e) => setPayrollFilter(e.target.value)}
                                                     title="Filter by Payroll"
@@ -922,10 +876,7 @@ export function Employees() {
                                                 </select>
                                                 <ChevronDown
                                                     size={14}
-                                                    className={cn(
-                                                        'pointer-events-none',
-                                                        payrollFilter === 'ALL' ? 'text-text-muted' : 'text-cta'
-                                                    )}
+                                                    className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 z-10 text-text-muted"
                                                 />
                                             </div>
                                         </div>

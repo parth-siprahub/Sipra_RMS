@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { billingConfigApi, type BillingConfig, type BillingConfigCreate } from '../api/billingConfig';
+import { useNavigate } from 'react-router-dom';
+import { billingConfigApi, type BillingConfig } from '../api/billingConfig';
 import { Plus, Trash2, Settings2, Calendar, Check, X, Pencil } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -45,124 +46,6 @@ function formatDateTime(iso: string | null | undefined): string {
     });
 }
 
-// ─── Add Config Modal ─────────────────────────────────────────────────────────
-
-interface AddConfigModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
-}
-
-function AddConfigModal({ isOpen, onClose, onSuccess }: AddConfigModalProps) {
-    const [form, setForm] = useState<BillingConfigCreate>({
-        client_name: 'DCLI',
-        billing_month: MONTH_OPTIONS[0]?.value ?? '',
-        billable_hours: 176,
-        working_days: 22,
-    });
-    const [submitting, setSubmitting] = useState(false);
-
-    useEffect(() => {
-        if (isOpen) {
-            setForm({
-                client_name: 'DCLI',
-                billing_month: MONTH_OPTIONS[0]?.value ?? '',
-                billable_hours: 176,
-                working_days: 22,
-            });
-        }
-    }, [isOpen]);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!form.billing_month) { toast.error('Select a billing month'); return; }
-        if (form.billable_hours <= 0) { toast.error('Billable hours must be > 0'); return; }
-        if (form.working_days <= 0) { toast.error('Working days must be > 0'); return; }
-        setSubmitting(true);
-        try {
-            await billingConfigApi.upsert({
-                client_name: form.client_name || 'DCLI',
-                billing_month: form.billing_month,
-                billable_hours: Number(form.billable_hours),
-                working_days: Number(form.working_days),
-            });
-            toast.success('Billing config saved');
-            onSuccess();
-            onClose();
-        } catch {
-            toast.error('Failed to save billing config');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Add Billing Config" maxWidth="max-w-md">
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label className="input-label" htmlFor="bc-client">Client Name *</label>
-                    <input
-                        id="bc-client"
-                        className="input-field"
-                        placeholder="e.g. DCLI"
-                        required
-                        maxLength={100}
-                        value={form.client_name}
-                        onChange={(e) => setForm(f => ({ ...f, client_name: e.target.value }))}
-                    />
-                </div>
-                <div>
-                    <label className="input-label" htmlFor="bc-month">Billing Month *</label>
-                    <select
-                        id="bc-month"
-                        className="input-field"
-                        required
-                        value={form.billing_month}
-                        onChange={(e) => setForm(f => ({ ...f, billing_month: e.target.value }))}
-                    >
-                        <option value="">Select month…</option>
-                        {MONTH_OPTIONS.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                    </select>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <label className="input-label" htmlFor="bc-hours">Billable Hours *</label>
-                        <input
-                            id="bc-hours"
-                            type="number"
-                            className="input-field"
-                            min={1} step={0.5} required
-                            placeholder="e.g. 176"
-                            value={form.billable_hours || ''}
-                            onChange={(e) => setForm(f => ({ ...f, billable_hours: parseFloat(e.target.value) || 0 }))}
-                        />
-                    </div>
-                    <div>
-                        <label className="input-label" htmlFor="bc-days">Working Days *</label>
-                        <input
-                            id="bc-days"
-                            type="number"
-                            className="input-field"
-                            min={1} step={1} required
-                            placeholder="e.g. 22"
-                            value={form.working_days || ''}
-                            onChange={(e) => setForm(f => ({ ...f, working_days: parseInt(e.target.value, 10) || 0 }))}
-                        />
-                    </div>
-                </div>
-                <div className="flex gap-3 pt-2">
-                    <button type="button" onClick={onClose} className="btn btn-secondary flex-1" disabled={submitting}>Cancel</button>
-                    <button type="submit" className="btn btn-cta flex-1" disabled={submitting}>
-                        {submitting ? <span className="spinner w-4 h-4" /> : 'Save Config'}
-                    </button>
-                </div>
-            </form>
-        </Modal>
-    );
-}
-
 // ─── Delete Confirm Modal ─────────────────────────────────────────────────────
 
 interface DeleteModalProps {
@@ -205,6 +88,7 @@ interface EditRowState {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function BillingConfig() {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const canAccess = user?.email ? BILLING_CONFIG_EMAILS.has(user.email.toLowerCase()) : false;
 
@@ -212,7 +96,6 @@ export function BillingConfig() {
     const [loading, setLoading] = useState(true);
     const [selectedMonth, setSelectedMonth] = useState('');
 
-    const [isAddOpen, setIsAddOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<BillingConfig | null>(null);
     const [deleting, setDeleting] = useState(false);
 
@@ -314,7 +197,7 @@ export function BillingConfig() {
                         <p className="text-sm text-text-muted">Monthly billable hours and working days per client</p>
                     </div>
                 </div>
-                <button onClick={() => setIsAddOpen(true)} className="btn btn-cta flex items-center gap-2">
+                <button onClick={() => navigate('/billing-config/create')} className="btn btn-cta flex items-center gap-2">
                     <Plus size={18} />
                     Add Config
                 </button>
@@ -497,7 +380,7 @@ export function BillingConfig() {
                         message={selectedMonth ? `No billing config for ${formatMonth(selectedMonth)}` : 'No billing configs yet'}
                         action={
                             <button
-                                onClick={selectedMonth ? () => setSelectedMonth('') : () => setIsAddOpen(true)}
+                                onClick={selectedMonth ? () => setSelectedMonth('') : () => navigate('/billing-config/create')}
                                 className="btn btn-secondary btn-sm"
                             >
                                 {selectedMonth ? 'Clear Filter' : 'Add Config'}
@@ -508,7 +391,6 @@ export function BillingConfig() {
             </div>
 
             {/* ── Modals ── */}
-            <AddConfigModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} onSuccess={fetchConfigs} />
             <DeleteModal
                 isOpen={!!deleteTarget}
                 onClose={() => setDeleteTarget(null)}

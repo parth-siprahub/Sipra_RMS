@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sowApi } from '../api/sows';
 import { type SOW } from '../api/sows';
-import { SowModal } from '../components/sows/SowModal';
 import {
     Plus,
     Edit2,
@@ -27,8 +26,6 @@ export function Sows() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ACTIVE');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedSow, setSelectedSow] = useState<SOW | undefined>();
     const [onboardedCounts, setOnboardedCounts] = useState<Record<number, number>>({});
     const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
     const [isExportOpen, setIsExportOpen] = useState(false);
@@ -140,8 +137,7 @@ export function Sows() {
     };
 
     const handleCreate = () => {
-        setSelectedSow(undefined);
-        setIsModalOpen(true);
+        navigate('/sows/create');
     };
 
     return (
@@ -343,24 +339,6 @@ export function Sows() {
                 )}
             </div>
 
-            {isModalOpen && (
-                <SowModal
-                    isOpen={isModalOpen}
-                    onClose={() => {
-                        setIsModalOpen(false);
-                        setSelectedSow(undefined);
-                    }}
-                    onSuccess={(updatedIsActive?: boolean) => {
-                        fetchSows();
-                        if (updatedIsActive === false) {
-                            setStatusFilter('INACTIVE');
-                        } else if (updatedIsActive === true && statusFilter === 'INACTIVE') {
-                            setStatusFilter('ACTIVE');
-                        }
-                    }}
-                    sow={selectedSow}
-                />
-            )}
         </div>
     );
 }
