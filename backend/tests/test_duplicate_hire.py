@@ -251,10 +251,11 @@ async def test_rehire_warning_for_exited_employee(override_auth):
 
 @pytest.mark.asyncio
 async def test_existing_candidate_dedup_still_returns_409(override_auth):
-    """The existing email dedup against candidates table should still return 409."""
+    """Email dedup should block when the existing candidate is ONBOARDED."""
     existing = make_candidate(
         id=50, email="duplicate@example.com",
         first_name="Existing", last_name="Person",
+        status="ONBOARDED",
     )
 
     mock_client = _build_mock_client(
@@ -271,7 +272,32 @@ async def test_existing_candidate_dedup_still_returns_409(override_auth):
             resp = await ac.post("/api/candidates/", json=_candidate_payload(email="duplicate@example.com"))
 
     assert resp.status_code == 409
-    assert "Duplicate candidate" in resp.json()["detail"]
+    assert "already exists" in resp.json()["detail"]["message"]
+
+
+@pytest.mark.asyncio
+async def test_existing_non_onboarded_duplicate_email_is_allowed(override_auth):
+    """Email dedup should not block for non-onboarded profiles (e.g., EXIT/rejected pipeline)."""
+    created = make_candidate(id=51, email="duplicate@example.com")
+
+    mock_client = _build_mock_client(
+        candidates_responses=[
+            [],          # ONBOARDED-only dedup finds nothing
+            [created],   # insert succeeds
+        ],
+        employees_responses=[
+            [],          # no rehire warning for this case
+        ],
+    )
+
+    async def _get():
+        return mock_client
+
+    with patch("app.candidates.router.get_supabase_admin_async", new=_get):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            resp = await ac.post("/api/candidates/", json=_candidate_payload(email="duplicate@example.com"))
+
+    assert resp.status_code == 201
 
 
 @pytest.mark.asyncio

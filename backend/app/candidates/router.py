@@ -165,11 +165,13 @@ async def create_candidate(
 ):
     client = await get_supabase_admin_async()
 
-    # Duplicate check: first_name + last_name + email OR phone
+    # Duplicate check should only block against currently ONBOARDED records.
+    # Rejected/exited pipeline entries are allowed to re-enter for a new role.
     dup_query = (
         client.table("candidates")
         .select("id, first_name, last_name, email, phone")
         .ilike("email", payload.email.strip())
+        .eq("status", CandidateStatus.ONBOARDED.value)
         .limit(1)
     )
     dup_result = await dup_query.execute()
@@ -196,6 +198,7 @@ async def create_candidate(
                 .select("id, first_name, last_name, email, phone")
                 .ilike("first_name", payload.first_name.strip())
                 .ilike("last_name", payload.last_name.strip())
+                .eq("status", CandidateStatus.ONBOARDED.value)
                 .execute()
             )
             for d in (name_dup.data or []):

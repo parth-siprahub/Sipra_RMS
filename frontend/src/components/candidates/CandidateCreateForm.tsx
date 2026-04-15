@@ -106,7 +106,7 @@ export function CandidateCreateForm({
             const normalizedLast = lastName.toLowerCase().trim();
             const strippedPhone = phone ? phone.replace(/\D/g, '').slice(-10) : '';
 
-            const dup = existing.find((c) => {
+            const duplicates = existing.filter((c) => {
                 const matchName =
                     c.first_name.toLowerCase().trim() === normalizedFirst &&
                     c.last_name.toLowerCase().trim() === normalizedLast;
@@ -115,7 +115,11 @@ export function CandidateCreateForm({
                     strippedPhone && c.phone ? c.phone.replace(/\D/g, '').slice(-10) === strippedPhone : false;
                 return matchEmail || (matchName && matchPhone);
             });
-            setDuplicateCandidate(dup || null);
+
+            // Keep indicator visible for any duplicate, but prioritize ONBOARDED
+            // so submit blocking behavior stays aligned with business rules.
+            const blockingDuplicate = duplicates.find((c) => c.status === 'ONBOARDED');
+            setDuplicateCandidate(blockingDuplicate || duplicates[0] || null);
         } catch {
             // silent
         }
@@ -145,7 +149,7 @@ export function CandidateCreateForm({
         }
         setValidationErrors({});
 
-        if (duplicateCandidate) {
+        if (duplicateCandidate?.status === 'ONBOARDED') {
             toast.error(
                 `Duplicate candidate found: ${formatCandidateFullName(duplicateCandidate.first_name, duplicateCandidate.last_name)} (${duplicateCandidate.email})`
             );
