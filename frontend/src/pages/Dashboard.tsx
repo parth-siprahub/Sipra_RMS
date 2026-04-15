@@ -36,8 +36,8 @@ export function Dashboard() {
                     </div>
                     <Skeleton className="h-8 w-32 rounded-full" />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[1, 2, 3, 4].map(i => <CardSkeleton key={i} />)}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    {[1, 2, 3, 4, 5].map(i => <CardSkeleton key={i} />)}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <Skeleton className="h-96 w-full rounded-2xl" />
