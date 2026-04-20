@@ -39,6 +39,7 @@ from app.audit.router import router as audit_router
 from app.reports.router import router as reports_router
 from app.billing_config.router import router as billing_config_router
 from app.analytics.router import router as analytics_router
+from app.users.router import router as users_router
 
 # Public URL prefix (must match Nginx proxy_pass and frontend VITE_API_URL).
 API_PREFIX = "/api"
@@ -227,3 +228,4 @@ app.include_router(audit_router, prefix=API_PREFIX)
 app.include_router(reports_router, prefix=API_PREFIX)
 app.include_router(billing_config_router, prefix=API_PREFIX)
 app.include_router(analytics_router, prefix=API_PREFIX)
+app.include_router(users_router, prefix=API_PREFIX)
