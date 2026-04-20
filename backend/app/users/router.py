@@ -20,8 +20,9 @@ async def list_recruiters(
     current_user: dict = Depends(get_current_user),
 ):
     """Return recruiter and admin profiles for UI dropdowns. Admin-only."""
-    role = (current_user.get("role") or "").lower()
-    if role != "admin":
+    # Roles are stored UPPERCASE in the DB (ADMIN, SUPER_ADMIN, MANAGER, RECRUITER…)
+    role = (current_user.get("role") or "").upper()
+    if role not in ("ADMIN", "SUPER_ADMIN", "MANAGER", "MANAGEMENT"):
         raise HTTPException(status_code=403, detail="Admin only")
 
     # Allow monkeypatching in tests
@@ -29,12 +30,12 @@ async def list_recruiters(
     if self_module._fetch_recruiters is not _SENTINEL:
         return self_module._fetch_recruiters()
 
-    # Real path: async Supabase query
+    # Real path: async Supabase query — roles are uppercase in DB
     client = await get_supabase_admin_async()
     resp = await (
         client.table("profiles")
         .select("id,full_name,role")
-        .in_("role", ["recruiter", "admin"])
+        .in_("role", ["RECRUITER", "ADMIN", "SUPER_ADMIN", "MANAGER", "MANAGEMENT"])
         .order("full_name")
         .execute()
     )

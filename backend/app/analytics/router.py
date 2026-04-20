@@ -55,7 +55,7 @@ async def _fetch_candidates(
     q = client.table("candidates").select(columns)
     q = _date_filters(q, start_date, end_date)
     if recruiter_id:
-        q = q.eq("created_by_id", recruiter_id)
+        q = q.eq("owner_id", recruiter_id)
     res = await q.range(0, 9999).execute()
     return res.data or []
 
@@ -88,7 +88,7 @@ async def get_resources_skills(
     client = await get_supabase_admin_async()
     candidates = await _fetch_candidates(
         client, start_date, end_date, recruiter_id,
-        columns="id,skills,created_at,created_by_id",
+        columns="id,skills,created_at,owner_id",
     )
     return service.build_resources_overview(candidates)
 
@@ -107,7 +107,7 @@ async def get_hiring_type(
     client = await get_supabase_admin_async()
     candidates = await _fetch_candidates(
         client, start_date, end_date, recruiter_id,
-        columns="id,source,created_at,created_by_id",
+        columns="id,source,created_at,owner_id",
     )
     result = service.build_hiring_type(candidates)
     return [r.model_dump() for r in result]
@@ -158,7 +158,7 @@ async def get_employment_type(
     client = await get_supabase_admin_async()
     candidates = await _fetch_candidates(
         client, start_date, end_date, recruiter_id,
-        columns="id,vendor,created_at,created_by_id",
+        columns="id,vendor,created_at,owner_id",
     )
     result = service.build_employment_type(candidates)
     return [r.model_dump() for r in result]
@@ -176,7 +176,7 @@ async def get_payroll_segregation(
     client = await get_supabase_admin_async()
     candidates = await _fetch_candidates(
         client, start_date, end_date, recruiter_id,
-        columns="id,vendor,created_at,created_by_id",
+        columns="id,vendor,created_at,owner_id",
     )
     result = service.build_payroll_segregation(candidates)
     return [r.model_dump() for r in result]
@@ -217,7 +217,7 @@ async def get_daily_status(
     count_q = client.table("candidates").select("id", count="exact")
     count_q = _date_filters(count_q, start_date, end_date)
     if recruiter_id:
-        count_q = count_q.eq("created_by_id", recruiter_id)
+        count_q = count_q.eq("owner_id", recruiter_id)
     count_res = await count_q.execute()
     total = count_res.count or 0
 
@@ -228,7 +228,7 @@ async def get_daily_status(
     )
     q = _date_filters(q, start_date, end_date)
     if recruiter_id:
-        q = q.eq("created_by_id", recruiter_id)
+        q = q.eq("owner_id", recruiter_id)
     q = q.order(sort_by, desc=(sort_order == "desc"))
     data_res = await q.range(offset, offset + page_size - 1).execute()
     rows = service.build_daily_status_rows(data_res.data or [])
@@ -256,7 +256,7 @@ async def get_requirement_tracker(
     reqs = await _fetch_resource_requests(client, start_date, end_date)
     cands = await _fetch_candidates(
         client, start_date, end_date, recruiter_id,
-        columns="id,status,resource_request_id,request_id,created_at,created_by_id",
+        columns="id,status,request_id,created_at,owner_id",
     )
     return service.build_requirement_tracker(reqs, cands)
 
@@ -288,7 +288,7 @@ async def get_daily_status_matrix(
 
     cands = await _fetch_candidates(
         client, start_date, end_date, recruiter_id,
-        columns="id,status,request_id,created_at,created_by_id",
+        columns="id,status,request_id,created_at,owner_id",
     )
     return service.build_daily_status_matrix(reqs, cands, jp_map)
 
@@ -312,7 +312,7 @@ async def get_pipeline_funnel(
 
     candidates = await _fetch_candidates(
         client, start_date, end_date, recruiter_id,
-        columns="id,status,created_at,created_by_id",
+        columns="id,status,created_at,owner_id",
     )
     return service.build_pipeline_funnel(candidates, total_requests)
 

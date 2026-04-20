@@ -159,21 +159,19 @@ function SkillDistribution({ params }: { params: Record<string, string> }) {
             ) : (
                 <div className="flex items-start gap-4">
                     <div className="w-[160px] h-[160px] shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie data={chartData} dataKey="value" nameKey="label"
-                                    innerRadius={40} outerRadius={72} paddingAngle={1.5}
-                                    animationDuration={600} stroke="none">
-                                    {chartData.map((_, i) => (
-                                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
-                                    formatter={(v: number, _n: string, p: { payload?: { label?: string } }) => [v, p?.payload?.label ?? '']}
-                                />
-                            </PieChart>
-                        </ResponsiveContainer>
+                        <PieChart width={160} height={160}>
+                            <Pie data={chartData} dataKey="value" nameKey="label"
+                                innerRadius={40} outerRadius={72} paddingAngle={1.5}
+                                animationDuration={600} stroke="none">
+                                {chartData.map((_, i) => (
+                                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                                ))}
+                            </Pie>
+                            <Tooltip
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
+                                formatter={(v: number, _n: string, p: { payload?: { label?: string } }) => [v, p?.payload?.label ?? '']}
+                            />
+                        </PieChart>
                     </div>
                     <div className="flex-1 max-h-[170px] overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
                         {chartData.map((entry, i) => (
@@ -221,21 +219,19 @@ function EmploymentType({ params }: { params: Record<string, string> }) {
             ) : (
                 <div className="flex items-center gap-6 justify-center h-40">
                     <div className="w-[140px] h-[140px] shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie data={data} dataKey="value" nameKey="label"
-                                    innerRadius={35} outerRadius={62} paddingAngle={3}
-                                    animationDuration={600} stroke="none">
-                                    {data.map((_, i) => (
-                                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
-                                    formatter={(v: number, _n: string, p: { payload?: { label?: string } }) => [v, p?.payload?.label ?? '']}
-                                />
-                            </PieChart>
-                        </ResponsiveContainer>
+                        <PieChart width={140} height={140}>
+                            <Pie data={data} dataKey="value" nameKey="label"
+                                innerRadius={35} outerRadius={62} paddingAngle={3}
+                                animationDuration={600} stroke="none">
+                                {data.map((_, i) => (
+                                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                                ))}
+                            </Pie>
+                            <Tooltip
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
+                                formatter={(v: number, _n: string, p: { payload?: { label?: string } }) => [v, p?.payload?.label ?? '']}
+                            />
+                        </PieChart>
                     </div>
                     <div className="space-y-3">
                         {data.map((entry, i) => (
@@ -288,21 +284,19 @@ function PayrollSegregation({ params }: { params: Record<string, string> }) {
             ) : (
                 <div className="flex items-center gap-6 justify-center h-40">
                     <div className="w-[140px] h-[140px] shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie data={data} dataKey="value" nameKey="label"
-                                    innerRadius={35} outerRadius={62} paddingAngle={3}
-                                    animationDuration={600} stroke="none">
-                                    {data.map((_, i) => (
-                                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
-                                    formatter={(v: number, _n: string, p: { payload?: { label?: string } }) => [v, p?.payload?.label ?? '']}
-                                />
-                            </PieChart>
-                        </ResponsiveContainer>
+                        <PieChart width={140} height={140}>
+                            <Pie data={data} dataKey="value" nameKey="label"
+                                innerRadius={35} outerRadius={62} paddingAngle={3}
+                                animationDuration={600} stroke="none">
+                                {data.map((_, i) => (
+                                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                                ))}
+                            </Pie>
+                            <Tooltip
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
+                                formatter={(v: number, _n: string, p: { payload?: { label?: string } }) => [v, p?.payload?.label ?? '']}
+                            />
+                        </PieChart>
                     </div>
                     <div className="space-y-3">
                         {data.map((entry, i) => (
@@ -358,21 +352,19 @@ function HiringTypeSplit({ params }: { params: Record<string, string> }) {
             ) : (
                 <div className="flex items-center gap-6 justify-center h-40">
                     <div className="w-[140px] h-[140px] shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie data={data} dataKey="value" nameKey="label"
-                                    innerRadius={35} outerRadius={62} paddingAngle={3}
-                                    animationDuration={600} stroke="none">
-                                    {data.map((_, i) => (
-                                        <Cell key={i} fill={colors[i % colors.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
-                                    formatter={(v: number, _n: string, p: { payload?: { label?: string } }) => [v, p?.payload?.label ?? '']}
-                                />
-                            </PieChart>
-                        </ResponsiveContainer>
+                        <PieChart width={140} height={140}>
+                            <Pie data={data} dataKey="value" nameKey="label"
+                                innerRadius={35} outerRadius={62} paddingAngle={3}
+                                animationDuration={600} stroke="none">
+                                {data.map((_, i) => (
+                                    <Cell key={i} fill={colors[i % colors.length]} />
+                                ))}
+                            </Pie>
+                            <Tooltip
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
+                                formatter={(v: number, _n: string, p: { payload?: { label?: string } }) => [v, p?.payload?.label ?? '']}
+                            />
+                        </PieChart>
                     </div>
                     <div className="space-y-3">
                         {data.map((entry, i) => (
@@ -421,7 +413,7 @@ function HiringSource({ params }: { params: Record<string, string> }) {
                 <SectionError />
             ) : (
                 <div className="h-40">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" debounce={50}>
                         <BarChart layout="vertical" data={data} margin={{ top: 4, right: 24, left: 8, bottom: 4 }} barSize={18}>
                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                             <XAxis type="number" fontSize={10} tick={{ fill: '#64748B' }} />
@@ -468,7 +460,7 @@ function ClientDemand({ params }: { params: Record<string, string> }) {
                 <SectionError />
             ) : (
                 <div className="h-40">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" debounce={50}>
                         <BarChart layout="vertical" data={top8} margin={{ top: 4, right: 24, left: 8, bottom: 4 }} barSize={18}>
                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                             <XAxis type="number" fontSize={10} tick={{ fill: '#64748B' }} />
