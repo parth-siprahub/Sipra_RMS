@@ -9,6 +9,7 @@ from app.analytics.schemas import (
     ResourcesOverview,
     PaginatedTable,
     PipelineFunnel,
+    RequirementTracker,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,20 @@ async def _fetch_candidates(
     q = _date_filters(q, start_date, end_date)
     if recruiter_id:
         q = q.eq("created_by_id", recruiter_id)
+    res = await q.range(0, 9999).execute()
+    return res.data or []
+
+
+async def _fetch_resource_requests(
+    client,
+    start_date: str | None,
+    end_date: str | None,
+) -> list[dict]:
+    """Fetch resource_requests with optional date filter."""
+    q = client.table("resource_requests").select(
+        "id,status,job_profile_id,created_at"
+    )
+    q = _date_filters(q, start_date, end_date)
     res = await q.range(0, 9999).execute()
     return res.data or []
 
@@ -191,6 +206,24 @@ async def get_daily_status(
 
 
 # ── Pipeline ──────────────────────────────────────────────────────────────────
+
+@router.get("/pipeline/requirement-tracker", response_model=RequirementTracker)
+async def get_requirement_tracker(
+    start_date: str | None = Query(None, description="YYYY-MM-DD"),
+    end_date: str | None = Query(None, description="YYYY-MM-DD"),
+    recruiter_id: str | None = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """6-stage requirement tracker: counts open requests by furthest candidate stage."""
+    recruiter_id = _scope_recruiter_id(recruiter_id, current_user)
+    client = await get_supabase_admin_async()
+    reqs = await _fetch_resource_requests(client, start_date, end_date)
+    cands = await _fetch_candidates(
+        client, start_date, end_date, recruiter_id,
+        columns="id,status,resource_request_id,request_id,created_at,created_by_id",
+    )
+    return service.build_requirement_tracker(reqs, cands)
+
 
 @router.get("/pipeline/funnel", response_model=PipelineFunnel)
 async def get_pipeline_funnel(

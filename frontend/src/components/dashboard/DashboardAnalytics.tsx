@@ -348,6 +348,61 @@ function ClientDemand({ params }: { params: Record<string, string> }) {
     );
 }
 
+// ─── Requirement Tracker ──────────────────────────────────────────────────────
+
+const TRACKER_COLORS: Record<string, string> = {
+    NEW: '#6366F1',
+    SCREENING: '#3B82F6',
+    L1: '#06B6D4',
+    L2: '#10B981',
+    WITH_CLIENT: '#F59E0B',
+    CLOSING: '#EF4444',
+};
+
+function RequirementTrackerSection({ params }: { params: Record<string, string> }) {
+    const [data, setData] = useState<Array<{ stage: string; label: string; open_count: number }>>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        setLoading(true);
+        setError(false);
+        analyticsApi.getRequirementTracker(params)
+            .then(r => { if (!cancelled) setData(r.stages); })
+            .catch(() => { if (!cancelled) setError(true); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [params]);
+
+    return (
+        <div className="card">
+            <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-info" />
+                Requirement Tracker
+                <span className="text-xs text-text-muted font-normal ml-1">(open requests by stage)</span>
+            </h3>
+            {loading ? <SectionSpinner /> : error ? <SectionError /> : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {data.map(s => (
+                        <div
+                            key={s.stage}
+                            className="flex flex-col gap-1 p-3 rounded-xl border border-border bg-surface-hover"
+                        >
+                            <div
+                                className="w-2 h-2 rounded-full"
+                                style={{ backgroundColor: TRACKER_COLORS[s.stage] ?? '#94A3B8' }}
+                            />
+                            <div className="text-2xl font-bold text-text tabular-nums">{s.open_count}</div>
+                            <div className="text-xs text-text-muted leading-tight">{s.label}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ─── Pipeline Funnel ──────────────────────────────────────────────────────────
 
 function AnalyticsFunnel({ params }: { params: Record<string, string> }) {
@@ -570,6 +625,9 @@ export function DashboardAnalytics() {
                 <HiringSource params={appliedParams} />
                 <ClientDemand params={appliedParams} />
             </div>
+
+            {/* Row N: Requirement Tracker */}
+            <RequirementTrackerSection params={appliedParams} />
 
             {/* Row 3: Pipeline Funnel */}
             <AnalyticsFunnel params={appliedParams} />

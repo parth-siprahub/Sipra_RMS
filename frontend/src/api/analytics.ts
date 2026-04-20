@@ -67,6 +67,12 @@ export const analyticsApi = {
   getDailyStatus: (params: Params & { page?: string; page_size?: string; sort_by?: string; sort_order?: string }) =>
     apiClient.get<PaginatedTable<DailyStatusRow>>('/analytics/ta/daily-status', params),
 
+  getRequirementTracker: (params: Params = {}) =>
+    apiClient.get<{ stages: Array<{ stage: string; label: string; open_count: number }> }>(
+        '/analytics/pipeline/requirement-tracker',
+        params,
+    ),
+
   getPipelineFunnel: (params: Params) =>
     apiClient.get<PipelineFunnel>('/analytics/pipeline/funnel', params),
 
