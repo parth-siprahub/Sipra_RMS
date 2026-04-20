@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { AnalyticsProvider } from './context/AnalyticsContext';
 import { Login } from './pages/Login';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -98,6 +99,7 @@ function App() {
       <ThemeProvider defaultTheme="light" storageKey="rms-theme">
         <BrowserRouter>
           <AuthProvider>
+            <AnalyticsProvider>
             <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
@@ -160,6 +162,7 @@ function App() {
               {/* Catch All */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </AnalyticsProvider>
           </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>
