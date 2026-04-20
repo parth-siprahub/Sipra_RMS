@@ -816,7 +816,9 @@ export function DashboardAnalytics() {
                 <div className="h-px flex-1 bg-border" />
             </div>
 
-            <FilterBar onRefresh={handleApply} />
+            <div className="sticky top-0 z-10 py-2" style={{ backgroundColor: 'var(--background, var(--surface))', backdropFilter: 'blur(8px)' }}>
+                <FilterBar onRefresh={handleApply} />
+            </div>
 
             {/* Row 1: Skill Distribution + Employment Type */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
