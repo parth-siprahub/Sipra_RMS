@@ -82,6 +82,12 @@ export const analyticsApi = {
   getHiringTypeSplit: (params: Params = {}) =>
     apiClient.get<LabelValue[]>('/analytics/ta/hiring-type-split', params),
 
+  getPayrollSegregation: (params: Params = {}) =>
+    apiClient.get<Array<{ label: string; value: number }>>(
+        '/analytics/resources/payroll',
+        params,
+    ),
+
   listRecruiters: (): Promise<Array<{ id: string; full_name: string }>> =>
     apiClient.get('/users/recruiters'),
 };

@@ -163,6 +163,24 @@ async def get_employment_type(
     return [r.model_dump() for r in result]
 
 
+@router.get("/resources/payroll", response_model=list[dict])
+async def get_payroll_segregation(
+    start_date: str | None = Query(None, description="YYYY-MM-DD"),
+    end_date: str | None = Query(None, description="YYYY-MM-DD"),
+    recruiter_id: str | None = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Doughnut chart: candidate distribution by payroll/vendor association."""
+    recruiter_id = _scope_recruiter_id(recruiter_id, current_user)
+    client = await get_supabase_admin_async()
+    candidates = await _fetch_candidates(
+        client, start_date, end_date, recruiter_id,
+        columns="id,vendor,created_at,created_by_id",
+    )
+    result = service.build_payroll_segregation(candidates)
+    return [r.model_dump() for r in result]
+
+
 @router.get("/ta/hiring-type-split", response_model=list[LabelValue])
 async def get_hiring_type_split(
     start_date: str | None = Query(None, description="YYYY-MM-DD"),

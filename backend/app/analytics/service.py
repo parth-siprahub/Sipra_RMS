@@ -241,3 +241,25 @@ def build_hiring_type_split(resource_requests: list[dict]) -> list[LabelValue]:
         LabelValue(label="New", value=new_count),
         LabelValue(label="Backfill", value=backfill_count),
     ]
+
+
+# ── Payroll Segregation ───────────────────────────────────────────────────────
+
+def build_payroll_segregation(candidates: list[dict]) -> list[LabelValue]:
+    """Group candidates by vendor/payroll association.
+
+    Null, empty, or 'INTERNAL' vendor → 'Internal'.
+    Specific vendor name → keep as-is.
+    """
+    buckets: dict[str, int] = {}
+    for c in candidates:
+        raw = (c.get("vendor") or "").strip()
+        if not raw or raw.upper() == "INTERNAL":
+            label = "Internal"
+        else:
+            label = raw
+        buckets[label] = buckets.get(label, 0) + 1
+    return [
+        LabelValue(label=k, value=v)
+        for k, v in sorted(buckets.items(), key=lambda x: -x[1])
+    ]
