@@ -256,6 +256,76 @@ function EmploymentType({ params }: { params: Record<string, string> }) {
     );
 }
 
+// ─── Hiring Type Split ────────────────────────────────────────────────────────
+
+function HiringTypeSplit({ params }: { params: Record<string, string> }) {
+    const [data, setData] = useState<LabelValue[] | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        setLoading(true);
+        setError(false);
+        analyticsApi.getHiringTypeSplit(params)
+            .then(d => { if (!cancelled) setData(d); })
+            .catch(() => { if (!cancelled) setError(true); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [params]);
+
+    const total = data?.reduce((s, d) => s + d.value, 0) ?? 0;
+    const NEW_COLOR = '#3B82F6';
+    const BACKFILL_COLOR = '#F59E0B';
+    const colors = [NEW_COLOR, BACKFILL_COLOR];
+
+    return (
+        <div className="card">
+            <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cta" />
+                Hiring Type
+                <span className="text-xs text-text-muted font-normal ml-1">(New vs Backfill)</span>
+            </h3>
+            {loading ? <SectionSpinner /> : error || !data?.length ? (
+                <SectionError />
+            ) : (
+                <div className="flex items-center gap-6 justify-center h-40">
+                    <div className="w-[140px] h-[140px] shrink-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie data={data} dataKey="value" nameKey="label"
+                                    innerRadius={35} outerRadius={62} paddingAngle={3}
+                                    animationDuration={600} stroke="none">
+                                    {data.map((_, i) => (
+                                        <Cell key={i} fill={colors[i % colors.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
+                                    formatter={(v: number, _n: string, p: { payload?: { label?: string } }) => [v, p?.payload?.label ?? '']}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div className="space-y-3">
+                        {data.map((entry, i) => (
+                            <div key={entry.label} className="flex items-center gap-2.5">
+                                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colors[i % colors.length] }} />
+                                <div>
+                                    <div className="text-xs font-semibold text-text">{entry.label}</div>
+                                    <div className="text-xs text-text-muted">
+                                        {entry.value} · {total > 0 ? Math.round((entry.value / total) * 100) : 0}%
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ─── Hiring Source ────────────────────────────────────────────────────────────
 
 function HiringSource({ params }: { params: Record<string, string> }) {
@@ -278,7 +348,7 @@ function HiringSource({ params }: { params: Record<string, string> }) {
         <div className="card">
             <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-warning" />
-                Hiring Source Breakdown
+                Source Channel
             </h3>
             {loading ? <SectionSpinner /> : error || !data?.length ? (
                 <SectionError />
@@ -618,6 +688,11 @@ export function DashboardAnalytics() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <SkillDistribution params={appliedParams} />
                 <EmploymentType params={appliedParams} />
+            </div>
+
+            {/* Row 1b: Hiring Type Split (New vs Backfill) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <HiringTypeSplit params={appliedParams} />
             </div>
 
             {/* Row 2: Hiring Source + Client Demand */}

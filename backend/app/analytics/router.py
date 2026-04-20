@@ -10,6 +10,7 @@ from app.analytics.schemas import (
     PaginatedTable,
     PipelineFunnel,
     RequirementTracker,
+    LabelValue,
 )
 
 logger = logging.getLogger(__name__)
@@ -159,6 +160,22 @@ async def get_employment_type(
         columns="id,vendor,created_at,created_by_id",
     )
     result = service.build_employment_type(candidates)
+    return [r.model_dump() for r in result]
+
+
+@router.get("/ta/hiring-type-split", response_model=list[LabelValue])
+async def get_hiring_type_split(
+    start_date: str | None = Query(None, description="YYYY-MM-DD"),
+    end_date: str | None = Query(None, description="YYYY-MM-DD"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Pie chart: New vs Backfill resource requests."""
+    client = await get_supabase_admin_async()
+    q = client.table("resource_requests").select("id,is_backfill,created_at")
+    q = _date_filters(q, start_date, end_date)
+    res = await q.range(0, 9999).execute()
+    reqs = res.data or []
+    result = service.build_hiring_type_split(reqs)
     return [r.model_dump() for r in result]
 
 

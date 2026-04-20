@@ -79,6 +79,9 @@ export const analyticsApi = {
   getPivotData: (params: Params) =>
     apiClient.get<PivotRow[]>('/analytics/reports/pivot-data', params),
 
+  getHiringTypeSplit: (params: Params = {}) =>
+    apiClient.get<LabelValue[]>('/analytics/ta/hiring-type-split', params),
+
   listRecruiters: (): Promise<Array<{ id: string; full_name: string }>> =>
     apiClient.get('/users/recruiters'),
 };

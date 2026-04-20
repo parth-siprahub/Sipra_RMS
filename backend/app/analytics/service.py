@@ -12,6 +12,7 @@ from app.analytics.schemas import (
     PivotRow,
     RequirementTrackerStage,
     RequirementTracker,
+    LabelValue,
 )
 
 # ── Pipeline stage mapping ────────────────────────────────────────────────────
@@ -228,3 +229,15 @@ def build_requirement_tracker(
         )
         for s in _TRACKER_ORDER
     ])
+
+
+# ── Hiring Type Split (New vs Backfill) ───────────────────────────────────────
+
+def build_hiring_type_split(resource_requests: list[dict]) -> list[LabelValue]:
+    """Split resource requests into New vs Backfill based on is_backfill flag."""
+    new_count = sum(1 for r in resource_requests if not r.get("is_backfill"))
+    backfill_count = sum(1 for r in resource_requests if r.get("is_backfill"))
+    return [
+        LabelValue(label="New", value=new_count),
+        LabelValue(label="Backfill", value=backfill_count),
+    ]
