@@ -11,6 +11,7 @@ from app.analytics.schemas import (
     PipelineFunnel,
     RequirementTracker,
     LabelValue,
+    DailyStatusMatrix,
 )
 
 logger = logging.getLogger(__name__)
@@ -258,6 +259,38 @@ async def get_requirement_tracker(
         columns="id,status,resource_request_id,request_id,created_at,created_by_id",
     )
     return service.build_requirement_tracker(reqs, cands)
+
+
+@router.get("/pipeline/daily-status-matrix", response_model=DailyStatusMatrix)
+async def get_daily_status_matrix(
+    start_date: str | None = Query(None, description="YYYY-MM-DD"),
+    end_date: str | None = Query(None, description="YYYY-MM-DD"),
+    recruiter_id: str | None = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Matrix: job profiles × candidate pipeline stage counts."""
+    recruiter_id = _scope_recruiter_id(recruiter_id, current_user)
+    client = await get_supabase_admin_async()
+
+    reqs = await _fetch_resource_requests(client, start_date, end_date)
+
+    # Fetch job profiles for the requests
+    jp_ids = list({r["job_profile_id"] for r in reqs if r.get("job_profile_id")})
+    jp_map: dict[int, dict] = {}
+    if jp_ids:
+        jp_res = await (
+            client.table("job_profiles")
+            .select("id,role_name")
+            .in_("id", jp_ids)
+            .execute()
+        )
+        jp_map = {jp["id"]: jp for jp in (jp_res.data or [])}
+
+    cands = await _fetch_candidates(
+        client, start_date, end_date, recruiter_id,
+        columns="id,status,request_id,created_at,created_by_id",
+    )
+    return service.build_daily_status_matrix(reqs, cands, jp_map)
 
 
 @router.get("/pipeline/funnel", response_model=PipelineFunnel)

@@ -100,3 +100,18 @@ class RequirementTrackerStage(BaseModel):
 
 class RequirementTracker(BaseModel):
     stages: list[RequirementTrackerStage]
+
+
+# ── Daily Status Matrix ────────────────────────────────────────────────────────
+
+class DailyStatusMatrixRow(BaseModel):
+    job_profile_id: int
+    job_profile_name: str
+    total_requirements: int
+    by_stage: dict[str, int]
+    # Columns: Screening, L1, L2, Selected, Open (unassigned)
+
+
+class DailyStatusMatrix(BaseModel):
+    rows: list[DailyStatusMatrixRow]
+    stage_names: list[str]  # ordered column headers

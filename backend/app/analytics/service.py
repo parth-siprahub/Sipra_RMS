@@ -13,6 +13,8 @@ from app.analytics.schemas import (
     RequirementTrackerStage,
     RequirementTracker,
     LabelValue,
+    DailyStatusMatrixRow,
+    DailyStatusMatrix,
 )
 
 # ── Pipeline stage mapping ────────────────────────────────────────────────────
@@ -263,3 +265,90 @@ def build_payroll_segregation(candidates: list[dict]) -> list[LabelValue]:
         LabelValue(label=k, value=v)
         for k, v in sorted(buckets.items(), key=lambda x: -x[1])
     ]
+
+
+# ── Daily Status Matrix ───────────────────────────────────────────────────────
+
+_MATRIX_STAGE_MAP: dict[str, str] = {
+    "SCREENING": "Screening",
+    "SUBMITTED_TO_ADMIN": "Screening",
+    "WITH_ADMIN": "Screening",
+    "SCREEN_REJECT": "Screening",
+    "L1_SCHEDULED": "L1",
+    "L1_COMPLETED": "L1",
+    "L1_SHORTLIST": "L1",
+    "L1_REJECT": "L1",
+    "L2_INTERVIEW": "L2",
+    "INTERVIEW_SCHEDULED": "L2",
+    "WITH_CLIENT": "L2",
+    "REJECTED_BY_CLIENT": "L2",
+    "REJECTED_BY_ADMIN": "L2",
+    "INTERVIEW_BACK_OUT": "L2",
+    "SELECTED": "Selected",
+    "ON_HOLD": "Selected",
+    "OFFER_BACK_OUT": "Selected",
+    "OFFERED": "Selected",
+    "ONBOARDED": "Selected",
+    "EXIT": "Selected",
+}
+
+_MATRIX_STAGE_ORDER = ["Open", "Screening", "L1", "L2", "Selected"]
+
+
+def build_daily_status_matrix(
+    resource_requests: list[dict],
+    candidates: list[dict],
+    job_profile_map: dict[int, dict],
+) -> DailyStatusMatrix:
+    """Group open resource requests by job profile and count candidates per pipeline stage."""
+    # Group candidates by request_id
+    cands_by_req: dict[int, list[str]] = {}
+    for c in candidates:
+        req_id = c.get("request_id")
+        if req_id is not None:
+            cands_by_req.setdefault(int(req_id), []).append(
+                (c.get("status") or "").upper()
+            )
+
+    # Aggregate by job_profile_id
+    profile_data: dict[int, dict] = {}
+    for req in resource_requests:
+        jp_id = req.get("job_profile_id")
+        if jp_id is None:
+            continue
+        jp_id = int(jp_id)
+        if jp_id not in profile_data:
+            jp = job_profile_map.get(jp_id, {})
+            profile_data[jp_id] = {
+                "job_profile_id": jp_id,
+                "job_profile_name": jp.get("role_name") or f"Profile #{jp_id}",
+                "total_requirements": 0,
+                "by_stage": {s: 0 for s in _MATRIX_STAGE_ORDER},
+            }
+        profile_data[jp_id]["total_requirements"] += 1
+
+        req_id = int(req["id"])
+        statuses = cands_by_req.get(req_id, [])
+        if not statuses:
+            profile_data[jp_id]["by_stage"]["Open"] += 1
+        else:
+            # Find furthest stage for this request
+            furthest = "Open"
+            furthest_idx = 0
+            for s in statuses:
+                stage = _MATRIX_STAGE_MAP.get(s)
+                if stage and _MATRIX_STAGE_ORDER.index(stage) > furthest_idx:
+                    furthest_idx = _MATRIX_STAGE_ORDER.index(stage)
+                    furthest = stage
+            profile_data[jp_id]["by_stage"][furthest] += 1
+
+    rows = [
+        DailyStatusMatrixRow(
+            job_profile_id=d["job_profile_id"],
+            job_profile_name=d["job_profile_name"],
+            total_requirements=d["total_requirements"],
+            by_stage=d["by_stage"],
+        )
+        for d in sorted(profile_data.values(), key=lambda x: -x["total_requirements"])
+    ]
+    return DailyStatusMatrix(rows=rows, stage_names=_MATRIX_STAGE_ORDER)

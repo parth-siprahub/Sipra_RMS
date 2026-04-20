@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { AlertCircle, Download, RotateCcw } from 'lucide-react';
 import { analyticsApi } from '../../api/analytics';
-import type { ResourcesOverview, LabelValue, PipelineFunnel, PivotRow } from '../../api/analytics';
+import type { ResourcesOverview, LabelValue, PipelineFunnel, PivotRow, DailyStatusMatrix } from '../../api/analytics';
 import { useAnalyticsFilters } from '../../context/AnalyticsContext';
 import { useAuth, isAdminRole } from '../../context/AuthContext';
 import * as XLSX from 'xlsx';
@@ -611,6 +611,73 @@ function AnalyticsFunnel({ params }: { params: Record<string, string> }) {
     );
 }
 
+// ─── Daily Status Matrix ───────────────────────────────────────────────────────
+
+function DailyStatusMatrixSection({ params }: { params: Record<string, string> }) {
+    const [data, setData] = useState<DailyStatusMatrix | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        setLoading(true);
+        setError(false);
+        analyticsApi.getDailyStatusMatrix(params)
+            .then(d => { if (!cancelled) setData(d); })
+            .catch(() => { if (!cancelled) setError(true); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [params]);
+
+    const stages = data?.stage_names ?? ['Open', 'Screening', 'L1', 'L2', 'Selected'];
+
+    return (
+        <div className="card">
+            <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cta" />
+                Daily Status Matrix
+                <span className="text-xs text-text-muted font-normal ml-1">(job profiles × pipeline)</span>
+            </h3>
+            {loading ? <SectionSpinner /> : error ? <SectionError /> : !data?.rows.length ? (
+                <div className="flex items-center justify-center h-24 text-text-muted text-xs">
+                    No data for selected filters
+                </div>
+            ) : (
+                <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-xs min-w-[500px]">
+                        <thead className="sticky top-0 bg-surface z-10">
+                            <tr className="border-b border-border text-text-muted">
+                                <th className="text-left py-2 pr-4 font-semibold whitespace-nowrap">Job Profile</th>
+                                <th className="text-right py-2 pr-4 font-semibold">Total Req</th>
+                                {stages.map(s => (
+                                    <th key={s} className="text-right py-2 pr-4 font-semibold whitespace-nowrap">{s}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.rows.map(row => (
+                                <tr key={row.job_profile_id} className="border-b border-border/40 hover:bg-surface-hover transition-colors">
+                                    <td className="py-1.5 pr-4 font-medium text-text truncate max-w-[200px]">
+                                        {row.job_profile_name}
+                                    </td>
+                                    <td className="py-1.5 pr-4 text-right font-bold text-text tabular-nums">
+                                        {row.total_requirements}
+                                    </td>
+                                    {stages.map(s => (
+                                        <td key={s} className="py-1.5 pr-4 text-right tabular-nums text-text-muted">
+                                            {row.by_stage[s] ?? 0}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ─── Pivot Export ─────────────────────────────────────────────────────────────
 
 function PivotExport({ params }: { params: Record<string, string> }) {
@@ -774,6 +841,9 @@ export function DashboardAnalytics() {
 
             {/* Row 3: Pipeline Funnel */}
             <AnalyticsFunnel params={appliedParams} />
+
+            {/* Row: Daily Status Matrix */}
+            <DailyStatusMatrixSection params={appliedParams} />
 
             {/* Row 4: Data Export */}
             <PivotExport params={appliedParams} />

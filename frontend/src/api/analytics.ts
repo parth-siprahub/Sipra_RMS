@@ -49,6 +49,18 @@ export interface PivotRow {
   created_at: string | null;
 }
 
+export interface DailyStatusMatrixRow {
+  job_profile_id: number;
+  job_profile_name: string;
+  total_requirements: number;
+  by_stage: Record<string, number>;
+}
+
+export interface DailyStatusMatrix {
+  rows: DailyStatusMatrixRow[];
+  stage_names: string[];
+}
+
 type Params = Record<string, string>;
 
 export const analyticsApi = {
@@ -87,6 +99,9 @@ export const analyticsApi = {
         '/analytics/resources/payroll',
         params,
     ),
+
+  getDailyStatusMatrix: (params: Params = {}) =>
+    apiClient.get<DailyStatusMatrix>('/analytics/pipeline/daily-status-matrix', params),
 
   listRecruiters: (): Promise<Array<{ id: string; full_name: string }>> =>
     apiClient.get('/users/recruiters'),
