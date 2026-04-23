@@ -1,6 +1,6 @@
 """RMS-107 — Search injection guard tests for candidates router."""
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 
 from app.main import app
@@ -20,7 +20,24 @@ async def authed_client():
     app.dependency_overrides.clear()
 
 
-MOCK_EMPTY = AsyncMock(return_value=AsyncMock(data=[]))
+def _make_mock_db():
+    """Supabase query builder is synchronous except for execute()."""
+    mock_query = MagicMock()
+    mock_query.select.return_value = mock_query
+    mock_query.eq.return_value = mock_query
+    mock_query.neq.return_value = mock_query
+    mock_query.or_.return_value = mock_query
+    mock_query.order.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.in_.return_value = mock_query
+    mock_query.not_ = mock_query
+    result = MagicMock()
+    result.data = []
+    result.count = 0
+    mock_query.execute = AsyncMock(return_value=result)
+    mock_client = MagicMock()
+    mock_client.table.return_value = mock_query
+    return mock_client
 
 
 @pytest.mark.asyncio
@@ -32,7 +49,12 @@ MOCK_EMPTY = AsyncMock(return_value=AsyncMock(data=[]))
     "name\x00inject",
 ])
 async def test_candidates_search_rejects_invalid_chars(authed_client, bad_input):
-    with patch("app.database.get_supabase_admin_async", return_value=AsyncMock()):
+    mock_client = _make_mock_db()
+
+    async def _get_client():
+        return mock_client
+
+    with patch("app.candidates.router.get_supabase_admin_async", new=_get_client):
         resp = await authed_client.get("/api/candidates/", params={"search": bad_input})
     assert resp.status_code == 400
     assert "Invalid characters" in resp.text
@@ -47,16 +69,11 @@ async def test_candidates_search_rejects_invalid_chars(authed_client, bad_input)
     "99876",
 ])
 async def test_candidates_search_accepts_valid_input(authed_client, good_input):
-    mock_client = AsyncMock()
-    mock_query = AsyncMock()
-    mock_query.select.return_value = mock_query
-    mock_query.eq.return_value = mock_query
-    mock_query.or_.return_value = mock_query
-    mock_query.order.return_value = mock_query
-    mock_query.range.return_value = mock_query
-    mock_query.execute = AsyncMock(return_value=AsyncMock(data=[]))
-    mock_client.table.return_value = mock_query
+    mock_client = _make_mock_db()
 
-    with patch("app.database.get_supabase_admin_async", return_value=mock_client):
+    async def _get_client():
+        return mock_client
+
+    with patch("app.candidates.router.get_supabase_admin_async", new=_get_client):
         resp = await authed_client.get("/api/candidates/", params={"search": good_input})
     assert resp.status_code == 200

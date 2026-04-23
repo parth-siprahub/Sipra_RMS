@@ -240,21 +240,45 @@ def build_requirement_tracker(
     resource_requests: list[dict],
     candidates: list[dict],
 ) -> RequirementTracker:
-    """Count active candidates in the pipeline by stage.
+    """Count OPEN resource_requests bucketed by their furthest candidate stage.
 
-    Each candidate is bucketed into exactly one tracker stage based on their
-    current status.  Unmapped statuses (e.g. bare 'NEW') fall into the 'NEW'
-    bucket.  resource_requests is kept in the signature for backward
-    compatibility with the router but is no longer used for counting.
+    Each OPEN request is counted exactly once:
+    - No linked candidates → NEW
+    - Has candidates → bucket of the furthest-stage candidate
+    CLOSED/non-OPEN requests are excluded.
     """
     counts: dict[str, int] = {stage: 0 for stage in _TRACKER_ORDER}
 
+    # Build a lookup: request_id → list of candidate statuses
+    req_candidates: dict = {}
     for c in candidates:
-        status = (c.get("status") or "").upper()
-        stage = _STATUS_TO_TRACKER_STAGE.get(status, "NEW")
-        if stage not in counts:
-            stage = "NEW"
-        counts[stage] += 1
+        rid = c.get("resource_request_id") or c.get("request_id")
+        if rid:
+            req_candidates.setdefault(rid, []).append(
+                (c.get("status") or "").upper()
+            )
+
+    for req in resource_requests:
+        if (req.get("status") or "").upper() != "OPEN":
+            continue
+        rid = req.get("id")
+        statuses = req_candidates.get(rid, [])
+        if not statuses:
+            counts["NEW"] += 1
+            continue
+        # Find the furthest stage for this request
+        stage_priority = {s: i for i, s in enumerate(_TRACKER_ORDER)}
+        best_stage = "NEW"
+        best_priority = -1
+        for status in statuses:
+            stage = _STATUS_TO_TRACKER_STAGE.get(status, "NEW")
+            if stage not in stage_priority:
+                stage = "NEW"
+            p = stage_priority[stage]
+            if p > best_priority:
+                best_priority = p
+                best_stage = stage
+        counts[best_stage] += 1
 
     return RequirementTracker(stages=[
         RequirementTrackerStage(

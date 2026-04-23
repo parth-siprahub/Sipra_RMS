@@ -45,6 +45,9 @@ def _scope_recruiter_id(
     return requested_recruiter_id
 
 
+_INACTIVE_STATUSES = ("ONBOARDED", "EXIT")
+
+
 async def _fetch_candidates(
     client,
     start_date: str | None,
@@ -52,8 +55,45 @@ async def _fetch_candidates(
     recruiter_id: str | None,
     columns: str = "id,first_name,last_name,status,source,skills,vendor,request_id,created_at",
 ) -> list[dict]:
+    """Fetch active-pipeline candidates only (excludes ONBOARDED / EXIT).
+
+    Used for pipeline-specific views (funnel, requirement tracker).
+    For employee-based analytics, use _fetch_active_employee_candidates instead.
+    """
     q = client.table("candidates").select(columns)
     q = _date_filters(q, start_date, end_date)
+    if recruiter_id:
+        q = q.eq("owner_id", recruiter_id)
+    # Exclude terminal statuses — those candidates are placed employees, not pipeline
+    q = q.not_.in_("status", list(_INACTIVE_STATUSES))
+    res = await q.range(0, 9999).execute()
+    return res.data or []
+
+
+async def _fetch_active_employee_candidates(
+    client,
+    recruiter_id: str | None,
+    columns: str = "id,first_name,last_name,status,source,skills,vendor,request_id,created_at",
+) -> list[dict]:
+    """Fetch candidates linked to ACTIVE employees — mirrors the Employees page count.
+
+    Starts from employees WHERE status='ACTIVE', resolves candidate_id, then
+    fetches those candidate records.  This is the correct base for analytics
+    charts that should reflect placed headcount (Role Distribution, Source Channel).
+    Date filters are intentionally not applied — we want the current active headcount.
+    """
+    emp_res = await (
+        client.table("employees")
+        .select("id,candidate_id")
+        .eq("status", "ACTIVE")
+        .range(0, 9999)
+        .execute()
+    )
+    employees = emp_res.data or []
+    candidate_ids = [e["candidate_id"] for e in employees if e.get("candidate_id")]
+    if not candidate_ids:
+        return []
+    q = client.table("candidates").select(columns).in_("id", candidate_ids)
     if recruiter_id:
         q = q.eq("owner_id", recruiter_id)
     res = await q.range(0, 9999).execute()
@@ -65,7 +105,25 @@ async def _fetch_resource_requests(
     start_date: str | None,
     end_date: str | None,
 ) -> list[dict]:
-    """Fetch resource_requests with optional date filter."""
+    """Fetch OPEN resource_requests only (active demand), with optional date filter."""
+    q = client.table("resource_requests").select(
+        "id,status,job_profile_id,created_at"
+    ).eq("status", "OPEN")
+    q = _date_filters(q, start_date, end_date)
+    res = await q.range(0, 9999).execute()
+    return res.data or []
+
+
+async def _fetch_all_resource_requests(
+    client,
+    start_date: str | None,
+    end_date: str | None,
+) -> list[dict]:
+    """Fetch ALL resource_requests regardless of status, with optional date filter.
+
+    Used for the Daily Status Matrix which should reflect the full picture
+    of where active employees were placed.
+    """
     q = client.table("resource_requests").select(
         "id,status,job_profile_id,created_at"
     )
@@ -83,14 +141,54 @@ async def get_resources_skills(
     recruiter_id: str | None = Query(None),
     current_user: dict = Depends(get_current_user),
 ):
-    """Total resources + skill distribution for doughnut chart."""
+    """Candidates total + role distribution (grouped by job_profiles.role_name)."""
     recruiter_id = _scope_recruiter_id(recruiter_id, current_user)
     client = await get_supabase_admin_async()
-    candidates = await _fetch_candidates(
-        client, start_date, end_date, recruiter_id,
-        columns="id,skills,created_at,owner_id",
+
+    # Base on ACTIVE employees — mirrors what the Employees page shows
+    candidates = await _fetch_active_employee_candidates(
+        client, recruiter_id,
+        columns="id,request_id,created_at",
     )
-    return service.build_resources_overview(candidates)
+
+    # Build role distribution: candidate → request → job_profile → role_name
+    req_to_jp: dict[int, int] = {}
+    jp_name_map: dict[int, str] = {}
+
+    request_ids = list({c["request_id"] for c in candidates if c.get("request_id")})
+    if request_ids:
+        rr_res = await (
+            client.table("resource_requests")
+            .select("id,job_profile_id")
+            .in_("id", request_ids)
+            .execute()
+        )
+        req_to_jp = {
+            r["id"]: r["job_profile_id"]
+            for r in (rr_res.data or []) if r.get("job_profile_id")
+        }
+        jp_ids = list(set(req_to_jp.values()))
+        if jp_ids:
+            jp_res = await (
+                client.table("job_profiles")
+                .select("id,role_name")
+                .in_("id", jp_ids)
+                .execute()
+            )
+            jp_name_map = {
+                jp["id"]: (jp.get("role_name") or f"Profile #{jp['id']}")
+                for jp in (jp_res.data or [])
+            }
+
+    # Count ALL candidates (including those without a linked request → "Unassigned")
+    role_counts: dict[str, int] = {}
+    for c in candidates:
+        rid = c.get("request_id")
+        jp_id = req_to_jp.get(int(rid)) if rid else None
+        role = jp_name_map.get(jp_id, "Unassigned") if jp_id else "Unassigned"
+        role_counts[role] = role_counts.get(role, 0) + 1
+
+    return service.build_resources_overview(candidates, role_counts if role_counts else None)
 
 
 # ── Talent Acquisition ────────────────────────────────────────────────────────
@@ -102,14 +200,21 @@ async def get_hiring_type(
     recruiter_id: str | None = Query(None),
     current_user: dict = Depends(get_current_user),
 ):
-    """Pie chart: candidates grouped by source (hiring channel)."""
+    """Bar chart: active employees grouped by hiring source/channel."""
     recruiter_id = _scope_recruiter_id(recruiter_id, current_user)
     client = await get_supabase_admin_async()
-    candidates = await _fetch_candidates(
-        client, start_date, end_date, recruiter_id,
-        columns="id,source,created_at,owner_id",
+    # Base on ACTIVE employees so it matches the 147 headcount
+    candidates = await _fetch_active_employee_candidates(
+        client, recruiter_id,
+        columns="id,source,vendor",
     )
-    result = service.build_hiring_type(candidates)
+    # Build case-insensitive vendor name lookup for source normalisation
+    # e.g. "Anten" → "ANTEN", "WRS" → "WRS"
+    vendors_res = await client.table("vendors").select("name").execute()
+    vendor_name_map: dict[str, str] = {
+        v["name"].upper(): v["name"] for v in (vendors_res.data or [])
+    }
+    result = service.build_hiring_type(candidates, vendor_name_map)
     return [r.model_dump() for r in result]
 
 
@@ -125,24 +230,24 @@ async def get_client_demand(
     client = await get_supabase_admin_async()
 
     # Fetch open resource requests
-    q = client.table("resource_requests").select("id,job_profile_id,status,created_at")
+    q = client.table("resource_requests").select("id,sow_id,status,created_at")
     q = _date_filters(q, start_date, end_date)
     requests_res = await q.range(0, 9999).execute()
     requests = requests_res.data or []
 
-    # Fetch job profiles for client names
-    jp_ids = list({r["job_profile_id"] for r in requests if r.get("job_profile_id")})
-    jp_map: dict[int, dict] = {}
-    if jp_ids:
-        jp_res = await (
-            client.table("job_profiles")
+    # Fetch sows for client names
+    sow_ids = list({r["sow_id"] for r in requests if r.get("sow_id")})
+    sow_map: dict[str, dict] = {}
+    if sow_ids:
+        sow_res = await (
+            client.table("sows")
             .select("id,client_name")
-            .in_("id", jp_ids)
+            .in_("id", sow_ids)
             .execute()
         )
-        jp_map = {jp["id"]: jp for jp in (jp_res.data or [])}
+        sow_map = {str(s["id"]): s for s in (sow_res.data or [])}
 
-    result = service.build_client_demand(requests, jp_map)
+    result = service.build_client_demand(requests, sow_map)
     return [r.model_dump() for r in result]
 
 
@@ -171,14 +276,11 @@ async def get_payroll_segregation(
     recruiter_id: str | None = Query(None),
     current_user: dict = Depends(get_current_user),
 ):
-    """Doughnut chart: candidate distribution by payroll/vendor association."""
-    recruiter_id = _scope_recruiter_id(recruiter_id, current_user)
+    """Doughnut chart: employee distribution by payroll source (mirrors Employees page)."""
     client = await get_supabase_admin_async()
-    candidates = await _fetch_candidates(
-        client, start_date, end_date, recruiter_id,
-        columns="id,vendor,created_at,owner_id",
-    )
-    result = service.build_payroll_segregation(candidates)
+    emp_res = await client.table("employees").select("id,source").eq("status", "ACTIVE").range(0, 9999).execute()
+    employees = emp_res.data or []
+    result = service.build_payroll_segregation(employees)
     return [r.model_dump() for r in result]
 
 
@@ -188,14 +290,49 @@ async def get_hiring_type_split(
     end_date: str | None = Query(None, description="YYYY-MM-DD"),
     current_user: dict = Depends(get_current_user),
 ):
-    """Pie chart: New vs Backfill resource requests."""
+    """Pie chart: New vs Backfill — per active employee (147 total).
+
+    Each active employee is classified based on whether their placement
+    resource request had is_backfill=True.  Total always equals the active
+    employee headcount, not the number of resource requests.
+    """
     client = await get_supabase_admin_async()
-    q = client.table("resource_requests").select("id,is_backfill,created_at")
-    q = _date_filters(q, start_date, end_date)
-    res = await q.range(0, 9999).execute()
-    reqs = res.data or []
-    result = service.build_hiring_type_split(reqs)
-    return [r.model_dump() for r in result]
+
+    # Get active employees' candidates (need request_id to look up is_backfill)
+    emp_candidates = await _fetch_active_employee_candidates(
+        client, recruiter_id=None,
+        columns="id,request_id",
+    )
+
+    # Resolve is_backfill for each unique request_id
+    req_backfill_map: dict[int, bool] = {}
+    request_ids = list({c["request_id"] for c in emp_candidates if c.get("request_id")})
+    if request_ids:
+        rr_res = await (
+            client.table("resource_requests")
+            .select("id,is_backfill")
+            .in_("id", request_ids)
+            .execute()
+        )
+        req_backfill_map = {
+            r["id"]: bool(r.get("is_backfill"))
+            for r in (rr_res.data or [])
+        }
+
+    # Classify each employee as New or Backfill
+    new_count = 0
+    backfill_count = 0
+    for c in emp_candidates:
+        rid = c.get("request_id")
+        if rid and req_backfill_map.get(int(rid)):
+            backfill_count += 1
+        else:
+            new_count += 1
+
+    return [
+        LabelValue(label="New", value=new_count).model_dump(),
+        LabelValue(label="Backfill", value=backfill_count).model_dump(),
+    ]
 
 
 @router.get("/ta/daily-status", response_model=PaginatedTable)
@@ -268,11 +405,12 @@ async def get_daily_status_matrix(
     recruiter_id: str | None = Query(None),
     current_user: dict = Depends(get_current_user),
 ):
-    """Matrix: job profiles × candidate pipeline stage counts."""
+    """Matrix: job profiles × placed-employee stage counts."""
     recruiter_id = _scope_recruiter_id(recruiter_id, current_user)
     client = await get_supabase_admin_async()
 
-    reqs = await _fetch_resource_requests(client, start_date, end_date)
+    # Use ALL resource requests (not just OPEN) so placed employees show up
+    reqs = await _fetch_all_resource_requests(client, start_date, end_date)
 
     # Fetch job profiles for the requests
     jp_ids = list({r["job_profile_id"] for r in reqs if r.get("job_profile_id")})
@@ -286,9 +424,10 @@ async def get_daily_status_matrix(
         )
         jp_map = {jp["id"]: jp for jp in (jp_res.data or [])}
 
-    cands = await _fetch_candidates(
-        client, start_date, end_date, recruiter_id,
-        columns="id,status,request_id,created_at,owner_id",
+    # Use active employee candidates so rows reflect the current headcount
+    cands = await _fetch_active_employee_candidates(
+        client, recruiter_id,
+        columns="id,status,request_id",
     )
     return service.build_daily_status_matrix(reqs, cands, jp_map)
 
@@ -334,29 +473,29 @@ async def get_pivot_data(
         client, start_date, end_date, recruiter_id,
     )
 
-    # Collect unique request IDs and job profile IDs
+    # Collect unique request IDs
     request_ids = list({c["request_id"] for c in candidates if c.get("request_id")})
     request_map: dict[int, dict] = {}
-    jp_map: dict[int, dict] = {}
+    sow_map: dict[str, dict] = {}
 
     if request_ids:
         rr_res = await (
             client.table("resource_requests")
-            .select("id,job_profile_id,priority,status")
+            .select("id,sow_id,priority,status")
             .in_("id", request_ids)
             .execute()
         )
         request_map = {r["id"]: r for r in (rr_res.data or [])}
 
-        jp_ids = list({r["job_profile_id"] for r in request_map.values() if r.get("job_profile_id")})
-        if jp_ids:
-            jp_res = await (
-                client.table("job_profiles")
+        sow_ids = list({r["sow_id"] for r in request_map.values() if r.get("sow_id")})
+        if sow_ids:
+            sow_res = await (
+                client.table("sows")
                 .select("id,client_name")
-                .in_("id", jp_ids)
+                .in_("id", sow_ids)
                 .execute()
             )
-            jp_map = {jp["id"]: jp for jp in (jp_res.data or [])}
+            sow_map = {str(s["id"]): s for s in (sow_res.data or [])}
 
-    rows = service.build_pivot_rows(candidates, request_map, jp_map)
+    rows = service.build_pivot_rows(candidates, request_map, sow_map)
     return [r.model_dump() for r in rows]

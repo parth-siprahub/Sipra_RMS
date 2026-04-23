@@ -22,16 +22,13 @@ def test_recruiter_cannot_spoof_recruiter_id(as_recruiter_a, monkeypatch):
     """When recruiter A passes ?recruiter_id=B, the handler must coerce it back to A."""
     captured = {}
 
-    # Patch _fetch_candidates to capture the recruiter_id it receives
-    # The real signature is: async def _fetch_candidates(client, start_date, end_date, recruiter_id, columns=...)
-    # We patch it to capture recruiter_id (4th positional arg, or keyword)
     import app.analytics.router as analytics_router_module
 
-    async def fake_fetch(client, start_date, end_date, recruiter_id=None, columns=None):
+    async def fake_fetch(client, recruiter_id=None, columns=None):
         captured["recruiter_id"] = recruiter_id
         return []
 
-    monkeypatch.setattr(analytics_router_module, "_fetch_candidates", fake_fetch)
+    monkeypatch.setattr(analytics_router_module, "_fetch_active_employee_candidates", fake_fetch)
 
     client = TestClient(app)
     resp = client.get(
@@ -54,11 +51,11 @@ def test_admin_recruiter_id_passes_through(monkeypatch):
 
     import app.analytics.router as analytics_router_module
 
-    async def fake_fetch(client, start_date, end_date, recruiter_id=None, columns=None):
+    async def fake_fetch(client, recruiter_id=None, columns=None):
         captured["recruiter_id"] = recruiter_id
         return []
 
-    monkeypatch.setattr(analytics_router_module, "_fetch_candidates", fake_fetch)
+    monkeypatch.setattr(analytics_router_module, "_fetch_active_employee_candidates", fake_fetch)
 
     client = TestClient(app)
     resp = client.get(f"/api/analytics/resources/skills?recruiter_id={RECRUITER_B_ID}")
