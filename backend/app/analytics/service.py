@@ -48,12 +48,28 @@ def _drop_off(prev: int, curr: int) -> float | None:
 
 # ── Aggregation functions ─────────────────────────────────────────────────────
 
-def build_resources_overview(candidates: list[dict]) -> ResourcesOverview:
+def build_resources_overview(
+    candidates: list[dict],
+    role_counts: dict[str, int] | None = None,
+) -> ResourcesOverview:
+    """Build resources overview.
+
+    When role_counts is provided (keyed by job_profile role_name), the chart
+    shows candidates grouped by the role they were requested for.
+    Falls back to skill-tag distribution when role data is unavailable.
+    """
+    if role_counts is not None:
+        skills = [
+            SkillDistribution(label=k, value=v)
+            for k, v in sorted(role_counts.items(), key=lambda x: -x[1])
+        ]
+        return ResourcesOverview(total_resources=len(candidates), skills=skills)
+
+    # Fallback: skill-tag distribution
     skill_counts: dict[str, int] = defaultdict(int)
     for c in candidates:
         for skill in _split_skills(c.get("skills")):
             skill_counts[skill] += 1
-
     skills = [
         SkillDistribution(label=k, value=v)
         for k, v in sorted(skill_counts.items(), key=lambda x: -x[1])
@@ -61,21 +77,40 @@ def build_resources_overview(candidates: list[dict]) -> ResourcesOverview:
     return ResourcesOverview(total_resources=len(candidates), skills=skills)
 
 
-def build_hiring_type(candidates: list[dict]) -> list[HiringTypeItem]:
+def build_hiring_type(
+    candidates: list[dict],
+    vendor_name_map: dict[str, str] | None = None,
+) -> list[HiringTypeItem]:
+    """Group candidates by hiring source/channel.
+
+    Resolution order:
+    1. vendor enum field (WRS / GFM / ANTEN) — authoritative when set
+    2. source field — normalised against vendor_name_map (case-insensitive)
+       so "Anten" → "ANTEN", "SipraHub" → "SipraHub", etc.
+    3. "Internal" fallback
+    """
     counts: dict[str, int] = defaultdict(int)
     for c in candidates:
-        label = (c.get("source") or "Unknown").strip()
+        vendor = (c.get("vendor") or "").strip()
+        source = (c.get("source") or "").strip()
+        if vendor and vendor.upper() != "INTERNAL":
+            label = vendor
+        elif source and source.upper() not in ("", "INTERNAL"):
+            # Normalise against vendors table canonical names when available
+            label = (vendor_name_map or {}).get(source.upper(), source)
+        else:
+            label = "Internal"
         counts[label] += 1
     return [HiringTypeItem(label=k, value=v) for k, v in sorted(counts.items(), key=lambda x: -x[1])]
 
 
-def build_client_demand(requests: list[dict], job_profiles: dict[int, dict]) -> list[ClientDemandItem]:
+def build_client_demand(requests: list[dict], sow_map: dict[str, dict]) -> list[ClientDemandItem]:
     """Count open resource requests per client."""
     counts: dict[str, int] = defaultdict(int)
     for req in requests:
-        jp_id = req.get("job_profile_id")
-        jp = job_profiles.get(jp_id) if jp_id else None
-        client = (jp.get("client_name") if jp else None) or "Unknown"
+        sow_id = req.get("sow_id")
+        sow = sow_map.get(str(sow_id)) if sow_id else None
+        client = (sow.get("client_name") if sow else None) or "Unknown"
         counts[client] += 1
     return [ClientDemandItem(label=k, value=v) for k, v in sorted(counts.items(), key=lambda x: -x[1])]
 
@@ -134,14 +169,14 @@ def build_pipeline_funnel(candidates: list[dict], total_requests: int) -> Pipeli
 def build_pivot_rows(
     candidates: list[dict],
     request_map: dict[int, dict],
-    job_profile_map: dict[int, dict],
+    sow_map: dict[str, dict],
 ) -> list[PivotRow]:
     rows = []
     for c in candidates:
         name = f"{c.get('first_name', '')} {c.get('last_name', '')}".strip()
         req = request_map.get(c.get("request_id")) if c.get("request_id") else None
-        jp_id = req.get("job_profile_id") if req else None
-        jp = job_profile_map.get(jp_id) if jp_id else None
+        sow_id = req.get("sow_id") if req else None
+        sow = sow_map.get(str(sow_id)) if sow_id else None
         created = c.get("created_at")
         rows.append(PivotRow(
             candidate_id=c["id"],
@@ -150,7 +185,7 @@ def build_pivot_rows(
             source=c.get("source"),
             skills=c.get("skills"),
             vendor=c.get("vendor"),
-            client_name=jp.get("client_name") if jp else None,
+            client_name=sow.get("client_name") if sow else None,
             request_priority=req.get("priority") if req else None,
             created_at=str(created)[:10] if created else None,
         ))
@@ -161,7 +196,7 @@ def build_pivot_rows(
 
 _TRACKER_ORDER = ["NEW", "SCREENING", "L1", "L2", "WITH_CLIENT", "CLOSING"]
 _TRACKER_LABELS = {
-    "NEW": "New Requests",
+    "NEW": "New",
     "SCREENING": "Screening",
     "L1": "L1 Interview",
     "L2": "L2 Interview",
@@ -169,25 +204,35 @@ _TRACKER_LABELS = {
     "CLOSING": "Closing",
 }
 _STATUS_TO_TRACKER_STAGE: dict[str, str] = {
+    # Screening stage
     "SCREENING": "SCREENING",
     "SUBMITTED_TO_ADMIN": "SCREENING",
     "WITH_ADMIN": "SCREENING",
+    "SCREEN_REJECT": "SCREENING",
+    # L1 stage
     "L1": "L1",
     "L1_INTERVIEW": "L1",
     "L1_SCHEDULED": "L1",
     "L1_COMPLETED": "L1",
     "L1_SHORTLIST": "L1",
+    "L1_REJECT": "L1",
+    # L2 stage
     "L2": "L2",
     "L2_INTERVIEW": "L2",
     "INTERVIEW_SCHEDULED": "L2",
+    "INTERVIEW_BACK_OUT": "L2",
+    # With client stage
     "WITH_CLIENT": "WITH_CLIENT",
     "CLIENT_INTERVIEW": "WITH_CLIENT",
     "REJECTED_BY_ADMIN": "WITH_CLIENT",
     "REJECTED_BY_CLIENT": "WITH_CLIENT",
+    # Closing stage
     "SELECTED": "CLOSING",
     "OFFERED": "CLOSING",
     "ON_HOLD": "CLOSING",
+    "OFFER_BACK_OUT": "CLOSING",
     "ONBOARDED": "CLOSING",
+    "EXIT": "CLOSING",
 }
 
 
@@ -195,33 +240,21 @@ def build_requirement_tracker(
     resource_requests: list[dict],
     candidates: list[dict],
 ) -> RequirementTracker:
-    """Count open resource requests by furthest candidate stage."""
-    open_reqs = [
-        r for r in resource_requests
-        if (r.get("status") or "").upper() in ("OPEN", "IN_PROGRESS", "ACTIVE")
-    ]
+    """Count active candidates in the pipeline by stage.
 
-    # Group candidate statuses by resource_request_id
-    by_req: dict[str, list[str]] = {}
-    for c in candidates:
-        rid = c.get("resource_request_id") or c.get("request_id")
-        if rid is not None:
-            by_req.setdefault(str(rid), []).append((c.get("status") or "").upper())
-
+    Each candidate is bucketed into exactly one tracker stage based on their
+    current status.  Unmapped statuses (e.g. bare 'NEW') fall into the 'NEW'
+    bucket.  resource_requests is kept in the signature for backward
+    compatibility with the router but is no longer used for counting.
+    """
     counts: dict[str, int] = {stage: 0 for stage in _TRACKER_ORDER}
-    for req in open_reqs:
-        statuses = by_req.get(str(req["id"]), [])
-        if not statuses:
-            counts["NEW"] += 1
-            continue
-        furthest_idx = 0
-        for s in statuses:
-            mapped = _STATUS_TO_TRACKER_STAGE.get(s)
-            if mapped:
-                idx = _TRACKER_ORDER.index(mapped)
-                if idx > furthest_idx:
-                    furthest_idx = idx
-        counts[_TRACKER_ORDER[furthest_idx]] += 1
+
+    for c in candidates:
+        status = (c.get("status") or "").upper()
+        stage = _STATUS_TO_TRACKER_STAGE.get(status, "NEW")
+        if stage not in counts:
+            stage = "NEW"
+        counts[stage] += 1
 
     return RequirementTracker(stages=[
         RequirementTrackerStage(
@@ -247,15 +280,15 @@ def build_hiring_type_split(resource_requests: list[dict]) -> list[LabelValue]:
 
 # ── Payroll Segregation ───────────────────────────────────────────────────────
 
-def build_payroll_segregation(candidates: list[dict]) -> list[LabelValue]:
-    """Group candidates by vendor/payroll association.
+def build_payroll_segregation(employees: list[dict]) -> list[LabelValue]:
+    """Group employees by payroll source — mirrors the Payroll column on the
+    Employees page.
 
-    Null, empty, or 'INTERNAL' vendor → 'Internal'.
-    Specific vendor name → keep as-is.
+    Reads employees.source.  Null / empty / 'INTERNAL' → 'Internal'.
     """
     buckets: dict[str, int] = {}
-    for c in candidates:
-        raw = (c.get("vendor") or "").strip()
+    for e in employees:
+        raw = (e.get("source") or "").strip()
         if not raw or raw.upper() == "INTERNAL":
             label = "Internal"
         else:

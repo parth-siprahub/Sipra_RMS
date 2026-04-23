@@ -1,21 +1,21 @@
-"""build_payroll_segregation: candidates grouped by vendor (payroll source)."""
+"""build_payroll_segregation: employees grouped by payroll source."""
 from app.analytics.service import build_payroll_segregation
 
 
-def test_groups_by_vendor():
-    cands = [
-        {"vendor": None},
-        {"vendor": ""},
-        {"vendor": "INTERNAL"},
-        {"vendor": "Acme Corp"},
-        {"vendor": "Acme Corp"},
-        {"vendor": "TechStaff"},
+def test_groups_by_source():
+    employees = [
+        {"source": None},
+        {"source": ""},
+        {"source": "INTERNAL"},
+        {"source": "Anten"},
+        {"source": "Anten"},
+        {"source": "SipraHub"},
     ]
-    result = build_payroll_segregation(cands)
+    result = build_payroll_segregation(employees)
     by_label = {r.label: r.value for r in result}
     assert by_label["Internal"] == 3   # null + "" + "INTERNAL"
-    assert by_label["Acme Corp"] == 2
-    assert by_label["TechStaff"] == 1
+    assert by_label["Anten"] == 2
+    assert by_label["SipraHub"] == 1
 
 
 def test_empty_returns_empty():
@@ -24,8 +24,8 @@ def test_empty_returns_empty():
 
 
 def test_all_internal_returns_single_bucket():
-    cands = [{"vendor": "INTERNAL"}, {"vendor": None}, {"vendor": ""}]
-    result = build_payroll_segregation(cands)
+    employees = [{"source": "INTERNAL"}, {"source": None}, {"source": ""}]
+    result = build_payroll_segregation(employees)
     assert len(result) == 1
     assert result[0].label == "Internal"
     assert result[0].value == 3
