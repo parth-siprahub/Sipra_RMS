@@ -1,6 +1,6 @@
 import { api } from './client';
 
-export type RequestStatus = 'OPEN' | 'CLOSED' | 'HOLD';
+export type RequestStatus = 'OPEN' | 'CLOSED' | 'HOLD' | 'CANCELLED';
 export type RequestPriority = 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
 export type RequestSource = 'PORTAL' | 'JOB_BOARDS' | 'NETWORK' | 'VENDORS';
 
@@ -16,6 +16,7 @@ export interface ResourceRequest {
     replacement_for_candidate_id: number | null;
     created_by_id: string | null;
     created_at: string | null;
+    notes: string | null;
 }
 
 export interface CreateResourceRequestPayload {
@@ -24,6 +25,7 @@ export interface CreateResourceRequestPayload {
     is_backfill?: boolean;
     job_profile_id?: number;
     sow_id?: number;
+    notes?: string;
 }
 
 export const resourceRequestsApi = {

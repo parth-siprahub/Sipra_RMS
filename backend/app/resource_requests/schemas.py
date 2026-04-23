@@ -15,6 +15,7 @@ class RequestStatus(str, Enum):
     OPEN = "OPEN"
     CLOSED = "CLOSED"
     HOLD = "HOLD"
+    CANCELLED = "CANCELLED"
 
 
 class RequestSource(str, Enum):
@@ -31,6 +32,7 @@ class ResourceRequestCreate(BaseModel):
     source: RequestSource | None = None
     is_backfill: bool = False
     replacement_for_candidate_id: int | None = None
+    notes: str | None = None
 
 
 class ResourceRequestUpdate(BaseModel):
@@ -39,6 +41,7 @@ class ResourceRequestUpdate(BaseModel):
     priority: RequestPriority | None = None
     source: RequestSource | None = None
     is_backfill: bool | None = None
+    notes: str | None = None
 
 
 class StatusTransition(BaseModel):
@@ -57,3 +60,4 @@ class ResourceRequestResponse(BaseModel):
     replacement_for_candidate_id: int | None = None
     created_by_id: str | None = None
     created_at: datetime | None = None
+    notes: str | None = None

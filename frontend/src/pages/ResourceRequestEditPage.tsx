@@ -17,6 +17,7 @@ export function ResourceRequestEditPage() {
     const [jobProfileId, setJobProfileId] = useState<number | ''>('');
     const [priority, setPriority] = useState<RequestPriority>('MEDIUM');
     const [isBackfill, setIsBackfill] = useState(false);
+    const [notes, setNotes] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [loading, setLoading] = useState(true);
 
@@ -43,6 +44,7 @@ export function ResourceRequestEditPage() {
                 setJobProfileId(reqData.job_profile_id ?? '');
                 setPriority((reqData.priority as RequestPriority) ?? 'MEDIUM');
                 setIsBackfill(reqData.is_backfill ?? false);
+                setNotes(reqData.notes ?? '');
             } catch {
                 if (!cancelled) {
                     toast.error('Resource request not found');
@@ -71,6 +73,7 @@ export function ResourceRequestEditPage() {
                 is_backfill: isBackfill,
                 sow_id: Number(sowId),
                 job_profile_id: Number(jobProfileId),
+                notes: notes.trim() || undefined,
             });
             toast.success('Resource request updated!');
             navigate('/resource-requests');
@@ -182,6 +185,20 @@ export function ResourceRequestEditPage() {
                     <label htmlFor="edit-rr-backfill" className="text-sm font-medium text-text cursor-pointer">
                         This is a backfill request
                     </label>
+                </div>
+
+                <div>
+                    <label className="input-label" htmlFor="edit-rr-notes">
+                        Notes
+                    </label>
+                    <textarea
+                        id="edit-rr-notes"
+                        className="input-field resize-none"
+                        rows={3}
+                        placeholder="Add any additional context or notes…"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                    />
                 </div>
 
                 <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t border-border sm:justify-end">
