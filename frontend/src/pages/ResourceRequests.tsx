@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Plus, RefreshCw, ChevronDown, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -16,9 +17,10 @@ import { jobProfileApi, type JobProfile } from '../api/jobProfiles';
 
 // ─── Status Transition Map ────────────────────────────────────────────────────
 const STATUS_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
-    OPEN: ['HOLD', 'CLOSED'],
-    HOLD: ['OPEN', 'CLOSED'],
-    CLOSED: ['OPEN'],  // Allow reopening
+    OPEN: ['HOLD', 'CLOSED', 'CANCELLED'],
+    HOLD: ['OPEN', 'CLOSED', 'CANCELLED'],
+    CLOSED: ['OPEN'],
+    CANCELLED: ['OPEN'],
 };
 
 // ─── Quick-Status Dropdown ────────────────────────────────────────────────────
@@ -29,8 +31,39 @@ interface StatusDropdownProps {
 
 function StatusDropdown({ request, onStatusChange }: StatusDropdownProps) {
     const [open, setOpen] = useState(false);
+    const [coords, setCoords] = useState({ top: 0, left: 0 });
+    const btnRef = useRef<HTMLButtonElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
     const current = (request.status as RequestStatus) ?? 'OPEN';
     const options = STATUS_TRANSITIONS[current] ?? [];
+
+    useEffect(() => {
+        if (!open) return;
+        const handler = (e: MouseEvent) => {
+            if (
+                btnRef.current && !btnRef.current.contains(e.target as Node) &&
+                dropdownRef.current && !dropdownRef.current.contains(e.target as Node)
+            ) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [open]);
+
+    const handleOpen = () => {
+        if (btnRef.current) {
+            const rect = btnRef.current.getBoundingClientRect();
+            const dropdownHeight = options.length * 40 + 8;
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const flipUp = spaceBelow < dropdownHeight + 8;
+            setCoords({
+                top: flipUp ? rect.top - dropdownHeight - 4 : rect.bottom + 4,
+                left: rect.left,
+            });
+        }
+        setOpen((o) => !o);
+    };
 
     if (options.length === 0) {
         return <StatusBadge value={request.status} type="request" />;
@@ -39,7 +72,8 @@ function StatusDropdown({ request, onStatusChange }: StatusDropdownProps) {
     return (
         <div className="relative inline-block">
             <button
-                onClick={() => setOpen((o) => !o)}
+                ref={btnRef}
+                onClick={handleOpen}
                 className="flex items-center gap-1 group"
                 title="Click to change status"
             >
@@ -49,10 +83,11 @@ function StatusDropdown({ request, onStatusChange }: StatusDropdownProps) {
                     className="text-text-muted group-hover:text-text transition-colors"
                 />
             </button>
-            {open && (
+            {open && createPortal(
                 <div
-                    className="absolute top-full left-0 mt-1 bg-surface border border-border rounded-lg shadow-lg z-dropdown py-1 min-w-[120px]"
-                    onMouseLeave={() => setOpen(false)}
+                    ref={dropdownRef}
+                    style={{ position: 'fixed', top: coords.top, left: coords.left, zIndex: 9999 }}
+                    className="bg-surface border border-border rounded-lg shadow-lg py-1 min-w-[130px]"
                 >
                     {options.map((s) => (
                         <button
@@ -67,7 +102,8 @@ function StatusDropdown({ request, onStatusChange }: StatusDropdownProps) {
                             <StatusBadge value={s} type="request" />
                         </button>
                     ))}
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
@@ -180,6 +216,7 @@ export function ResourceRequests() {
                         <option value="OPEN">Open</option>
                         <option value="HOLD">On Hold</option>
                         <option value="CLOSED">Closed</option>
+                        <option value="CANCELLED">Cancelled</option>
                     </select>
                 </div>
                 <div className="flex flex-col gap-1">

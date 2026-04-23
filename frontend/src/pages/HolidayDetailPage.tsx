@@ -115,7 +115,7 @@ export function HolidayDetailPage() {
             </div>
 
             {/* Table */}
-            <div className="card overflow-hidden p-0">
+            <div className="card overflow-hidden p-0 max-h-[60vh] overflow-y-auto">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-12 gap-3">
                         <div className="spinner w-6 h-6 border-cta" />
