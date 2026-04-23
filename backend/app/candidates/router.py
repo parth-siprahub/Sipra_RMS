@@ -1,4 +1,5 @@
 """Candidates CRUD + Admin Review + Exit — aligned with public.candidates table."""
+import re
 from datetime import date
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from app.auth.dependencies import get_current_user, require_admin
@@ -20,6 +21,8 @@ from app.audit.service import log_audit
 import logging
 
 logger = logging.getLogger(__name__)
+
+_SEARCH_SAFE_RE = re.compile(r'^[\w\s@.\-]+$')
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
 
@@ -142,6 +145,8 @@ async def list_candidates(
     
     if search:
         search = search.strip()
+        if not _SEARCH_SAFE_RE.match(search):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid characters in search query")
         # OR filter on key fields (first_name, last_name, email, phone)
         query = query.or_(
             f"first_name.ilike.%{search}%,"
@@ -237,6 +242,14 @@ async def create_candidate(
 
     data = payload.model_dump(exclude_none=True, mode="json")
     data = _normalize_candidate_names_dict(data)
+    # Auto-populate vendor name string if vendor_id is provided
+    if data.get("vendor_id"):
+        try:
+            v_row = await client.table("vendors").select("name").eq("id", data["vendor_id"]).single().execute()
+            if v_row.data:
+                data["vendor"] = v_row.data["name"]
+        except Exception:
+            pass  # Non-blocking — vendor_id still saved, display will fall back to vendor lookup
     data["owner_id"] = current_user["id"]
     data["status"] = CandidateStatus.NEW.value
     result = await client.table("candidates").insert(data).execute()
@@ -318,7 +331,7 @@ async def admin_review_candidate(
     current_status_str = existing.data[0].get("status", "")
     if current_status_str == payload.status.value:
         # No change needed — return current record
-        return existing.data[0]
+        return _candidate_api_row(existing.data[0])
 
     # All users must follow the pipeline — sequential transitions only
     try:
@@ -382,6 +395,7 @@ async def admin_review_candidate(
                 "jira_username": c.get("client_jira_id"),
                 "start_date": start,
                 "status": "ACTIVE",
+                "source": c.get("source"),
             }
             employee_data = {k: v for k, v in employee_data.items() if v is not None}
             employee_data = normalize_employee_text(employee_data)
