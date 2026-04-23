@@ -242,14 +242,24 @@ async def create_candidate(
 
     data = payload.model_dump(exclude_none=True, mode="json")
     data = _normalize_candidate_names_dict(data)
-    # Auto-populate vendor name string if vendor_id is provided
+    # Auto-populate vendor enum from vendor_id — map vendor name to candidate_vendor enum values
     if data.get("vendor_id"):
         try:
             v_row = await client.table("vendors").select("name").eq("id", data["vendor_id"]).single().execute()
             if v_row.data:
-                data["vendor"] = v_row.data["name"]
+                vendor_name_upper = (v_row.data["name"] or "").strip().upper()
+                _VENDOR_ENUM = {"WRS", "GFM", "INTERNAL", "ANTEN"}
+                if vendor_name_upper in _VENDOR_ENUM:
+                    data["vendor"] = vendor_name_upper
+                elif vendor_name_upper.startswith("ANTEN"):
+                    data["vendor"] = "ANTEN"
+                elif vendor_name_upper.startswith("WRS"):
+                    data["vendor"] = "WRS"
+                elif vendor_name_upper.startswith("GFM"):
+                    data["vendor"] = "GFM"
+                # else: leave at DB default (INTERNAL)
         except Exception:
-            pass  # Non-blocking — vendor_id still saved, display will fall back to vendor lookup
+            pass  # Non-blocking — vendor_id still saved
     data["owner_id"] = current_user["id"]
     data["status"] = CandidateStatus.NEW.value
     result = await client.table("candidates").insert(data).execute()

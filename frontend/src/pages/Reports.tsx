@@ -13,8 +13,6 @@ import {
     Calculator,
     ExternalLink,
     Lock,
-    X,
-    CalendarDays,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
@@ -168,7 +166,6 @@ function ComparisonTab({
     const [sortCol, setSortCol] = useState<string>('flag');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
     const [billingConfigs, setBillingConfigs] = useState<BillingConfig[]>([]);
-    const [holidayModalOpen, setHolidayModalOpen] = useState(false);
     const frozenMonths = new Set(billingConfigs.filter(c => c.is_frozen).map(c => c.billing_month));
     const currentMonthFrozen = frozenMonths.has(month);
 
@@ -461,9 +458,9 @@ function ComparisonTab({
                     label="On Holiday (employees : days)"
                     value={`${holidayCount}:${totalOooDays}`}
                     valueClassName="text-text"
-                    onClick={() => setHolidayModalOpen(true)}
+                    onClick={() => navigate(`/reports/holiday/${month}`)}
                     activeBorderCssVar="--color-cta"
-                    active={holidayModalOpen}
+                    active={false}
                 />
                 {sourceOptions.map(src => (
                     <SummaryCard
@@ -478,67 +475,6 @@ function ComparisonTab({
                     />
                 ))}
             </div>
-
-            {/* Holiday detail modal */}
-            {holidayModalOpen && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-                    onClick={() => setHolidayModalOpen(false)}
-                >
-                    <div
-                        className="card w-full max-w-lg mx-4 max-h-[80vh] flex flex-col shadow-xl"
-                        onClick={e => e.stopPropagation()}
-                    >
-                        {/* Modal header */}
-                        <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
-                            <CalendarDays size={16} className="text-cta shrink-0" />
-                            <div className="flex-1 min-w-0">
-                                <h3 className="text-sm font-semibold text-text">Employees on Holiday</h3>
-                                <p className="text-xs text-text-muted">{holidayCount} employees · {totalOooDays} days total — {month}</p>
-                            </div>
-                            <button
-                                onClick={() => setHolidayModalOpen(false)}
-                                className="btn btn-ghost btn-icon shrink-0"
-                                aria-label="Close"
-                            >
-                                <X size={15} />
-                            </button>
-                        </div>
-
-                        {/* Modal table */}
-                        <div className="overflow-y-auto custom-scrollbar">
-                            <table className="data-table w-full">
-                                <thead>
-                                    <tr>
-                                        <th className="px-4 py-2 text-left text-[11px] font-bold text-text-muted uppercase tracking-wide">Employee</th>
-                                        <th className="px-4 py-2 text-left text-[11px] font-bold text-text-muted uppercase tracking-wide">Payroll</th>
-                                        <th className="px-4 py-2 text-right text-[11px] font-bold text-text-muted uppercase tracking-wide">OOO Days</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {rows
-                                        .filter(r => (r.ooo_days ?? 0) > 0)
-                                        .sort((a, b) => (b.ooo_days ?? 0) - (a.ooo_days ?? 0))
-                                        .map(r => (
-                                            <tr key={r.employee_id}>
-                                                <td className="px-4 py-2 text-sm font-medium text-text">
-                                                    {formatPersonName(r.rms_name)}
-                                                </td>
-                                                <td className="px-4 py-2 text-sm text-text-muted">
-                                                    {r.source ?? '—'}
-                                                </td>
-                                                <td className="px-4 py-2 text-sm text-right font-semibold text-warning">
-                                                    {r.ooo_days}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Filter bar */}
             <div className="flex flex-wrap items-center gap-2">
