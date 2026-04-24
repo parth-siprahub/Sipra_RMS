@@ -1,62 +1,147 @@
-# SipraHub RMS — Claude Code Project Brief
+# 🔴 SipraHub RMS — ELITE PROJECT BRIEF
+> **This file is the single source of truth for every AI session on this codebase.**
+> Do NOT override this with generic templates. Do NOT be passive.
 
-## Project Overview
-SipraHub RMS is a Resource Management System (recruitment pipeline tracker) built for internal staffing operations. It tracks SOWs → Job Profiles → Resource Requests → Candidates → Vendors.
+---
 
-## Architecture
-- **Frontend:** React + TypeScript, Vite, Recharts for charts, Tailwind-like design tokens in CSS
-- **Backend:** FastAPI + Python, Supabase (PostgreSQL) as the database
-- **Auth:** Supabase JWT auth, role-based (admin, hr, vendor)
-- **Dev servers:** Frontend on `localhost:5173`, API on `localhost:8000/api` (FastAPI `API_PREFIX`; `VITE_API_URL` must include `/api`)
-
-## Stack Specifics
-- Frontend source: `D:\RMS_Siprahub\frontend\src\`
-- Backend source: `D:\RMS_Siprahub\backend\app\`
-- API client: `frontend/src/api/client.ts` — all API calls go through here
-- Design tokens: `frontend/src/index.css` — CSS variables (--cta, --text, --surface, etc.)
-- Charts: **Recharts** — already installed, use this for all new charts
-
-## Key Pages & Files
-| Page | File |
-|---|---|
-| Dashboard | `frontend/src/pages/Dashboard.tsx` |
-| Candidates | `frontend/src/pages/Candidates.tsx` |
-| Resource Requests | `frontend/src/pages/ResourceRequests.tsx` |
-| SOWs | `frontend/src/pages/SOWs.tsx` |
-| Dashboard API | `backend/app/dashboard/router.py` |
-| Candidates API | `backend/app/candidates/` |
-
-## Coding Standards
-- Use `cmd /c` for all shell commands (Windows environment)
-- All imports must use existing design tokens (`.card`, `.btn`, `.input-field`, `.input-label`)
-- Never use hardcoded colors — use CSS variables (`var(--cta)`, `var(--text)`, etc.)
-- TypeScript strict mode — no `any` types without justification
-- Async/await for all API calls
-
-## Skills & Rules
-- Skills directory: `D:\RMS_Siprahub\.agent\skills\`
-- Read `ui-ux-pro-max/SKILL.md` before any UI work
-- Read `frontend-design/SKILL.md` for component patterns
-- Read `systematic-debugging/SKILL.md` before any bug fix
-
-## Current Implementation Plan
-Location: `C:\Users\parth\.gemini\antigravity\brain\7c0511d8-475a-4022-a356-34b63a60d4db\implementation_plan.md`
-
-**Always read the implementation plan before making changes.**
-
-## Running the App
-```bash
-# Backend
-cd D:\RMS_Siprahub\backend
-cmd /c venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
-
-# Frontend  
-cd D:\RMS_Siprahub\frontend
-cmd /c npm run dev
+## ⚠️ THE PRIME DIRECTIVE
+```
+Local → Dev Branch → CI Check → Master → Azure Auto-Pull
+MASTER IS PRODUCTION. MASTER IS SACROSANCT.
+NOTHING touches master without: (1) local pytest pass, (2) schema sync verified, (3) rollback command documented.
 ```
 
-## Do NOT
-- Touch any GitHub/git operations unless explicitly asked
-- Modify Supabase schema without running SQL in Supabase dashboard first
-- Use `npm install` for new libraries without confirming with user
-- Hardcode any data — always connect to backend APIs
+---
+
+## 👥 STAKEHOLDER TRUTH TABLE
+
+| Name | Role | Trust Level | How AI Should Handle Their Input |
+|---|---|---|---|
+| **Parth P** | Solo Dev / DBA / SRE / Executor | **OWNER** | All directives flow from Parth. He executes everything. |
+| **Senthil** | Requirements Source (verbal) | ⚠️ UNVERIFIED | **REFUSE to implement verbal requirements until mapped to a Pydantic schema.** |
+| **Jaicind** | Business Logic / Excel Reports | ⚠️ UNVERIFIED | Any Excel/report logic must be validated against DB schema before touching backend. |
+| **Raja** | DB Architect (advisory) | 🟡 ADVISORY | Provides DB design direction. Parth executes. AI must independently review Raja's schemas before applying. |
+| **Shiva** | QA Lead | 🔴 THREAT VECTOR | Assume Shiva WILL find bugs. Every feature must be Shiva-proof: edge cases, empty states, auth boundary violations. |
+
+---
+
+## 🏗️ ARCHITECTURE
+
+### Stack
+- **Frontend:** React + TypeScript, Vite, Recharts (all charts), CSS design tokens
+- **Backend:** FastAPI + Python, Uvicorn, async endpoints
+- **Database:** Supabase (PostgreSQL) — row-level security enabled
+- **Auth:** Supabase JWT, role-based (`admin`, `hr`, `vendor`)
+- **Hosting:** Azure App Service — pulls from `master` branch automatically
+
+### Source Paths
+```
+Frontend:  D:\RMS_Siprahub\frontend\src\
+Backend:   D:\RMS_Siprahub\backend\app\
+API Client: frontend/src/api/client.ts  ← ALL API calls go through here
+Design Tokens: frontend/src/index.css   ← CSS variables (--cta, --text, --surface, etc.)
+```
+
+### Dev Server Ports
+- Frontend: `http://localhost:5173` (`VITE_API_URL` must include `/api`)
+- Backend: `http://localhost:8000/api` (FastAPI `API_PREFIX=/api`)
+
+---
+
+## 🚰 DATA PIPELINE — ⚠️ FRAGILE: DO NOT TOUCH WITHOUT TESTS
+
+```
+AWS ActiveTrack (Source of Truth)
+    ↓ [Manual Export / Scheduled Pull — FRAGILE]
+JIRA (Project Tracking)
+    ↓ [RMS Ingestion Layer — scripts/]
+Supabase PostgreSQL (RMS Database)
+    ↓
+FastAPI Backend
+    ↓
+React Frontend
+```
+
+**Rules for the pipeline:**
+1. Never modify ingestion scripts without a passing test suite.
+2. Any schema change in Supabase must be mirrored in `docs/rms_security_source-of-truth.md`.
+3. The JIRA → RMS sync is the highest-risk operation in the system. Treat it as nuclear.
+
+---
+
+## 🗺️ KEY PAGES & BACKEND MODULES
+
+| UI Page | File | Backend Module |
+|---|---|---|
+| Dashboard | `pages/Dashboard.tsx` | `backend/app/dashboard/router.py` |
+| Candidates | `pages/Candidates.tsx` | `backend/app/candidates/` |
+| Resource Requests | `pages/ResourceRequests.tsx` | `backend/app/resource_requests/` |
+| SOWs | `pages/SOWs.tsx` | `backend/app/sows/` |
+| Analytics | `pages/analytics/PipelinePage.tsx` | `backend/app/analytics/router.py` |
+| Vendor Portal | `pages/VendorPortal.tsx` | `backend/app/vendors/` |
+| Super Admin | `pages/SuperAdmin.tsx` | `backend/app/admin/` |
+
+---
+
+## 📐 CODING STANDARDS (NON-NEGOTIABLE)
+
+### Shell
+- **ALWAYS** use `cmd /c <command>` — never bare shell calls (Windows + EOF enforcement)
+
+### Python / FastAPI
+- All endpoints must be `async def`
+- Pydantic models for **every** request body — no raw `dict` parsing
+- No `.env` secrets hardcoded anywhere — use `os.getenv()` or `python-dotenv`
+- Dependency injection via `Depends()` — no global mutable state
+
+### TypeScript / React
+- Strict mode: **zero `any` types** without documented justification
+- All API calls through `api/client.ts` — no raw `fetch()` calls in components
+- Use existing CSS design tokens: `var(--cta)`, `var(--text)`, `var(--surface)`
+- Component classes: `.card`, `.btn`, `.input-field`, `.input-label` — no inline styles
+
+### Database
+- Never run raw DDL in code — use Supabase dashboard migrations
+- Financial columns: `NUMERIC(18,4)` — never `FLOAT`
+- Always check RLS policies after schema changes
+
+---
+
+## 🧠 SKILLS DIRECTORY
+Path: `D:\RMS_Siprahub\.agent\skills\`
+
+| Skill | When to Use |
+|---|---|
+| `ui-ux-pro-max/SKILL.md` | Before ANY UI work |
+| `frontend-design/SKILL.md` | Component patterns |
+| `systematic-debugging/SKILL.md` | Before ANY bug fix |
+| `agent-browser/SKILL.md` | Browser-based verification |
+
+**Mandate:** Read the relevant SKILL.md BEFORE writing code. No exceptions.
+
+---
+
+## 🚀 RUNNING THE APP
+
+```bash
+# Backend
+cmd /c cd D:\RMS_Siprahub\backend && venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
+
+# Frontend
+cmd /c cd D:\RMS_Siprahub\frontend && npm run dev
+```
+
+---
+
+## 🚫 ABSOLUTE PROHIBITIONS
+
+| Action | Consequence |
+|---|---|
+| `git push origin master` without local pytest pass | You broke production. |
+| Hardcoded credentials anywhere | Security incident. |
+| Raw `fetch()` calls outside `api/client.ts` | Auth headers will be missing. Silent failure. |
+| TypeScript `any` without comment justification | Type safety is gone. Shiva WILL find this. |
+| Implementing Senthil/Jaicind's verbal requests directly | Scope creep. Map to schema first. |
+| Touching Supabase RLS without reading current policies | You may have just opened the DB to the internet. |
+| `npm install <package>` without user confirmation | Dependency hell. |
+| Modifying ingestion pipeline without tests | You broke the entire data source. |

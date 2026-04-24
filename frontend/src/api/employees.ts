@@ -11,6 +11,7 @@ export interface Employee {
     jira_username: string | null;
     start_date: string | null;
     exit_date: string | null;
+    exit_reason: string | null;
     /** Final billing date — last day billed to the client */
     client_offboarding_date: string | null;
     /** Final salary date — last day on Siprahub payroll */

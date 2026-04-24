@@ -221,11 +221,11 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
         <div className="space-y-6">
             {/* KPI Strip — 5 cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                <KPICard label="Total Candidates" value={metrics.total_candidates || 0} accent={KPI_ACCENT_COLORS.red} gradient={KPI_GRADIENTS.red} sub="All vendors combined" icon={Users} />
+                <KPICard label="Total Candidates" value={metrics.total_candidates || 0} accent={KPI_ACCENT_COLORS.red} gradient={KPI_GRADIENTS.red} sub="Active pipeline" icon={Users} />
                 <KPICard label="Selected / Onboarded" value={selectedOnboarded} accent={KPI_ACCENT_COLORS.green} gradient={KPI_GRADIENTS.green} sub="Cleared pipeline" subClassName="text-[var(--color-success-text)]" icon={UserCheck} />
                 <KPICard label="Total Rejections" value={totalRejections} accent={KPI_ACCENT_COLORS.orange} gradient={KPI_GRADIENTS.orange} sub="Screen + L1 + L2" icon={XCircle} />
                 <KPICard label="On Hold" value={onHoldCount} accent={KPI_ACCENT_COLORS.purple} gradient={KPI_GRADIENTS.purple} sub="Pending decisions" icon={Pause} />
-                <KPICard label="Active Requests" value={metrics.total_requests || 0} accent={KPI_ACCENT_COLORS.blue} gradient={KPI_GRADIENTS.blue} sub="Inflow active" icon={Briefcase} />
+                <KPICard label="Active Requests" value={metrics.open_requests ?? metrics.requests_by_status?.['OPEN'] ?? 0} accent={KPI_ACCENT_COLORS.blue} gradient={KPI_GRADIENTS.blue} sub="Inflow active" icon={Briefcase} />
             </div>
 
             {/* Status + Funnel row */}
@@ -534,7 +534,7 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                                     <XAxis type="number" fontSize={10} tick={{ fill: '#64748B' }} axisLine={{ stroke: '#E2E8F0' }} allowDecimals={false} />
                                     <YAxis dataKey="skill" type="category" width={90} fontSize={11} tick={{ fill: '#334155' }} axisLine={false} tickLine={false} />
-                                    <Tooltip contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }} formatter={(v: number) => [v, 'Candidates']} />
+                                    <Tooltip contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }} formatter={(v: any) => [v, 'Candidates']} />
                                     <Bar dataKey="count" radius={[0, 4, 4, 0]} animationDuration={800}>
                                         {metrics.candidates_by_skill.slice(0, 10).map((_, i) => (
                                             <Cell key={`sk-${i}`} fill={VENDOR_BAR_COLORS[i % VENDOR_BAR_COLORS.length]} />

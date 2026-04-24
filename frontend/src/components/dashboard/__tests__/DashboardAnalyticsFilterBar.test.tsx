@@ -8,9 +8,14 @@ vi.mock('../../../api/analytics', () => ({
   analyticsApi: {
     getResourcesSkills: vi.fn().mockResolvedValue({ total_resources: 0, skills: [] }),
     getHiringType: vi.fn().mockResolvedValue([]),
+    getHiringTypeSplit: vi.fn().mockResolvedValue([]),
     getClientDemand: vi.fn().mockResolvedValue([]),
     getEmploymentType: vi.fn().mockResolvedValue([]),
     getPipelineFunnel: vi.fn().mockResolvedValue({ stages: [] }),
+    getPayrollSegregation: vi.fn().mockResolvedValue([]),
+    getRequirementTracker: vi.fn().mockResolvedValue({ stages: [] }),
+    getDailyStatusMatrix: vi.fn().mockResolvedValue({ rows: [], stage_names: [] }),
+    getDailyStatus: vi.fn().mockResolvedValue({ data: [], total: 0, page: 1, page_size: 20 }),
     getPivotData: vi.fn().mockResolvedValue([]),
     listRecruiters: vi.fn().mockResolvedValue([
       { id: 'r1', full_name: 'Alice Recruiter' },

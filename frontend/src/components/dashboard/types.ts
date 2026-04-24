@@ -70,6 +70,7 @@ export interface SkillStatusRow {
 
 export interface DashboardMetrics {
     total_requests: number;
+    open_requests?: number;
     requests_by_status: Record<string, number>;
     requests_by_priority: Record<string, number>;
     total_candidates: number;

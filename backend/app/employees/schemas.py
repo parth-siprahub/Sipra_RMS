@@ -61,3 +61,4 @@ class EmployeeResponse(BaseModel):
     vendor_name: str | None = None   # from candidate → vendor
     sow_number: str | None = None    # from candidate → resource_request → sow
     is_backfill: bool | None = None  # from candidate → resource_request → is_backfill
+    exit_reason: str | None = None   # from candidates table

@@ -13,6 +13,7 @@ import {
     Clock,
     Landmark,
     BarChart3,
+    PieChart,
     Settings2,
 } from 'lucide-react';
 
@@ -27,7 +28,7 @@ interface SidebarProps {
 }
 
 const navItems = [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
+    { to: '/dashboard/overview', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/sows', icon: ScrollText, label: 'SOWs' },
     { to: '/job-profiles', icon: FileText, label: 'Job Profiles' },
     { to: '/resource-requests', icon: Briefcase, label: 'Resource Requests' },
@@ -69,6 +70,10 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
 
     const isActive = (to: string, exact?: boolean) => {
         if (exact) return location.pathname === to;
+        // Dashboard item covers both sub-routes
+        if (to === '/dashboard/overview') {
+            return location.pathname.startsWith('/dashboard/');
+        }
         return location.pathname.startsWith(to);
     };
 
