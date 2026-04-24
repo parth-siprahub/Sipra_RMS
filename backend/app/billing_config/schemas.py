@@ -40,3 +40,20 @@ class BillingConfigResponse(BaseModel):
     working_days: int
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    # Freeze fields
+    is_frozen: bool = False
+    frozen_by: str | None = None
+    frozen_at: datetime | None = None
+    last_unfrozen_by: str | None = None
+    last_unfrozen_at: datetime | None = None
+
+
+class BillingConfigFreezeResponse(BaseModel):
+    id: int
+    billing_month: str
+    is_frozen: bool
+    frozen_by: str | None
+    frozen_at: datetime | None
+    last_unfrozen_by: str | None
+    last_unfrozen_at: datetime | None
+    message: str

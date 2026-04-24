@@ -1,4 +1,5 @@
 """Resource Requests CRUD — aligned with public.resource_requests table."""
+import re
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
@@ -15,13 +16,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+_SEARCH_SAFE_RE = re.compile(r'^[\w\s@.\-]+$')
+
 router = APIRouter(prefix="/requests", tags=["Resource Requests"])
 
 # Valid status transitions (I5)
 REQUEST_STATUS_TRANSITIONS = {
-    RequestStatus.OPEN: [RequestStatus.CLOSED, RequestStatus.HOLD],
-    RequestStatus.HOLD: [RequestStatus.OPEN, RequestStatus.CLOSED],
+    RequestStatus.OPEN: [RequestStatus.CLOSED, RequestStatus.HOLD, RequestStatus.CANCELLED],
+    RequestStatus.HOLD: [RequestStatus.OPEN, RequestStatus.CLOSED, RequestStatus.CANCELLED],
     RequestStatus.CLOSED: [RequestStatus.OPEN],  # Allow reopening
+    RequestStatus.CANCELLED: [RequestStatus.OPEN],  # Allow reopening cancelled requests
 }
 
 
@@ -47,6 +51,8 @@ async def list_requests(
         query = query.eq("priority", priority)
     if search:
         search = search.strip()
+        if not _SEARCH_SAFE_RE.match(search):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid characters in search query")
         # OR filter on key fields (client_name, job_profile, request_display_id, location)
         query = query.or_(
             f"client_name.ilike.%{search}%,"

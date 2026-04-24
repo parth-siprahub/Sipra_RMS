@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { AnalyticsProvider } from './context/AnalyticsContext';
 import { Login } from './pages/Login';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -38,6 +39,7 @@ import { VendorCreatePage } from './pages/VendorCreatePage';
 import { ClientEditPage } from './pages/ClientEditPage';
 import { ClientCreatePage } from './pages/ClientCreatePage';
 import { CommunicationLogCreatePage } from './pages/CommunicationLogCreatePage';
+import { HolidayDetailPage } from './pages/HolidayDetailPage';
 
 const NotFound = () => <div className="p-10 text-center text-2xl text-text-muted font-medium">404 - Page Not Found</div>;
 
@@ -98,6 +100,7 @@ function App() {
       <ThemeProvider defaultTheme="light" storageKey="rms-theme">
         <BrowserRouter>
           <AuthProvider>
+            <AnalyticsProvider>
             <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
@@ -110,9 +113,14 @@ function App() {
             }>
               <Route index element={
                 <ProtectedRoute>
-                  {/* Redirect SUPER_ADMIN role from Dashboard to Employees/User Creation */}
-                  <RoleRedirect role="SUPER_ADMIN" to="/employees" defaultElement={<Dashboard />} />
+                  <RoleRedirect role="SUPER_ADMIN" to="/employees" defaultElement={<Navigate to="/dashboard/overview" replace />} />
                 </ProtectedRoute>
+              } />
+              <Route path="dashboard/overview" element={
+                <ProtectedRoute><Dashboard /></ProtectedRoute>
+              } />
+              <Route path="dashboard/analytics" element={
+                <ProtectedRoute><Dashboard /></ProtectedRoute>
               } />
               <Route path="resource-requests" element={<ResourceRequests />} />
               <Route path="resource-requests/create" element={<ResourceRequestCreatePage />} />
@@ -140,6 +148,7 @@ function App() {
               <Route path="clients/:id/edit" element={<ClientEditPage />} />
               <Route path="reports" element={<Reports />} />
               <Route path="reports/employee/:employeeId" element={<ReportEmployeeDrillDown />} />
+              <Route path="reports/holiday/:month" element={<HolidayDetailPage />} />
               <Route path="billing-config" element={
                 <BillingConfigGuard>
                   <BillingConfig />
@@ -154,12 +163,13 @@ function App() {
               <Route path="timesheets/drill-down/aws" element={<TimesheetAwsDrillDown />} />
             </Route>
 
-              {/* Dashboard alias – direct nav to /dashboard redirects to root */}
-              <Route path="/dashboard" element={<Navigate to="/" replace />} />
+              {/* /dashboard → /dashboard/overview */}
+              <Route path="/dashboard" element={<Navigate to="/dashboard/overview" replace />} />
 
               {/* Catch All */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </AnalyticsProvider>
           </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>

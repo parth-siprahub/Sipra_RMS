@@ -15,7 +15,7 @@ import logging
 import contextvars
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
+
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
@@ -38,6 +38,8 @@ from app.exports.router import router as exports_router
 from app.audit.router import router as audit_router
 from app.reports.router import router as reports_router
 from app.billing_config.router import router as billing_config_router
+from app.analytics.router import router as analytics_router
+from app.users.router import router as users_router
 
 # Public URL prefix (must match Nginx proxy_pass and frontend VITE_API_URL).
 API_PREFIX = "/api"
@@ -115,26 +117,28 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # ─── Security Headers Middleware ───────────────────────────────────────────────
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+# Uses @app.middleware("http") (NOT BaseHTTPMiddleware) to avoid anyio
+# BaseExceptionGroup incompatibility with async streaming endpoints.
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
     """Adds essential security headers to every response."""
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-        # Prevent MIME type sniffing
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        # Prevent clickjacking
-        response.headers["X-Frame-Options"] = "DENY"
-        # Legacy XSS filter (still used by some browsers)
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        # Control referrer info sent with requests
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        # Restrict browser feature access
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        # HSTS: Only activate in production after HTTPS is confirmed
-        if settings.ENVIRONMENT == "production":
-            response.headers["Strict-Transport-Security"] = (
-                "max-age=31536000; includeSubDomains"
-            )
-        return response
+    response = await call_next(request)
+    # Prevent MIME type sniffing
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    # Prevent clickjacking
+    response.headers["X-Frame-Options"] = "DENY"
+    # Legacy XSS filter (still used by some browsers)
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    # Control referrer info sent with requests
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Restrict browser feature access
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    # HSTS: Only activate in production after HTTPS is confirmed
+    if settings.ENVIRONMENT == "production":
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
+    return response
 
 
 # ─── Request Correlation ID + Timing Middleware ──────────────────────────────
@@ -160,12 +164,10 @@ async def add_request_id_and_timing(request: Request, call_next):
 
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
-# Middleware order matters in Starlette: middleware added LAST wraps outermost.
-# SecurityHeaders should be inner, CORS should be outer, so CORS headers are
-# always present — even on 400/500 error responses.
-
-# Inner: SecurityHeaders (runs after CORS on request, before CORS on response)
-app.add_middleware(SecurityHeadersMiddleware)
+# Middleware order matters in Starlette: @app.middleware decorators are evaluated
+# last-registered-first on the way out (response), first-registered-first on the
+# way in (request).  CORS must wrap everything so its headers appear on ALL
+# responses including errors.
 
 # Outer: CORS (wraps everything — ensures CORS headers on ALL responses)
 app.add_middleware(
@@ -225,3 +227,5 @@ app.include_router(exports_router, prefix=API_PREFIX)
 app.include_router(audit_router, prefix=API_PREFIX)
 app.include_router(reports_router, prefix=API_PREFIX)
 app.include_router(billing_config_router, prefix=API_PREFIX)
+app.include_router(analytics_router, prefix=API_PREFIX)
+app.include_router(users_router, prefix=API_PREFIX)

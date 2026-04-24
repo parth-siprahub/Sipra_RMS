@@ -104,20 +104,23 @@ async def calculate_monthly_billing(
 
     client = await get_supabase_admin_async()
 
-    # ── Check if month is frozen ──────────────────────────
-    existing = await (
-        client.table("billing_records")
-        .select("id, processed")
+    # ── Check if month is frozen in billing_config ────────
+    config_res = await (
+        client.table("billing_config")
+        .select("is_frozen, frozen_by, frozen_at")
         .eq("billing_month", billing_month)
+        .eq("client_name", "DCLI")
+        .limit(1)
         .execute()
     )
-    frozen_records = [r for r in (existing.data or []) if r.get("processed")]
-    if frozen_records:
+    if config_res.data and config_res.data[0].get("is_frozen"):
+        cfg = config_res.data[0]
+        frozen_who = cfg.get("frozen_by") or "admin"
+        frozen_when = (cfg.get("frozen_at") or "")[:10]
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            f"Billing month {billing_month} is already frozen. "
-            f"{len(frozen_records)} processed record(s) exist. "
-            "Unfreeze before recalculating.",
+            f"Billing month {billing_month} is locked (frozen by {frozen_who} on {frozen_when}). "
+            "Go to Billing Config to unlock before recalculating.",
         )
 
     # Get all employees (include EXITED to handle partial months)
@@ -153,13 +156,12 @@ async def calculate_monthly_billing(
             employee_start_date=start_date,
         )
 
-        # Upsert billing record — mark as processed immediately
+        # Upsert billing record — NOT auto-frozen; use Billing Config freeze to lock
         record = {
             "employee_id": emp_id,
             "billing_month": billing_month,
+            "processed": False,
             **billing,
-            "processed": True,
-            "processed_at": now,
         }
 
         # Delete existing + insert (idempotent upsert)

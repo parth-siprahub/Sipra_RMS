@@ -321,7 +321,7 @@ async def export_comparison(
     report = await get_timesheet_comparison(month=month, current_user=current_user)
 
     output = io.StringIO()
-    output.write("Employee,Jira Username,AWS Email,Jira Total Hours,Jira Capped Hours,"
+    output.write("Employee,Jira Username,AWS Email,Payroll,Jira Total Hours,Jira Capped Hours,"
                  "OOO Days,Jira Billable Hours,AWS Total Hours,Difference,Difference %,Flag\n")
 
     for c in report.comparisons:
@@ -329,7 +329,7 @@ async def export_comparison(
         diff = str(c.difference) if c.difference is not None else ""
         diff_pct = str(c.difference_pct) if c.difference_pct is not None else ""
         output.write(
-            f'"{c.rms_name}","{c.jira_username or ""}","{c.aws_email or ""}",'
+            f'"{c.rms_name}","{c.jira_username or ""}","{c.aws_email or ""}","{c.source or ""}",'
             f'{c.jira_total_hours},{c.jira_capped_hours},{c.jira_ooo_days},'
             f'{c.jira_billable_hours},{aws_hrs},{diff},{diff_pct},{c.flag}\n'
         )
@@ -403,17 +403,28 @@ async def calculate_billing(
 
     client = await get_supabase_admin_async()
 
-    # 1. Validate billing config exists
+    # 1. Validate billing config exists + check freeze
     config_res = await (
         client.table("billing_config")
         .select("*")
         .eq("billing_month", billing_month)
+        .eq("client_name", "DCLI")
         .limit(1)
         .execute()
     )
     if not config_res.data:
         raise HTTPException(status_code=400, detail=f"No billing config for {billing_month}. Configure billable hours first.")
     config = config_res.data[0]
+    if config.get("is_frozen"):
+        frozen_who = config.get("frozen_by") or "admin"
+        frozen_when = (config.get("frozen_at") or "")[:10]
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Billing month {billing_month} is locked (frozen by {frozen_who} on {frozen_when}). "
+                "Go to Billing Config to unlock before recalculating."
+            ),
+        )
     target_billable = float(config["billable_hours"])
 
     # 2. Fetch active employees

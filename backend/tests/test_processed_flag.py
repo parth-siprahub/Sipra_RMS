@@ -53,18 +53,17 @@ def _billing_record(
 # ═══════════════════════════════════════════════════════════
 
 class TestBillingCalculationSetsProcessed:
-    """After calculate_monthly_billing, inserted records should have processed=True."""
+    """After calculate_monthly_billing, inserted records should have processed=False (not yet frozen)."""
 
     async def test_calculate_sets_processed_true(self, authed_client):
-        """The billing record inserted after calculation should include processed=True."""
+        """The billing record inserted after calculation should include processed=False (unfrozen until freeze endpoint is called)."""
         mock_client = MockSupabaseClient()
         emp = make_employee(id=1)
         ts = make_timesheet_entry(employee_id=1, log_date="2025-03-10", hours_logged=8.0)
         mock_client.configure_table("employees", data=[emp])
         mock_client.configure_table("timesheet_logs", data=[ts])
-        # billing_records: first select returns [] (no frozen records),
-        # then delete + insert chains work via default MockSupabaseTable
         mock_client.configure_table("billing_records", data=[])
+        mock_client.configure_table("billing_config", data=[])
 
         inserted_records: list[dict] = []
         original_table = mock_client.table
@@ -92,8 +91,8 @@ class TestBillingCalculationSetsProcessed:
         assert resp.status_code == 200
         assert len(inserted_records) >= 1
         record = inserted_records[0]
-        assert record["processed"] is True
-        assert record["processed_at"] is not None
+        assert record["processed"] is False
+        assert "processed_at" not in record or record.get("processed_at") is None
 
 
 # ═══════════════════════════════════════════════════════════
@@ -228,11 +227,14 @@ class TestFrozenMonthConflict:
     """Attempting to recalculate billing for a frozen month should raise 409."""
 
     async def test_calculate_frozen_month_returns_409(self, authed_client):
-        frozen_records = [
-            _billing_record(id=1, processed=True, processed_at="2025-03-31T23:00:00+00:00"),
-        ]
         mock_client = MockSupabaseClient()
-        mock_client.configure_table("billing_records", data=frozen_records)
+        mock_client.configure_table("billing_config", data=[{
+            "billing_month": "2025-03",
+            "client_name": "DCLI",
+            "is_frozen": True,
+            "frozen_by": "admin",
+            "frozen_at": "2025-03-31T23:00:00+00:00",
+        }])
         mock_client.configure_table("employees", data=[make_employee(id=1)])
         mock_client.configure_table("timesheet_logs", data=[
             make_timesheet_entry(employee_id=1),
@@ -300,6 +302,8 @@ class TestTimesheetImportFrozenGuard:
             def update(self, data): return self
             def delete(self): return self
             def eq(self, *a): return self
+            def in_(self, *a): return self
+            def not_(self, *a): return self
             def limit(self, *a): return self
             def single(self): return self
             def order(self, *a, **kw): return self

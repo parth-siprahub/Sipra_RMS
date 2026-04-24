@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 
 const ROUTE_LABELS: Record<string, string> = {
     '/': 'Dashboard Overview',
+    '/dashboard/overview': 'Dashboard Overview',
+    '/dashboard/analytics': 'Analytics',
     '/resource-requests': 'Staffing Requests',
     '/candidates': 'Candidate Pipeline',
     '/job-profiles': 'Job Profiles',

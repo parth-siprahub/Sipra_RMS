@@ -93,6 +93,18 @@
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
 }
 
+/* Warning */
+.btn-warning {
+    background-color: var(--color-warning);
+    color: white;
+}
+
+.btn-warning:not(:disabled):hover {
+    background-color: #D97706;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+}
+
 /* Sizes */
 .btn-sm {
     padding: 0.3125rem 0.625rem;

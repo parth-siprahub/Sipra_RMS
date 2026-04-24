@@ -177,12 +177,13 @@ export function EditEmployeeForm({
         github_id: employee.github_id || '',
         jira_username: employee.jira_username || '',
         source: employee.source || '',
+        start_date: employee.start_date || '',
     });
     const [employmentStatus, setEmploymentStatus] = useState<'ACTIVE' | 'EXITED'>(
         initiallyExited ? 'EXITED' : 'ACTIVE'
     );
     const [exitDate, setExitDate] = useState<string>(employee.exit_date || todayIsoDate());
-    const [exitReason, setExitReason] = useState<string>('');
+    const [exitReason, setExitReason] = useState<string>(employee.exit_reason || '');
     const [clientOffboardingDate, setClientOffboardingDate] = useState<string>(employee.client_offboarding_date || '');
     const [siprahubOffboardingDate, setSiprahubOffboardingDate] = useState<string>(employee.siprahub_offboarding_date || '');
     const [showRevertConfirm, setShowRevertConfirm] = useState(false);
@@ -215,6 +216,7 @@ export function EditEmployeeForm({
             if (form.github_id !== undefined) payload.github_id = form.github_id || undefined;
             if (form.jira_username !== undefined) payload.jira_username = form.jira_username || undefined;
             if (form.source !== undefined) payload.source = form.source || undefined;
+            if (form.start_date) payload.start_date = form.start_date;
             payload.status = employmentStatus;
             payload.exit_date = employmentStatus === 'EXITED' ? exitDate : null;
             payload.client_offboarding_date = employmentStatus === 'EXITED' ? (clientOffboardingDate || null) : null;
@@ -309,6 +311,18 @@ export function EditEmployeeForm({
                                 </option>
                             ))}
                         </select>
+                    </div>
+                    <div>
+                        <label className="input-label" htmlFor="start_date">Start Date</label>
+                        <input
+                            id="start_date"
+                            type="date"
+                            className="input-field"
+                            value={form.start_date || ''}
+                            onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value || undefined }))}
+                            onFocus={(e) => e.currentTarget.showPicker?.()}
+                            onClick={(e) => e.currentTarget.showPicker?.()}
+                        />
                     </div>
                 </div>
                 <div className="card p-3 space-y-3 border border-border">

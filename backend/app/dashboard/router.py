@@ -288,16 +288,20 @@ async def get_metrics(current_user: dict = Depends(get_current_user)):
 
     result = {
         "total_requests": len(all_requests),
+        "open_requests": by_status.get("OPEN", 0),
         "requests_by_status": by_status,
         "requests_by_priority": by_priority,
-        "total_candidates": len(all_candidates),
+        "total_candidates": sum(1 for c in all_candidates if c.get("status") in (
+            "NEW", "SCREENING", "L1_SCHEDULED", "L1_COMPLETED", "L1_SHORTLIST",
+            "INTERVIEW_SCHEDULED", "SELECTED", "WITH_ADMIN", "WITH_CLIENT", "SUBMITTED_TO_ADMIN",
+        )),
         "candidates_by_status": candidates_by_status,
         "backfill_count": sum(1 for r in all_requests if r.get("is_backfill")),
         "vendor_performance": vendor_stats,
         "sow_utilization": sow_utilization,
         "timeline": timeline,
         "candidates_by_skill": candidates_by_skill,
-        "total_employees": len(all_employees),
+        "total_employees": len(active_employees),
         "active_employees": len(active_employees),
         "active_employees_by_technology": active_employees_by_technology,
         "missing_identifiers": missing_identifiers,

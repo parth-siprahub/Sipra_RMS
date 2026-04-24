@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { billingConfigApi, type BillingConfig } from '../api/billingConfig';
-import { Plus, Trash2, Settings2, Calendar, Check, X, Pencil } from 'lucide-react';
+import { Plus, Trash2, Settings2, Calendar, Check, X, Pencil, Lock, Unlock, AlertTriangle } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useAuth } from '../context/AuthContext';
@@ -10,7 +10,6 @@ import { BILLING_CONFIG_EMAILS } from '../lib/accessControl';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Generate month options from Jan 2025 to 3 months ahead of today */
 function getMonthOptions(): { value: string; label: string }[] {
     const options: { value: string; label: string }[] = [];
     const now = new Date();
@@ -77,12 +76,95 @@ function DeleteModal({ isOpen, onClose, onConfirm, config, deleting }: DeleteMod
     );
 }
 
+// ─── Freeze / Unfreeze Confirm Modal ─────────────────────────────────────────
+
+interface FreezeModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    config: BillingConfig | null;
+    loading: boolean;
+    action: 'freeze' | 'unfreeze';
+}
+
+function FreezeModal({ isOpen, onClose, onConfirm, config, loading, action }: FreezeModalProps) {
+    if (!config) return null;
+    const isFreeze = action === 'freeze';
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={isFreeze ? 'Lock Billing Month' : 'Unlock Billing Month'}
+            maxWidth="max-w-sm"
+        >
+            <div className="space-y-4">
+                <div className={`flex items-start gap-3 p-3 rounded-lg ${isFreeze ? 'bg-warning/10' : 'bg-success/10'}`}>
+                    <AlertTriangle size={18} className={isFreeze ? 'text-warning mt-0.5 shrink-0' : 'text-success mt-0.5 shrink-0'} />
+                    <p className="text-sm text-text">
+                        {isFreeze ? (
+                            <>
+                                Locking <strong>{formatMonth(config.billing_month)}</strong> will
+                                prevent any recalculation until it is unlocked.
+                            </>
+                        ) : (
+                            <>
+                                Unlocking <strong>{formatMonth(config.billing_month)}</strong> will
+                                allow billing to be recalculated. The previous lock audit trail is preserved.
+                            </>
+                        )}
+                    </p>
+                </div>
+                <div className="flex gap-3">
+                    <button onClick={onClose} className="btn btn-secondary flex-1" disabled={loading}>
+                        Cancel
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        className={`btn flex-1 ${isFreeze ? 'btn-warning' : 'btn-cta'}`}
+                        disabled={loading}
+                    >
+                        {loading ? (
+                            <span className="spinner w-4 h-4" />
+                        ) : isFreeze ? (
+                            <><Lock size={14} className="mr-1.5" />Lock Month</>
+                        ) : (
+                            <><Unlock size={14} className="mr-1.5" />Unlock Month</>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </Modal>
+    );
+}
+
 // ─── Inline Edit Row ──────────────────────────────────────────────────────────
 
 interface EditRowState {
     client_name: string;
     billable_hours: number;
     working_days: number;
+}
+
+// ─── Audit Trail Tooltip ──────────────────────────────────────────────────────
+
+function AuditTrail({ config }: { config: BillingConfig }) {
+    if (!config.frozen_by && !config.last_unfrozen_by) return null;
+    return (
+        <div className="mt-1 space-y-0.5">
+            {config.frozen_by && (
+                <p className="text-xs text-text-muted">
+                    Locked by <span className="font-medium text-text">{config.frozen_by}</span>{' '}
+                    on {formatDateTime(config.frozen_at)}
+                </p>
+            )}
+            {config.last_unfrozen_by && (
+                <p className="text-xs text-text-muted">
+                    Unlocked by <span className="font-medium text-text">{config.last_unfrozen_by}</span>{' '}
+                    on {formatDateTime(config.last_unfrozen_at)}
+                </p>
+            )}
+        </div>
+    );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -103,6 +185,11 @@ export function BillingConfig() {
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editRow, setEditRow] = useState<EditRowState>({ client_name: '', billable_hours: 0, working_days: 0 });
     const [saving, setSaving] = useState(false);
+
+    // Freeze / unfreeze state
+    const [freezeTarget, setFreezeTarget] = useState<BillingConfig | null>(null);
+    const [freezeAction, setFreezeAction] = useState<'freeze' | 'unfreeze'>('freeze');
+    const [freezing, setFreezing] = useState(false);
 
     const fetchConfigs = useCallback(async () => {
         try {
@@ -184,6 +271,32 @@ export function BillingConfig() {
         }
     };
 
+    const openFreeze = (cfg: BillingConfig) => {
+        setFreezeTarget(cfg);
+        setFreezeAction(cfg.is_frozen ? 'unfreeze' : 'freeze');
+    };
+
+    const handleFreezeConfirm = async () => {
+        if (!freezeTarget) return;
+        setFreezing(true);
+        try {
+            if (freezeAction === 'freeze') {
+                await billingConfigApi.freeze(freezeTarget.billing_month);
+                toast.success(`${formatMonth(freezeTarget.billing_month)} locked successfully`);
+            } else {
+                await billingConfigApi.unfreeze(freezeTarget.billing_month);
+                toast.success(`${formatMonth(freezeTarget.billing_month)} unlocked successfully`);
+            }
+            setFreezeTarget(null);
+            fetchConfigs();
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Action failed';
+            toast.error(msg);
+        } finally {
+            setFreezing(false);
+        }
+    };
+
     return (
         <div className="space-y-6 animate-fade-in">
             {/* ── Header ── */}
@@ -247,8 +360,8 @@ export function BillingConfig() {
                                     <th>Billing Month</th>
                                     <th className="text-right">Billable Hours</th>
                                     <th className="text-right">Working Days</th>
+                                    <th>Status / Audit</th>
                                     <th>Created At</th>
-                                    <th>Updated At</th>
                                     <th className="text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -256,7 +369,7 @@ export function BillingConfig() {
                                 {configs.map((cfg) => {
                                     const isEditing = editingId === cfg.id;
                                     return (
-                                        <tr key={cfg.id}>
+                                        <tr key={cfg.id} className={cfg.is_frozen ? 'bg-warning/5' : ''}>
                                             {/* ID */}
                                             <td className="text-text-muted text-xs font-mono">{cfg.id}</td>
 
@@ -318,11 +431,29 @@ export function BillingConfig() {
                                                 )}
                                             </td>
 
+                                            {/* Status — audit trail shown only in edit mode for context */}
+                                            <td>
+                                                {cfg.is_frozen ? (
+                                                    <div>
+                                                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-warning/15 text-warning">
+                                                            <Lock size={10} />
+                                                            Locked
+                                                        </span>
+                                                        {isEditing && <AuditTrail config={cfg} />}
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-success/15 text-success">
+                                                            <Unlock size={10} />
+                                                            Open
+                                                        </span>
+                                                        {isEditing && <AuditTrail config={cfg} />}
+                                                    </div>
+                                                )}
+                                            </td>
+
                                             {/* Created At */}
                                             <td className="text-xs text-text-muted">{formatDateTime(cfg.created_at?.toString())}</td>
-
-                                            {/* Updated At */}
-                                            <td className="text-xs text-text-muted">{formatDateTime(cfg.updated_at?.toString())}</td>
 
                                             {/* Actions */}
                                             <td>
@@ -347,23 +478,46 @@ export function BillingConfig() {
                                                                 <X size={14} />
                                                                 Cancel
                                                             </button>
+                                                            {/* Delete lives here — requires Edit intent first */}
+                                                            <div className="w-px h-4 bg-border mx-0.5 shrink-0" />
+                                                            <button
+                                                                onClick={() => { cancelEdit(); setDeleteTarget(cfg); }}
+                                                                disabled={saving}
+                                                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-danger hover:bg-danger/10 transition-colors"
+                                                                title="Delete this config"
+                                                            >
+                                                                <Trash2 size={13} />
+                                                                Delete
+                                                            </button>
                                                         </>
                                                     ) : (
                                                         <>
+                                                            {/* Freeze / Unfreeze */}
                                                             <button
-                                                                onClick={() => startEdit(cfg)}
-                                                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-cta transition-colors"
-                                                                title="Edit"
+                                                                onClick={() => openFreeze(cfg)}
+                                                                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                                                    cfg.is_frozen
+                                                                        ? 'text-warning hover:bg-warning/10'
+                                                                        : 'text-text-muted hover:bg-surface-hover hover:text-warning'
+                                                                }`}
+                                                                title={cfg.is_frozen ? 'Unlock month' : 'Lock month'}
+                                                            >
+                                                                {cfg.is_frozen ? <Unlock size={13} /> : <Lock size={13} />}
+                                                                {cfg.is_frozen ? 'Unlock' : 'Lock'}
+                                                            </button>
+                                                            {/* Edit — disabled when frozen; Delete lives inside edit mode */}
+                                                            <button
+                                                                onClick={() => !cfg.is_frozen && startEdit(cfg)}
+                                                                disabled={cfg.is_frozen}
+                                                                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                                                    cfg.is_frozen
+                                                                        ? 'text-text-muted opacity-30 cursor-not-allowed'
+                                                                        : 'text-text-muted hover:bg-surface-hover hover:text-cta'
+                                                                }`}
+                                                                title={cfg.is_frozen ? 'Unlock month to edit' : 'Edit (Delete available inside)'}
                                                             >
                                                                 <Pencil size={13} />
                                                                 Edit
-                                                            </button>
-                                                            <button
-                                                                onClick={() => setDeleteTarget(cfg)}
-                                                                className="p-1.5 rounded-lg text-text-muted hover:bg-danger/10 hover:text-danger transition-colors"
-                                                                title="Delete"
-                                                            >
-                                                                <Trash2 size={14} />
                                                             </button>
                                                         </>
                                                     )}
@@ -397,6 +551,14 @@ export function BillingConfig() {
                 onConfirm={handleDeleteConfirm}
                 config={deleteTarget}
                 deleting={deleting}
+            />
+            <FreezeModal
+                isOpen={!!freezeTarget}
+                onClose={() => setFreezeTarget(null)}
+                onConfirm={handleFreezeConfirm}
+                config={freezeTarget}
+                loading={freezing}
+                action={freezeAction}
             />
         </div>
     );

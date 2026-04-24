@@ -46,8 +46,31 @@ export interface TriadEntry {
     is_billable: boolean;
 }
 
+export interface VendorRisk {
+    vendor_name: string;
+    total: number;
+    rejected: number;
+    rejection_rate: number;
+    risk_level: 'Critical' | 'High' | 'Medium' | 'Low';
+}
+
+export interface PipelineRisk {
+    pipeline_dropout_pct: number;
+    bottleneck_pct: number;
+    pipeline_health_score: number;
+    critical_vendor_count: number;
+    vendor_risks: VendorRisk[];
+}
+
+export interface SkillStatusRow {
+    skill: string;
+    statuses: Record<string, number>;
+    total: number;
+}
+
 export interface DashboardMetrics {
     total_requests: number;
+    open_requests?: number;
     requests_by_status: Record<string, number>;
     requests_by_priority: Record<string, number>;
     total_candidates: number;
@@ -63,4 +86,6 @@ export interface DashboardMetrics {
     missing_identifiers?: MissingIdentifier[];
     triad_summary?: TriadEntry[];
     triad_billing_month?: string;
+    risk?: PipelineRisk;
+    skill_status_matrix?: SkillStatusRow[];
 }

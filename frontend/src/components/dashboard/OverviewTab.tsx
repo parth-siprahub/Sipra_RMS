@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import {
     Briefcase, Users, FileText,
-    Activity, UserCheck, XCircle, Pause, BarChart3, Table2
+    Activity, UserCheck, XCircle, Pause, BarChart3, Table2,
+    ShieldAlert, TrendingUp
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Link } from 'react-router-dom';
@@ -218,12 +219,13 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
     return (
         <>
         <div className="space-y-6">
-            {/* KPI Strip */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <KPICard label="Active Employees" value={selectedOnboarded} accent={KPI_ACCENT_COLORS.green} gradient={KPI_GRADIENTS.green} sub="Current headcount" subClassName="text-[var(--color-success-text)]" icon={UserCheck} />
+            {/* KPI Strip — 5 cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <KPICard label="Total Candidates" value={metrics.total_candidates || 0} accent={KPI_ACCENT_COLORS.red} gradient={KPI_GRADIENTS.red} sub="Active pipeline" icon={Users} />
+                <KPICard label="Selected / Onboarded" value={selectedOnboarded} accent={KPI_ACCENT_COLORS.green} gradient={KPI_GRADIENTS.green} sub="Cleared pipeline" subClassName="text-[var(--color-success-text)]" icon={UserCheck} />
                 <KPICard label="Total Rejections" value={totalRejections} accent={KPI_ACCENT_COLORS.orange} gradient={KPI_GRADIENTS.orange} sub="Screen + L1 + L2" icon={XCircle} />
                 <KPICard label="On Hold" value={onHoldCount} accent={KPI_ACCENT_COLORS.purple} gradient={KPI_GRADIENTS.purple} sub="Pending decisions" icon={Pause} />
-                <KPICard label="Active Requests" value={metrics.total_requests || 0} accent={KPI_ACCENT_COLORS.blue} gradient={KPI_GRADIENTS.blue} sub="Inflow active" icon={Briefcase} />
+                <KPICard label="Active Requests" value={metrics.open_requests ?? metrics.requests_by_status?.['OPEN'] ?? 0} accent={KPI_ACCENT_COLORS.blue} gradient={KPI_GRADIENTS.blue} sub="Inflow active" icon={Briefcase} />
             </div>
 
             {/* Status + Funnel row */}
@@ -513,6 +515,117 @@ export function OverviewTab({ metrics }: { metrics: DashboardMetrics }) {
                     </div>
                 ) : (
                     <div className="h-40 flex items-center justify-center text-text-muted text-sm">No submission data in the last 30 days</div>
+                )}
+            </div>
+
+            {/* ── Skill Distribution + Pipeline Health ────────────────────── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Candidates by Skill */}
+                {metrics.candidates_by_skill && metrics.candidates_by_skill.length > 0 && (
+                    <div className="card">
+                        <h2 className="text-base font-bold mb-4 flex items-center gap-2">
+                            <TrendingUp size={18} className="text-info" />
+                            Skill Intelligence
+                            <span className="text-xs font-normal text-text-muted ml-1">top {Math.min(metrics.candidates_by_skill.length, 10)}</span>
+                        </h2>
+                        <div className="h-64">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart layout="vertical" data={metrics.candidates_by_skill.slice(0, 10)} margin={{ top: 4, right: 30, left: 10, bottom: 4 }} barSize={16}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                                    <XAxis type="number" fontSize={10} tick={{ fill: '#64748B' }} axisLine={{ stroke: '#E2E8F0' }} allowDecimals={false} />
+                                    <YAxis dataKey="skill" type="category" width={90} fontSize={11} tick={{ fill: '#334155' }} axisLine={false} tickLine={false} />
+                                    <Tooltip contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }} formatter={(v: any) => [v, 'Candidates']} />
+                                    <Bar dataKey="count" radius={[0, 4, 4, 0]} animationDuration={800}>
+                                        {metrics.candidates_by_skill.slice(0, 10).map((_, i) => (
+                                            <Cell key={`sk-${i}`} fill={VENDOR_BAR_COLORS[i % VENDOR_BAR_COLORS.length]} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                )}
+
+                {/* Pipeline Health */}
+                {metrics.risk && (
+                    <div className="card flex flex-col gap-4">
+                        <h2 className="text-base font-bold flex items-center gap-2">
+                            <ShieldAlert size={18} className="text-warning" />
+                            Pipeline Health
+                        </h2>
+
+                        {/* Health Score */}
+                        <div className="flex items-center gap-4 p-4 rounded-xl bg-surface-hover border border-border">
+                            <div className="relative w-16 h-16 shrink-0">
+                                <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
+                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#E2E8F0" strokeWidth="3" />
+                                    <circle cx="18" cy="18" r="15.9" fill="none"
+                                        stroke={metrics.risk.pipeline_health_score >= 70 ? '#16A34A' : metrics.risk.pipeline_health_score >= 40 ? '#F59E0B' : '#EF4444'}
+                                        strokeWidth="3"
+                                        strokeDasharray={`${metrics.risk.pipeline_health_score} 100`}
+                                        strokeLinecap="round"
+                                    />
+                                </svg>
+                                <span className="absolute inset-0 flex items-center justify-center text-sm font-extrabold text-text">
+                                    {metrics.risk.pipeline_health_score}
+                                </span>
+                            </div>
+                            <div>
+                                <p className="text-xs text-text-muted uppercase tracking-wide font-semibold">Health Score</p>
+                                <p className="text-lg font-bold text-text mt-0.5">
+                                    {metrics.risk.pipeline_health_score >= 70 ? 'Healthy' : metrics.risk.pipeline_health_score >= 40 ? 'At Risk' : 'Critical'}
+                                </p>
+                                <p className="text-xs text-text-muted">Based on conversion + dropout + bottleneck</p>
+                            </div>
+                        </div>
+
+                        {/* Risk KPIs */}
+                        <div className="grid grid-cols-3 gap-3">
+                            <div className="text-center p-3 rounded-lg bg-surface-hover border border-border">
+                                <p className="text-xl font-extrabold tabular-nums" style={{ color: metrics.risk.pipeline_dropout_pct > 40 ? '#EF4444' : '#64748B' }}>
+                                    {metrics.risk.pipeline_dropout_pct}%
+                                </p>
+                                <p className="text-[10px] text-text-muted mt-0.5 font-semibold uppercase tracking-wide">Dropout</p>
+                            </div>
+                            <div className="text-center p-3 rounded-lg bg-surface-hover border border-border">
+                                <p className="text-xl font-extrabold tabular-nums" style={{ color: metrics.risk.bottleneck_pct > 20 ? '#F59E0B' : '#64748B' }}>
+                                    {metrics.risk.bottleneck_pct}%
+                                </p>
+                                <p className="text-[10px] text-text-muted mt-0.5 font-semibold uppercase tracking-wide">On Hold</p>
+                            </div>
+                            <div className="text-center p-3 rounded-lg bg-surface-hover border border-border">
+                                <p className="text-xl font-extrabold tabular-nums" style={{ color: metrics.risk.critical_vendor_count > 0 ? '#EF4444' : '#16A34A' }}>
+                                    {metrics.risk.critical_vendor_count}
+                                </p>
+                                <p className="text-[10px] text-text-muted mt-0.5 font-semibold uppercase tracking-wide">Critical Vendors</p>
+                            </div>
+                        </div>
+
+                        {/* Vendor risk list */}
+                        {metrics.risk.vendor_risks.filter(v => v.risk_level !== 'Low').length > 0 && (
+                            <div className="space-y-1.5 max-h-[120px] overflow-y-auto custom-scrollbar">
+                                {metrics.risk.vendor_risks
+                                    .filter(v => v.risk_level !== 'Low')
+                                    .sort((a, b) => b.rejection_rate - a.rejection_rate)
+                                    .slice(0, 5)
+                                    .map(v => (
+                                        <div key={v.vendor_name} className="flex items-center gap-2 text-xs">
+                                            <span className={cn('w-1.5 h-1.5 rounded-full shrink-0',
+                                                v.risk_level === 'Critical' ? 'bg-danger' :
+                                                v.risk_level === 'High' ? 'bg-orange-400' : 'bg-warning'
+                                            )} />
+                                            <span className="flex-1 truncate text-text">{v.vendor_name}</span>
+                                            <span className="font-semibold text-text-muted tabular-nums">{v.rejection_rate}%</span>
+                                            <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-bold',
+                                                v.risk_level === 'Critical' ? 'bg-danger/10 text-danger' :
+                                                v.risk_level === 'High' ? 'bg-orange-100 text-orange-600' : 'bg-warning/10 text-warning'
+                                            )}>{v.risk_level}</span>
+                                        </div>
+                                    ))
+                                }
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
 

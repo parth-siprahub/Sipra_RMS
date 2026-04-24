@@ -78,14 +78,19 @@ async def list_employees(
     is_backfill_map: dict[int, bool | None] = {}
     vendor_name_map: dict[int, str | None] = {}
     cand_onboarding: dict[int, object | None] = {}
+    exit_reason_map: dict[int, str | None] = {}
+    source_map: dict[int, str | None] = {}
     if candidate_ids:
-        cands = await client.table("candidates").select("id,request_id,onboarding_date,vendor_id,vendor").in_("id", candidate_ids).execute()
+        cands = await client.table("candidates").select("id,request_id,onboarding_date,vendor_id,vendor,exit_reason,source").in_("id", candidate_ids).execute()
         request_ids = [c["request_id"] for c in (cands.data or []) if c.get("request_id")]
         cand_onboarding = {c["id"]: c.get("onboarding_date") for c in (cands.data or []) if c.get("id")}
         cand_to_req = {c["id"]: c["request_id"] for c in (cands.data or []) if c.get("request_id")}
         for c in (cands.data or []):
-            if c.get("id") and c.get("vendor"):
-                vendor_name_map[c["id"]] = c["vendor"]
+            if c.get("id"):
+                if c.get("vendor"):
+                    vendor_name_map[c["id"]] = c["vendor"]
+                exit_reason_map[c["id"]] = c.get("exit_reason")
+                source_map[c["id"]] = c.get("source")
         if request_ids:
             rrs = await client.table("resource_requests").select("id,job_profile_id,sow_id,is_backfill").in_("id", request_ids).execute()
             jp_ids = [r["job_profile_id"] for r in (rrs.data or []) if r.get("job_profile_id")]
@@ -117,10 +122,11 @@ async def list_employees(
             **e,
             "job_profile_name": job_profile_map.get(cid) if cid else None,
             "sow_number": sow_number_map.get(cid) if cid else None,
-            "source": e.get("source"),
+            "source": e.get("source") or (source_map.get(cid) if cid else None),
             "vendor_name": vendor_name_map.get(cid) if cid else None,
             "start_date": e.get("start_date") or (cand_onboarding.get(cid) if cid else None),
             "is_backfill": is_backfill_map.get(cid) if cid else None,
+            "exit_reason": exit_reason_map.get(cid) if cid else None,
         }
         enriched.append(_employee_api_row(merged))
     api_cache.set(cache_key, enriched)
@@ -183,6 +189,9 @@ async def create_employee_from_candidate(
     effective_start = c.get("onboarding_date") or date.today().isoformat()
     if not c.get("onboarding_date"):
         await client.table("candidates").update({"onboarding_date": effective_start}).eq("id", candidate_id).execute()
+    # Derive payroll source: Anten vendor → "Anten", all others → "SipraHub"
+    candidate_vendor = (c.get("vendor") or "").strip().upper()
+    payroll_source = "Anten" if candidate_vendor == "ANTEN" else "SipraHub"
     employee_data = {
         "candidate_id": candidate_id,
         "rms_name": f"{c.get('first_name', '')} {c.get('last_name', '')}".strip(),
@@ -190,6 +199,7 @@ async def create_employee_from_candidate(
         "jira_username": c.get("client_jira_id"),
         "start_date": effective_start,
         "status": EmployeeStatus.ACTIVE.value,
+        "source": payroll_source,
     }
     employee_data = {k: v for k, v in employee_data.items() if v is not None}
     employee_data = normalize_employee_text(employee_data)
@@ -241,7 +251,18 @@ async def get_employee(employee_id: int, current_user: dict = Depends(get_curren
     result = await client.table("employees").select("*").eq("id", employee_id).single().execute()
     if not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Employee not found")
-    return _employee_api_row(result.data)
+    e = result.data
+    cid = e.get("candidate_id")
+    enriched = {**e}
+    if cid:
+        cand_result = await client.table("candidates").select("id,onboarding_date,vendor,exit_reason,source").eq("id", cid).execute()
+        if cand_result.data:
+            c = cand_result.data[0]
+            enriched["start_date"] = e.get("start_date") or c.get("onboarding_date")
+            enriched["source"] = e.get("source") or c.get("source")
+            enriched["vendor_name"] = c.get("vendor")
+            enriched["exit_reason"] = c.get("exit_reason")
+    return _employee_api_row(enriched)
 
 
 @router.patch("/{employee_id}", response_model=EmployeeResponse)
