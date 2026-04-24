@@ -47,8 +47,13 @@ function StatusDropdown({ request, onStatusChange }: StatusDropdownProps) {
                 setOpen(false);
             }
         };
+        const closeOnScroll = () => setOpen(false);
         document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
+        window.addEventListener('scroll', closeOnScroll, true);
+        return () => {
+            document.removeEventListener('mousedown', handler);
+            window.removeEventListener('scroll', closeOnScroll, true);
+        };
     }, [open]);
 
     const handleOpen = () => {
