@@ -13,7 +13,6 @@ import {
     Clock,
     Landmark,
     BarChart3,
-    PieChart,
     Settings2,
     type LucideProps,
 } from 'lucide-react';
