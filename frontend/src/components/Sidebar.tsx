@@ -13,9 +13,10 @@ import {
     Clock,
     Landmark,
     BarChart3,
-    PieChart,
     Settings2,
+    type LucideProps,
 } from 'lucide-react';
+import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 
 import { cn } from '../lib/utils';
 import { formatPersonName } from '../lib/personNames';
@@ -27,7 +28,7 @@ interface SidebarProps {
     setCollapsed: (collapsed: boolean) => void;
 }
 
-const navItems = [
+const navItems: { to: string; icon: ForwardRefExoticComponent<Omit<LucideProps, 'ref'> & RefAttributes<SVGSVGElement>>; label: string; emailOnly?: boolean; exact?: boolean }[] = [
     { to: '/dashboard/overview', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/sows', icon: ScrollText, label: 'SOWs' },
     { to: '/job-profiles', icon: FileText, label: 'Job Profiles' },
