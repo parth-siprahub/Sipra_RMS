@@ -11,7 +11,6 @@ import { useAuth, isAdminRole } from '../context/AuthContext';
 import {
     Download,
     Calculator,
-    ExternalLink,
     Lock,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -71,6 +70,7 @@ function ReportsToolbar({
     monthOptions,
     isAdmin,
     onExport,
+    onExportLeaves,
     onCalculate,
     calculating,
     frozenMonths,
@@ -80,6 +80,7 @@ function ReportsToolbar({
     monthOptions: { value: string; label: string }[];
     isAdmin: boolean;
     onExport: () => void;
+    onExportLeaves: () => void;
     onCalculate: () => void;
     calculating: boolean;
     frozenMonths?: Set<string>;
@@ -111,6 +112,15 @@ function ReportsToolbar({
                         >
                             <Download size={14} />
                             Export CSV
+                        </button>
+                        <button
+                            type="button"
+                            className="btn btn-secondary btn-sm inline-flex items-center gap-1.5 shrink-0"
+                            onClick={onExportLeaves}
+                            title="Finance hand-off: leaves taken per employee (no payout/LOP math)"
+                        >
+                            <Download size={14} />
+                            Leaves CSV
                         </button>
                         <button
                             type="button"
@@ -239,6 +249,7 @@ function ComparisonTab({
                 difference_pct: c.difference_pct,
                 flag: c.flag,
                 source: c.source ?? null,
+                job_role: c.job_role ?? null,
             }));
         }
         return (report?.comparisons || []).map(c => ({
@@ -254,6 +265,7 @@ function ComparisonTab({
             difference_pct: c.difference_pct,
             flag: c.flag,
             source: c.source ?? null,
+            job_role: c.job_role ?? null,
         }));
     }, [computed, report]);
 
@@ -273,6 +285,7 @@ function ComparisonTab({
                     monthOptions={monthOptions}
                     isAdmin={isAdmin}
                     onExport={() => reportsApi.exportComparison(month)}
+                    onExportLeaves={() => reportsApi.exportLeavesTaken(month)}
                     onCalculate={handleCalculate}
                     calculating={calculating}
                     frozenMonths={frozenMonths}
@@ -294,6 +307,7 @@ function ComparisonTab({
                     monthOptions={monthOptions}
                     isAdmin={isAdmin}
                     onExport={() => reportsApi.exportComparison(month)}
+                    onExportLeaves={() => reportsApi.exportLeavesTaken(month)}
                     onCalculate={handleCalculate}
                     calculating={calculating}
                     frozenMonths={frozenMonths}
@@ -321,7 +335,8 @@ function ComparisonTab({
             return (
                 name.includes(q) ||
                 (c.jira_username || '').toLowerCase().includes(q) ||
-                (c.aws_email || '').toLowerCase().includes(q)
+                (c.aws_email || '').toLowerCase().includes(q) ||
+                (c.job_role || '').toLowerCase().includes(q)
             );
         })
         .slice()
@@ -371,6 +386,7 @@ function ComparisonTab({
                 monthOptions={monthOptions}
                 isAdmin={isAdmin}
                 onExport={() => reportsApi.exportComparison(month)}
+                onExportLeaves={() => reportsApi.exportLeavesTaken(month)}
                 onCalculate={handleCalculate}
                 calculating={calculating}
                 frozenMonths={frozenMonths}
@@ -530,6 +546,7 @@ function ComparisonTab({
                             <tr className="bg-surface-hover/50 border-b border-border">
                                 <th className={thClass('name')} onClick={() => toggleSort('name')}>Employee <SortIcon col="name" /></th>
                                 <th className={thClass('source')} onClick={() => toggleSort('source')}>Payroll <SortIcon col="source" /></th>
+                                <th className={thClass('job_role')}>Job Role</th>
                                 <th className={thClass('flag', 'center')} onClick={() => toggleSort('flag')}>Status <SortIcon col="flag" /></th>
                                 <th className={thClass('billable', 'right')}>Billable Target</th>
                                 <th className={thClass('jira', 'right')} onClick={() => toggleSort('jira')}>Jira Hrs <SortIcon col="jira" /></th>
@@ -537,7 +554,6 @@ function ComparisonTab({
                                 <th className={thClass('ooo', 'center')} onClick={() => toggleSort('ooo')}>OOO <SortIcon col="ooo" /></th>
                                 <th className={thClass('diff', 'right')} onClick={() => toggleSort('diff')}>Diff <SortIcon col="diff" /></th>
                                 <th className={thClass('pct', 'right')} onClick={() => toggleSort('pct')}>% <SortIcon col="pct" /></th>
-                                <th className="px-2 py-2 w-9"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -549,7 +565,12 @@ function ComparisonTab({
                                 >
                                     <td className="px-3 py-2">
                                         <p className="font-medium text-text leading-tight">{formatPersonName(row.rms_name || '')}</p>
-                                        <p className="text-xs text-text-muted leading-tight mt-0.5">{row.jira_username || row.aws_email || '—'}</p>
+                                        <p className="text-xs text-text-muted leading-tight mt-0.5">{row.jira_username || '—'}</p>
+                                        {row.aws_email && (
+                                            <p className="block text-[10px] font-mono text-text-muted/60 leading-tight mt-0.5 truncate" title={row.aws_email}>
+                                                {row.aws_email}
+                                            </p>
+                                        )}
                                     </td>
                                     <td className="px-3 py-2">
                                         {row.source ? (
@@ -559,6 +580,9 @@ function ComparisonTab({
                                         ) : (
                                             <span className="text-text-muted text-xs">—</span>
                                         )}
+                                    </td>
+                                    <td className="px-3 py-2 text-text-muted text-sm">
+                                        {row.job_role || '—'}
                                     </td>
                                     <td className="px-3 py-2 text-center">
                                         <span className={cn('inline-block px-2 py-0.5 rounded text-[11px] font-semibold',
@@ -601,9 +625,6 @@ function ComparisonTab({
                                             <span className="text-text-muted">—</span>
                                         )}
                                     </td>
-                                    <td className="px-1.5 py-2 text-center">
-                                        <ExternalLink size={14} className="text-text-muted" />
-                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -625,6 +646,7 @@ interface RowData {
     jira_username: string | null;
     aws_email: string | null;
     source: string | null;
+    job_role: string | null;
     jira_hours: number;
     billable_hours: number | null;
     ooo_days: number;

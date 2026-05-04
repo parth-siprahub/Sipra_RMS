@@ -14,6 +14,7 @@ export interface TimesheetComparison {
     difference_pct: number | null;
     flag: 'green' | 'amber' | 'red' | 'no_aws';
     source: string | null;
+    job_role?: string | null;
 }
 
 export interface ComparisonReport {
@@ -59,6 +60,7 @@ export interface ComputedReport {
     jira_username?: string | null;
     aws_email?: string | null;
     source?: string | null;
+    job_role?: string | null;
 }
 
 export interface CalculateResult {
@@ -73,7 +75,16 @@ export interface EmployeeDetail {
     jira_entries: Record<string, unknown>[];
 }
 
+export interface MonthTarget {
+    month: string;
+    working_days: number;
+    target_hours: number;
+}
+
 export const reportsApi = {
+    getMonthTarget: (month: string) =>
+        api.get<MonthTarget>('/reports/month-target', { month }),
+
     getComparison: (month: string) =>
         api.get<ComparisonReport>('/reports/timesheet-comparison', { month }),
 
@@ -82,6 +93,11 @@ export const reportsApi = {
 
     exportComparison: (month: string) =>
         api.download(`/reports/timesheet-comparison/export?month=${month}`, `comparison_${month}.csv`),
+
+    /** Finance hand-off: leaves taken per employee for the month.
+     *  Per the May 4 directive, RMS does not compute payout/LOP — Finance handles policy. */
+    exportLeavesTaken: (month: string) =>
+        api.download(`/exports/leaves-taken?month=${month}`, `leaves_taken_${month}.csv`),
 
     calculateBilling: (month: string) =>
         api.post<CalculateResult>(`/reports/calculate/${month}`, {}),

@@ -165,6 +165,26 @@ class AwsImportV2Result(BaseModel):
     entries_inserted: int
     unmatched_emails: list[str]
     unmatched_details: list[UnmatchedDetail] = []
+    daily_logs_inserted: int = 0
+
+
+# ──────────────────────────────────────────────
+# AWS Daily Logs schema (aws_daily_logs — per-day granular rows)
+# ──────────────────────────────────────────────
+
+class AwsDailyLogResponse(BaseModel):
+    id: int
+    employee_id: int | None = None
+    aws_email: str
+    billing_month: str
+    log_date: date
+    work_seconds: int = 0
+    productive_seconds: int = 0
+    screen_time_seconds: int = 0
+    is_weekend: bool = False
+    post_exit_flag: bool = False
+    import_header_id: int | None = None
+    created_at: datetime | None = None
 
 
 # ──────────────────────────────────────────────

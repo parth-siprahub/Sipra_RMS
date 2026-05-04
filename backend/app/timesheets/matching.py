@@ -6,7 +6,8 @@ Matching tiers (in order):
 3. Username-to-name conversion (e.g. "harinath.sirigiri" -> "Harinath Sirigiri")
 4. Normalized substring matching
 5. Token-set overlap matching
-6. Levenshtein distance (suggestions only, never auto-linked)
+6. rapidfuzz token_set_ratio >= 90% (auto-links Display Names, e.g. "Rajesh Sai Krishna V")
+7. Levenshtein distance (suggestions only, never auto-linked)
 """
 
 from __future__ import annotations
@@ -15,8 +16,19 @@ import logging
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import date
 from enum import Enum
 from typing import Optional
+
+try:
+    from rapidfuzz import fuzz as _rf_fuzz
+    _RAPIDFUZZ_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _rf_fuzz = None  # type: ignore[assignment]
+    _RAPIDFUZZ_AVAILABLE = False
+
+# Minimum rapidfuzz token_set_ratio score (0–100) for auto-linking a Display Name
+_RF_AUTO_LINK_THRESHOLD = 90
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +80,7 @@ class _EmployeeRecord:
     rms_name_tokens: frozenset[str]
     jira_username_lower: str
     aws_email_lower: str
+    exit_date: Optional[date] = None
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +196,7 @@ class EmployeeMatcher:
 
         # Load employees -------------------------------------------------------
         emp_resp = await client.table("employees").select(  # type: ignore[union-attr]
-            "id, rms_name, jira_username, aws_email"
+            "id, rms_name, jira_username, aws_email, exit_date"
         ).execute()
 
         self._employees.clear()
@@ -197,6 +210,15 @@ class EmployeeMatcher:
             if emp_id is None or not rms_name:
                 continue
 
+            # Parse exit_date from ISO string if present
+            raw_exit = row.get("exit_date")
+            parsed_exit: Optional[date] = None
+            if raw_exit:
+                try:
+                    parsed_exit = date.fromisoformat(str(raw_exit)[:10])
+                except ValueError:
+                    pass
+
             rec = _EmployeeRecord(
                 id=emp_id,
                 rms_name=rms_name,
@@ -205,6 +227,7 @@ class EmployeeMatcher:
                 rms_name_tokens=_tokenize(rms_name),
                 jira_username_lower=jira.lower(),
                 aws_email_lower=aws.lower(),
+                exit_date=parsed_exit,
             )
             self._employees.append(rec)
             self._id_to_name[emp_id] = rms_name
@@ -320,7 +343,32 @@ class EmployeeMatcher:
                     matched_value=best_emp.rms_name,
                 )
 
-        # Tier 6 — Levenshtein is suggestion-only, not auto-linked
+        # Tier 6 — rapidfuzz token_set_ratio for Display Name auto-linking.
+        # Handles "Rajesh Sai Krishna V" (Jira Display Name) → "RAJESH SAI KRISHNA V" (RMS).
+        # Only fires when rapidfuzz is installed (production requirement).
+        if _RAPIDFUZZ_AVAILABLE:
+            best_rf_emp: Optional[_EmployeeRecord] = None
+            best_rf_score = 0.0
+            for emp in self._employees:
+                if not emp.rms_name_normalized or not ident_normalized:
+                    continue
+                score = _rf_fuzz.token_set_ratio(ident_normalized, emp.rms_name_normalized)
+                if score > best_rf_score:
+                    best_rf_score = score
+                    best_rf_emp = emp
+            if best_rf_emp is not None and best_rf_score >= _RF_AUTO_LINK_THRESHOLD:
+                logger.debug(
+                    "Tier 6 rapidfuzz: '%s' → '%s' (score=%s)",
+                    identifier, best_rf_emp.rms_name, best_rf_score,
+                )
+                return MatchResult(
+                    employee_id=best_rf_emp.id,
+                    confidence=Confidence.FUZZY,
+                    match_type=f"rapidfuzz_display_name:{best_rf_score:.0f}",
+                    matched_value=best_rf_emp.rms_name,
+                )
+
+        # Tier 7 — Levenshtein is suggestion-only, not auto-linked
         return MatchResult(
             employee_id=None,
             confidence=Confidence.NONE,
@@ -419,7 +467,15 @@ class EmployeeMatcher:
     def _match_employee_columns(
         self, ident_lower: str, sys_upper: str,
     ) -> Optional[MatchResult]:
-        """Tier 2: match against jira_username, aws_email, rms_name columns."""
+        """Tier 2: match against jira_username, aws_email, rms_name columns.
+
+        Three separate passes are intentional: explicit system-field mappings
+        (jira_username / aws_email) must win over rms_name collisions.  This
+        matters when two employees share the same rms_name but only one has an
+        explicit jira_username set — the single-pass approach would match the
+        wrong (often EXITED) employee whose rms_name appears first in the list.
+        """
+        # Pass 1 — explicit system-field (highest priority)
         for emp in self._employees:
             if sys_upper == "JIRA" and emp.jira_username_lower == ident_lower:
                 return MatchResult(
@@ -435,6 +491,9 @@ class EmployeeMatcher:
                     match_type="aws_email_column",
                     matched_value=emp.rms_name,
                 )
+
+        # Pass 2 — rms_name fallback (only reached when no explicit field matched)
+        for emp in self._employees:
             if emp.rms_name_lower == ident_lower:
                 return MatchResult(
                     employee_id=emp.id,

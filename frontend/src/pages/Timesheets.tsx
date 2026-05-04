@@ -331,7 +331,7 @@ export function Timesheets() {
                     onImport={() => setIsAwsImportOpen(true)}
                     navigateToDrillDown={(entries, idx, empMap) => {
                         navigate('/timesheets/drill-down/aws', {
-                            state: { entries, currentIndex: idx, empMap },
+                            state: { entries, currentIndex: idx, empMap, billing_month: selectedMonth },
                         });
                     }}
                     setUnmatchedModalOpen={setIsUnmatchedModalOpen}
@@ -937,17 +937,21 @@ function AwsV2ImportModal({
     onSuccess: (result: AwsImportV2Result) => void;
     defaultMonth: string;
 }) {
-    const [file, setFile] = useState<File | null>(null);
+    const [summaryFile, setSummaryFile] = useState<File | null>(null);
+    const [granularFile, setGranularFile] = useState<File | null>(null);
     const [month, setMonth] = useState(defaultMonth);
     const [uploading, setUploading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!file) { toast.error('Select a CSV file'); return; }
+        if (!summaryFile) { toast.error('Select the Top Users (Summary) CSV file'); return; }
         setUploading(true);
         try {
-            const result = await timesheetsApi.importAwsV2(file, month);
-            toast.success(`Imported ${result.entries_inserted} AWS entries`);
+            const result = await timesheetsApi.importAwsV2(summaryFile, month, granularFile ?? undefined);
+            const dailyMsg = result.daily_logs_inserted > 0
+                ? ` + ${result.daily_logs_inserted} daily log rows`
+                : '';
+            toast.success(`Imported ${result.entries_inserted} AWS entries${dailyMsg}`);
             onSuccess(result);
             onClose();
         } catch (error) {
@@ -955,7 +959,7 @@ function AwsV2ImportModal({
             if (msg.includes('timed out') || msg.includes('300s')) {
                 toast.success('Upload sent — processing may still be running. Refreshing data...', { duration: 5000 });
                 onClose();
-                setTimeout(() => onSuccess({ month, total_rows: 0, employees_matched: 0, employees_unmatched: 0, entries_inserted: 0, unmatched_emails: [] }), 3000);
+                setTimeout(() => onSuccess({ month, total_rows: 0, employees_matched: 0, employees_unmatched: 0, entries_inserted: 0, unmatched_emails: [], daily_logs_inserted: 0 }), 3000);
             }
         } finally {
             setUploading(false);
@@ -965,35 +969,54 @@ function AwsV2ImportModal({
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Import AWS ActiveTrack Data">
             <form onSubmit={handleSubmit} className="space-y-4">
+                {/* ── Required: Top Users Summary CSV ── */}
                 <div>
-                    <label className="input-label">CSV File</label>
+                    <label className="input-label">
+                        Top Users CSV <span className="text-error text-xs">(required)</span>
+                    </label>
                     <input
                         type="file"
                         accept=".csv"
                         className="input-field"
-                        onChange={e => setFile(e.target.files?.[0] || null)}
+                        onChange={e => setSummaryFile(e.target.files?.[0] || null)}
                     />
+                    <p className="text-xs text-text-muted mt-1">Monthly aggregate — one row per employee</p>
                 </div>
+
+                {/* ── Optional: Working Hours Granular CSV ── */}
+                <div>
+                    <label className="input-label">
+                        Working Hours CSV <span className="text-text-muted text-xs">(optional)</span>
+                    </label>
+                    <input
+                        type="file"
+                        accept=".csv"
+                        className="input-field"
+                        onChange={e => setGranularFile(e.target.files?.[0] || null)}
+                    />
+                    <p className="text-xs text-text-muted mt-1">Daily rows — enables date-wise drilldown view</p>
+                </div>
+
                 <div>
                     <label className="input-label" htmlFor="aws-import-month">Billing Month</label>
-                    <input 
+                    <input
                         id="aws-import-month"
-                        type="month" 
-                        className="input-field" 
-                        value={month} 
-                        onChange={e => setMonth(e.target.value)} 
+                        type="month"
+                        className="input-field"
+                        value={month}
+                        onChange={e => setMonth(e.target.value)}
                         title="Billing Month"
                         placeholder="YYYY-MM"
                     />
                 </div>
                 <div className="text-xs text-text-muted space-y-1">
-                    <p><Monitor size={12} className="inline text-cta mr-1" />Export from AWS ActiveTrack — single or multi-month CSV supported</p>
+                    <p><Monitor size={12} className="inline text-cta mr-1" />Export both CSVs from AWS ActiveTrack for the same month</p>
                     <p><CheckCircle size={12} className="inline text-success mr-1" />Only rows matching the selected billing month are imported</p>
                     <p><CheckCircle size={12} className="inline text-info mr-1" />Re-uploading same month replaces previous data</p>
                 </div>
                 <div className="flex gap-3 pt-2">
                     <button type="button" onClick={onClose} className="btn btn-secondary flex-1" disabled={uploading}>Cancel</button>
-                    <button type="submit" className="btn btn-cta flex-1" disabled={uploading || !file}>
+                    <button type="submit" className="btn btn-cta flex-1" disabled={uploading || !summaryFile}>
                         {uploading ? <span className="spinner w-4 h-4" /> : 'Upload & Import'}
                     </button>
                 </div>

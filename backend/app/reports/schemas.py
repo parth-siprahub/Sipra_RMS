@@ -17,6 +17,7 @@ class TimesheetComparison(BaseModel):
     flag: str  # "green" | "amber" | "red" (legacy rows may still have "no_aws")
     source: str | None = None  # payroll type: internal / vendor / contractor
     vendor_name: str | None = None  # from candidate → vendor
+    job_role: str | None = None  # from candidate → resource_request → job_profile.role_name
 
 
 class ComplianceEntry(BaseModel):
@@ -89,6 +90,7 @@ class ComputedReportRow(BaseModel):
     aws_email: str | None = None
     source: str | None = None  # payroll type: internal / vendor / contractor
     vendor_name: str | None = None  # from candidate → vendor
+    job_role: str | None = None  # from candidate → resource_request → job_profile.role_name
 
 
 class CalculateResult(BaseModel):

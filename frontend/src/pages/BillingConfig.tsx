@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { billingConfigApi, type BillingConfig } from '../api/billingConfig';
-import { Plus, Trash2, Settings2, Calendar, Check, X, Pencil, Lock, Unlock, AlertTriangle } from 'lucide-react';
+import { reportsApi, type MonthTarget } from '../api/reports';
+import { Plus, Trash2, Settings2, Calendar, Check, X, Pencil, Lock, Unlock, AlertTriangle, Calculator } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useAuth } from '../context/AuthContext';
@@ -141,7 +142,6 @@ function FreezeModal({ isOpen, onClose, onConfirm, config, loading, action }: Fr
 
 interface EditRowState {
     client_name: string;
-    billable_hours: number;
     working_days: number;
 }
 
@@ -183,8 +183,21 @@ export function BillingConfig() {
 
     // Inline edit state
     const [editingId, setEditingId] = useState<number | null>(null);
-    const [editRow, setEditRow] = useState<EditRowState>({ client_name: '', billable_hours: 0, working_days: 0 });
+    const [editRow, setEditRow] = useState<EditRowState>({ client_name: '', working_days: 0 });
     const [saving, setSaving] = useState(false);
+
+    // System-calculated month targets (month → target) — fetched lazily on edit
+    const [monthTargets, setMonthTargets] = useState<Record<string, MonthTarget>>({});
+
+    const fetchMonthTarget = async (month: string) => {
+        if (monthTargets[month]) return;
+        try {
+            const target = await reportsApi.getMonthTarget(month);
+            setMonthTargets(prev => ({ ...prev, [month]: target }));
+        } catch {
+            /* non-critical — UI falls back to showing cfg.billable_hours */
+        }
+    };
 
     // Freeze / unfreeze state
     const [freezeTarget, setFreezeTarget] = useState<BillingConfig | null>(null);
@@ -226,9 +239,10 @@ export function BillingConfig() {
         setEditingId(cfg.id);
         setEditRow({
             client_name: cfg.client_name,
-            billable_hours: cfg.billable_hours,
             working_days: cfg.working_days,
         });
+        // Pre-fetch system target for this month so it's ready when editing
+        fetchMonthTarget(cfg.billing_month);
     };
 
     const cancelEdit = () => {
@@ -236,14 +250,18 @@ export function BillingConfig() {
     };
 
     const saveEdit = async (cfg: BillingConfig) => {
-        if (editRow.billable_hours <= 0) { toast.error('Billable hours must be > 0'); return; }
         if (editRow.working_days <= 0) { toast.error('Working days must be > 0'); return; }
         setSaving(true);
+        // Use system-calculated billable_hours (working_days × 8h) — never manually entered
+        const systemTarget = monthTargets[cfg.billing_month];
+        const billableHours = systemTarget
+            ? systemTarget.target_hours
+            : editRow.working_days * 8;  // fallback if API not yet loaded
         try {
             await billingConfigApi.upsert({
                 client_name: editRow.client_name || cfg.client_name,
                 billing_month: cfg.billing_month,
-                billable_hours: Number(editRow.billable_hours),
+                billable_hours: billableHours,
                 working_days: Number(editRow.working_days),
             });
             toast.success('Billing config updated');
@@ -358,7 +376,7 @@ export function BillingConfig() {
                                     <th className="w-12">ID</th>
                                     <th>Client</th>
                                     <th>Billing Month</th>
-                                    <th className="text-right">Billable Hours</th>
+                                    <th className="text-right">System Target</th>
                                     <th className="text-right">Working Days</th>
                                     <th>Status / Audit</th>
                                     <th>Created At</th>
@@ -395,22 +413,32 @@ export function BillingConfig() {
                                                 </span>
                                             </td>
 
-                                            {/* Billable Hours */}
-                                            <td className="text-right">
-                                                {isEditing ? (
-                                                    <input
-                                                        type="number"
-                                                        className="input-field py-1 text-sm w-24 text-right"
-                                                        min={1} step={0.5}
-                                                        value={editRow.billable_hours || ''}
-                                                        onChange={(e) => setEditRow(r => ({ ...r, billable_hours: parseFloat(e.target.value) || 0 }))}
-                                                    />
-                                                ) : (
-                                                    <>
-                                                        <span className="font-mono font-semibold text-sm text-text">{cfg.billable_hours.toLocaleString()}</span>
-                                                        <span className="ml-1 text-xs text-text-muted">hrs</span>
-                                                    </>
-                                                )}
+                                            {/* System Calculated Target Hours — READ-ONLY.
+                                                Derived from prorated_target_hours(working_days × 8h).
+                                                DO NOT add an input element here — manual override would
+                                                break per-employee proration for mid-month exits (e.g. Pathak). */}
+                                            <td
+                                                className="text-right"
+                                                aria-readonly="true"
+                                                title="System-calculated target. Read-only — protects proration logic."
+                                            >
+                                                {(() => {
+                                                    const sysTarget = monthTargets[cfg.billing_month];
+                                                    const hours = sysTarget ? sysTarget.target_hours : cfg.billable_hours;
+                                                    const days = sysTarget ? sysTarget.working_days : null;
+                                                    return (
+                                                        <div className="flex flex-col items-end gap-0.5">
+                                                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-cta/10 text-cta">
+                                                                <Lock size={10} />
+                                                                <Calculator size={10} />
+                                                                {hours.toLocaleString()}h
+                                                            </span>
+                                                            {days !== null && (
+                                                                <span className="text-xs text-text-muted">{days} days × 8h</span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </td>
 
                                             {/* Working Days */}

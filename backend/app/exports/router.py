@@ -148,3 +148,82 @@ async def export_timesheets(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/leaves-taken")
+async def export_leaves_taken(
+    month: str = Query(..., description="YYYY-MM format", pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    current_user: dict = Depends(require_admin),
+):
+    """Finance hand-off: leaves taken per employee for the month.
+
+    Per the May 4 directive (Jaicind), RMS does NOT compute payout/LOP. This
+    endpoint exposes the raw leave count only; Finance applies their own policy.
+
+    Columns: employee_id, employee_name, month, total_leaves_taken
+    Source: timesheet_logs.is_ooo = TRUE rows (one per OOO day).
+    """
+    client = await get_supabase_admin_async()
+
+    # Fetch all OOO rows for the month, paginated to avoid the 1000-row cap.
+    ooo_rows: list[dict] = []
+    offset = 0
+    while True:
+        batch = await (
+            client.table("timesheet_logs")
+            .select("employee_id, log_date")
+            .eq("import_month", month)
+            .eq("is_ooo", True)
+            .range(offset, offset + 999)
+            .execute()
+        )
+        chunk = batch.data or []
+        ooo_rows.extend(chunk)
+        if len(chunk) < 1000:
+            break
+        offset += 1000
+
+    # Aggregate leaves by employee_id (count distinct log_dates per employee).
+    leaves_by_emp: dict[int, set] = {}
+    for row in ooo_rows:
+        eid = row.get("employee_id")
+        d = row.get("log_date")
+        if eid and d:
+            leaves_by_emp.setdefault(eid, set()).add(d)
+
+    # Resolve employee names (include all employees active in the month, even with 0 leaves).
+    emp_result = await client.table("employees").select("id, rms_name").execute()
+    emp_map: dict[int, str] = {}
+    for e in (emp_result.data or []):
+        nm = format_person_name(e.get("rms_name") or "") or e.get("rms_name") or ""
+        emp_map[e["id"]] = nm
+
+    rows = []
+    seen = set()
+    for eid, dates in sorted(leaves_by_emp.items(), key=lambda kv: emp_map.get(kv[0], "")):
+        rows.append({
+            "employee_id": eid,
+            "employee_name": emp_map.get(eid, ""),
+            "month": month,
+            "total_leaves_taken": len(dates),
+        })
+        seen.add(eid)
+    # Append zero-leave employees so Finance has the full roster.
+    for eid, name in sorted(emp_map.items(), key=lambda kv: kv[1]):
+        if eid in seen:
+            continue
+        rows.append({
+            "employee_id": eid,
+            "employee_name": name,
+            "month": month,
+            "total_leaves_taken": 0,
+        })
+
+    columns = ["employee_id", "employee_name", "month", "total_leaves_taken"]
+    buf = _build_csv(rows, columns)
+    filename = f"leaves_taken_{month}.csv"
+    return StreamingResponse(
+        buf,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

@@ -113,6 +113,23 @@ export interface AwsImportV2Result {
     entries_inserted: number;
     unmatched_emails: string[];
     unmatched_details?: UnmatchedDetail[];
+    daily_logs_inserted: number;
+}
+
+// ── AWS Daily Logs (aws_daily_logs — per-day granular rows) ─────────────────
+export interface AwsDailyLog {
+    id: number;
+    employee_id: number | null;
+    aws_email: string;
+    billing_month: string;
+    log_date: string;            // YYYY-MM-DD
+    work_seconds: number;
+    productive_seconds: number;
+    screen_time_seconds: number;
+    is_weekend: boolean;
+    post_exit_flag: boolean;
+    import_header_id: number | null;
+    created_at: string | null;
 }
 
 // ── Legacy AWS types (kept for backward compat) ─────────────────────────────
@@ -171,12 +188,25 @@ export const timesheetsApi = {
     listAwsV2: (month: string) =>
         api.get<AwsTimesheetV2Entry[]>('/timesheets/aws', { billing_month: month, page_size: 500 }),
 
-    importAwsV2: async (file: File, importMonth: string): Promise<AwsImportV2Result> => {
+    importAwsV2: async (
+        summaryFile: File,
+        importMonth: string,
+        granularFile?: File,
+    ): Promise<AwsImportV2Result> => {
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('summary_file', summaryFile);
         formData.append('import_month', importMonth);
+        if (granularFile) {
+            formData.append('granular_file', granularFile);
+        }
         return api.upload<AwsImportV2Result>('/timesheets/aws/import', formData);
     },
+
+    getAwsDailyLogs: (employeeId: number, billingMonth: string) =>
+        api.get<AwsDailyLog[]>('/timesheets/aws/daily', {
+            employee_id: employeeId,
+            billing_month: billingMonth,
+        }),
 
     linkAwsToEmployee: (logId: number, employeeId: number) =>
         api.patch<AwsTimesheetV2Entry>(`/timesheets/aws/${logId}/link?employee_id=${employeeId}`, {}),

@@ -296,3 +296,52 @@ class TestCalculateBilling:
         assert result["total_logged_hours"] == 22 * 9.0
         assert result["capped_hours"] <= MAX_WEEKLY_HOURS * 5  # Max 5 weeks
         assert result["is_billable"] is True
+
+
+# ═══════════════════════════════════════════════════════════
+# May 4 Pivot — holiday-worked hours MUST flow into billable totals
+# ═══════════════════════════════════════════════════════════
+
+class TestHolidayWorkedIsBillable:
+    """Jaicind directive (May 4): hours logged on declared holidays (e.g. May 1)
+    must be billed to the customer. The billing engine treats hours as hours;
+    the holiday calendar only affects the *target*, not the billable amount.
+    """
+
+    def test_may_1_worked_hours_count_toward_billable(self):
+        # 2026-05-01 is Maharashtra Day / Labour Day (declared holiday).
+        # If an employee worked 6h that day, those 6h MUST appear in totals.
+        entries = [entry("2026-05-01", 6.0)]
+        result = calculate_billing(entries)
+        assert result["total_logged_hours"] == 6.0
+        assert result["capped_hours"] == 6.0
+        assert result["is_billable"] is True
+
+    def test_holiday_plus_regular_week(self):
+        """Holiday hours add to the weekly total; capped only by 8/40 rule."""
+        # Mon-Fri at 8h each = 40h, then May 1 (Friday holiday) adds another row.
+        # Wait — May 1 2026 IS a Friday. Use the prior weekday config: build a
+        # week where Mon=4h, Tue=4h, Wed=4h, Thu=4h, then Fri (holiday) = 8h.
+        # Total = 24h regular + 8h holiday = 32h, all billable (under 40h cap).
+        entries = [
+            entry("2026-04-27", 4.0),  # Monday
+            entry("2026-04-28", 4.0),  # Tuesday
+            entry("2026-04-29", 4.0),  # Wednesday
+            entry("2026-04-30", 4.0),  # Thursday
+            entry("2026-05-01", 8.0),  # Friday — declared holiday
+        ]
+        result = calculate_billing(entries)
+        assert result["total_logged_hours"] == 24.0
+        # The 5 entries fall in two ISO weeks: 4/27-4/30 (week 18, 16h)
+        # and 5/1 (week 18 still — week 18 = 4/27..5/3). Total 24h, all under 40h cap.
+        assert result["capped_hours"] == 24.0
+        assert result["is_billable"] is True
+
+    def test_holiday_hours_not_silently_dropped(self):
+        """Regression guard: no LOP/holiday branch may zero out logged hours."""
+        # If anyone re-introduces "skip holidays" logic, this test fails loudly.
+        entries = [entry("2026-05-01", 8.0)]  # Pure-holiday work
+        result = calculate_billing(entries)
+        assert result["capped_hours"] == 8.0, (
+            "Holiday hours MUST be billed to customer per May 4 directive"
+        )

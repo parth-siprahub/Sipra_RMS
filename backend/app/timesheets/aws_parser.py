@@ -1,10 +1,12 @@
 """
 AWS ActiveTrack CSV Parser — supports both monthly-aggregate and daily-row formats.
 Parses CSV exports from AWS ActiveTrack, aggregates daily rows per employee per month.
+Also parses the "Working Hours" (granular) CSV into per-day rows for aws_daily_logs.
 """
 import csv
 import logging
 from collections import defaultdict
+from datetime import date, datetime, timedelta
 from io import StringIO
 
 logger = logging.getLogger(__name__)
@@ -259,4 +261,107 @@ def _parse_monthly_rows(
         results.append(record)
 
     logger.info("Parsed %d AWS entries for month %s", len(results), billing_month)
+    return results
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Working Hours (Granular) CSV Parser → aws_daily_logs rows
+# ──────────────────────────────────────────────────────────────────────────────
+
+def parse_aws_working_hours_csv(file_bytes: bytes, billing_month: str) -> list[dict]:
+    """
+    Parse the "Working Hours" (granular / date-wise) AWS ActiveTrack CSV export.
+
+    Expected CSV columns (bare seconds, not h:mm:ss):
+        Date, User, Last Activity Log, Location, Productive, Screen Time,
+        Offline Meetings, Time Off, Work Time, ...
+
+    Returns list of dicts suitable for bulk-insert into aws_daily_logs:
+        aws_email, log_date (ISO str), billing_month, work_seconds,
+        productive_seconds, screen_time_seconds, is_weekend
+
+    Only rows whose date falls within billing_month are included.
+    Duplicate (email, date) rows are summed.
+    """
+    content = file_bytes.decode("utf-8-sig")
+    reader = csv.reader(StringIO(content))
+
+    try:
+        raw_headers = next(reader)
+    except StopIteration:
+        return []
+
+    headers = [h.strip() for h in raw_headers]
+
+    # Locate required columns by name (case-insensitive search)
+    def _find_col(name: str) -> int | None:
+        n = name.lower()
+        for i, h in enumerate(headers):
+            if h.lower() == n:
+                return i
+        return None
+
+    date_idx  = _find_col("date")
+    user_idx  = _find_col("user")
+    work_idx  = _find_col("work time")
+    prod_idx  = _find_col("productive")
+    scr_idx   = _find_col("screen time")
+
+    if user_idx is None:
+        raise ValueError("Working Hours CSV must have a 'User' column")
+    if date_idx is None:
+        raise ValueError("Working Hours CSV must have a 'Date' column")
+
+    # Accumulator: (email, date_str) -> {work_s, prod_s, scr_s}
+    acc: dict[tuple[str, str], dict[str, int]] = defaultdict(
+        lambda: {"work_seconds": 0, "productive_seconds": 0, "screen_time_seconds": 0}
+    )
+
+    for row in reader:
+        if not row or len(row) <= max(filter(lambda x: x is not None, [date_idx, user_idx])):
+            continue
+
+        email = row[user_idx].strip().strip('"').lower()
+        if not email or email in ("nan", "user"):
+            continue
+
+        raw_date = row[date_idx].strip().strip('"') if date_idx < len(row) else ""
+        if not raw_date:
+            continue
+
+        # Parse date from "2026-04-28T00:00:00" or "2026-04-28"
+        try:
+            log_date: date = (datetime.fromisoformat(raw_date) + timedelta(hours=5, minutes=30)).date()
+        except ValueError:
+            logger.warning("Skipping unrecognised date format: %r", raw_date)
+            continue
+
+        # Filter to billing_month
+        if log_date.strftime("%Y-%m") != billing_month:
+            continue
+
+        log_date_str = log_date.isoformat()  # "YYYY-MM-DD"
+        key = (email, log_date_str)
+
+        acc[key]["work_seconds"]       += _safe_int(row[work_idx]) if (work_idx is not None and work_idx < len(row)) else 0
+        acc[key]["productive_seconds"] += _safe_int(row[prod_idx]) if (prod_idx is not None and prod_idx < len(row)) else 0
+        acc[key]["screen_time_seconds"]+= _safe_int(row[scr_idx])  if (scr_idx  is not None and scr_idx  < len(row)) else 0
+
+    results: list[dict] = []
+    for (email, log_date_str), secs in acc.items():
+        log_date_obj = date.fromisoformat(log_date_str)
+        results.append({
+            "aws_email":          email,
+            "billing_month":      billing_month,
+            "log_date":           log_date_str,
+            "work_seconds":       secs["work_seconds"],
+            "productive_seconds": secs["productive_seconds"],
+            "screen_time_seconds":secs["screen_time_seconds"],
+            "is_weekend":         log_date_obj.weekday() >= 5,  # Sat=5, Sun=6
+        })
+
+    logger.info(
+        "Parsed %d daily rows from Working Hours CSV for month %s",
+        len(results), billing_month,
+    )
     return results

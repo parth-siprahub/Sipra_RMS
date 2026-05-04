@@ -14,14 +14,16 @@ from app.timesheets.schemas import (
     JiraRawImportResult,
     AwsTimesheetV2Response,
     AwsImportV2Result,
+    AwsDailyLogResponse,
 )
 from app.timesheets.parser import parse_tempo_xls
 from app.timesheets.jira_raw_parser import parse_jira_raw
-from app.timesheets.aws_parser import parse_aws_csv
+from app.timesheets.aws_parser import parse_aws_csv, parse_aws_working_hours_csv
 from app.timesheets.matching import EmployeeMatcher, Confidence
 from app.utils.cache import api_cache
 from app.utils.person_names import format_person_name
 from app.audit.service import log_audit
+from app.imports.service import stage_failed_record
 
 logger = logging.getLogger(__name__)
 
@@ -198,6 +200,18 @@ async def import_jira_raw(
                             for s in suggestions
                         ],
                     })
+
+        # Stage unmatched records into the DLQ (best-effort — never aborts the import).
+        for unmatched in unmatched_details:
+            try:
+                await stage_failed_record(
+                    client=client,
+                    source="jira",
+                    raw_payload=unmatched,
+                    error_reason=f"employee_not_matched: jira_user='{unmatched['source_name']}' has no RMS employee record",
+                )
+            except Exception as _stage_exc:
+                logger.warning("DLQ staging failed for jira_user=%s: %s", unmatched.get("source_name"), _stage_exc)
 
         # Idempotent: delete existing raw entries for this month
         await client.table("jira_timesheet_raw").delete().eq("billing_month", import_month).execute()
@@ -411,6 +425,18 @@ async def import_timesheet(
             else:
                 unmatched_usernames.add(entry["jira_username"])
 
+        # Stage unmatched usernames into the DLQ (best-effort).
+        for username in unmatched_usernames:
+            try:
+                await stage_failed_record(
+                    client=client,
+                    source="jira",
+                    raw_payload={"jira_username": username, "import_month": import_month},
+                    error_reason=f"employee_not_matched: jira_username='{username}' has no RMS employee record",
+                )
+            except Exception as _stage_exc:
+                logger.warning("DLQ staging failed for jira_username=%s: %s", username, _stage_exc)
+
         if matched_entries:
             # 1. Batch check for frozen records
             frozen_check = await (
@@ -497,24 +523,50 @@ async def list_aws_timesheets(
     return result.data
 
 
+@router.get("/aws/daily", response_model=list[AwsDailyLogResponse])
+async def list_aws_daily_logs(
+    employee_id: int = Query(..., description="Employee ID"),
+    billing_month: str = Query(..., description="YYYY-MM"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Return per-day AWS working-hours rows for a single employee in a given month."""
+    _validate_import_month_strict(billing_month)
+    client = await get_supabase_admin_async()
+    result = await (
+        client.table("aws_daily_logs")
+        .select("*")
+        .eq("employee_id", employee_id)
+        .eq("billing_month", billing_month)
+        .order("log_date")
+        .execute()
+    )
+    return result.data
+
+
 @router.post("/aws/import", response_model=AwsImportV2Result)
 async def import_aws_timesheet(
-    file: UploadFile = File(...),
+    summary_file: UploadFile = File(..., description="Top-Users summary CSV (one row per employee)"),
     import_month: str = Form(..., description="YYYY-MM format"),
+    granular_file: UploadFile = File(..., description="Working-Hours CSV (one row per employee per day)"),
     current_user: dict = Depends(require_admin),
 ):
     """
-    Upload an AWS ActiveTrack CSV export for a specific month.
-    Idempotent: deletes existing entries for the month, then inserts fresh.
-    File is parsed in memory and never stored.
+    Upload AWS ActiveTrack CSV exports for a specific month.
+
+    summary_file  — required — Top Users monthly aggregate CSV.
+    granular_file — required — Working Hours daily CSV; rows are persisted into
+                    aws_daily_logs with is_weekend and post_exit_flag set.
+
+    Both operations are idempotent: existing month rows are deleted before re-insert.
+    Files are parsed in memory and never stored on disk.
     """
-    if not file.filename or not file.filename.endswith(".csv"):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "File must be .csv")
+    if not summary_file.filename or not summary_file.filename.endswith(".csv"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "summary_file must be .csv")
 
     _validate_import_month_strict(import_month)
 
-    file_bytes = await file.read()
-    _validate_file_size(file_bytes, file.filename)
+    file_bytes = await summary_file.read()
+    _validate_file_size(file_bytes, summary_file.filename)
 
     try:
         entries = parse_aws_csv(file_bytes, import_month)
@@ -522,14 +574,24 @@ async def import_aws_timesheet(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
 
     if not entries:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "No valid entries found in CSV")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "No valid entries found in summary CSV")
+
+    # Parse granular file upfront so we can fail-fast before touching the DB
+    if not granular_file.filename or not granular_file.filename.endswith(".csv"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "granular_file must be .csv")
+    granular_bytes = await granular_file.read()
+    _validate_file_size(granular_bytes, granular_file.filename)
+    try:
+        daily_raw_rows = parse_aws_working_hours_csv(granular_bytes, import_month)
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"granular_file: {e}")
 
     client = await get_supabase_admin_async()
 
     # Create import_headers row
     header_row = {
         "import_type": "AWS_TIMESHEET",
-        "filename": file.filename,
+        "filename": summary_file.filename,
         "import_month": import_month,
         "records_total": len(entries),
         "records_matched": 0,
@@ -540,6 +602,8 @@ async def import_aws_timesheet(
     }
     header_result = await client.table("import_headers").insert(header_row).execute()
     import_header_id = header_result.data[0]["id"]
+
+    daily_logs_inserted = 0
 
     try:
         # Build multi-tier employee matcher
@@ -553,9 +617,9 @@ async def import_aws_timesheet(
         rows_to_insert = []
         for entry in entries:
             email = entry["aws_email"]
-            result = matcher.match(email or "", system="AWS")
+            match_result = matcher.match(email or "", system="AWS")
 
-            if result.employee_id:
+            if match_result.employee_id:
                 matched += 1
             else:
                 unmatched_emails.append(email)
@@ -575,21 +639,74 @@ async def import_aws_timesheet(
                 })
 
             row = {
-                "employee_id": result.employee_id,
+                "employee_id": match_result.employee_id,
                 "import_header_id": import_header_id,
                 **entry,
             }
             rows_to_insert.append(row)
 
-        # Idempotent: delete existing entries for this month
+        # Stage unmatched AWS emails into the DLQ (best-effort — never aborts the import).
+        for unmatched_aws in aws_unmatched_details:
+            try:
+                await stage_failed_record(
+                    client=client,
+                    source="aws",
+                    raw_payload=unmatched_aws,
+                    error_reason=f"employee_not_matched: aws_email='{unmatched_aws['source_name']}' has no RMS employee record",
+                )
+            except Exception as _stage_exc:
+                logger.warning("DLQ staging failed for aws_email=%s: %s", unmatched_aws.get("source_name"), _stage_exc)
+
+        # Idempotent: delete existing summary entries for this month
         await client.table("aws_timesheet_logs_v2").delete().eq("billing_month", import_month).execute()
 
-        # Batch insert
+        # Batch insert summary rows
         if rows_to_insert:
             batch_size = 50
             for i in range(0, len(rows_to_insert), batch_size):
                 batch = rows_to_insert[i:i + batch_size]
                 await client.table("aws_timesheet_logs_v2").insert(batch).execute()
+
+        # ── Granular daily logs ───────────────────────────────────────────────
+        if daily_raw_rows:
+            # Build email -> (employee_id, exit_date) lookup from matcher
+            emp_lookup: dict[str, tuple[int | None, date_type | None]] = {}
+            for emp in matcher._employees:
+                if emp.aws_email_lower:
+                    emp_lookup[emp.aws_email_lower] = (emp.id, emp.exit_date)
+
+            daily_rows_to_insert: list[dict] = []
+            for raw in daily_raw_rows:
+                email = raw["aws_email"]
+                emp_id, exit_date = emp_lookup.get(email, (None, None))
+
+                # post_exit_flag: log_date is after the employee's exit_date
+                log_date_val: date_type = date_type.fromisoformat(raw["log_date"])
+                post_exit = bool(exit_date and log_date_val > exit_date)
+
+                daily_rows_to_insert.append({
+                    "employee_id":          emp_id,
+                    "aws_email":            email,
+                    "billing_month":        raw["billing_month"],
+                    "log_date":             raw["log_date"],
+                    "work_seconds":         raw["work_seconds"],
+                    "productive_seconds":   raw["productive_seconds"],
+                    "screen_time_seconds":  raw["screen_time_seconds"],
+                    "is_weekend":           raw["is_weekend"],
+                    "post_exit_flag":       post_exit,
+                    "import_header_id":     import_header_id,
+                })
+
+            # Idempotent: delete existing daily logs for this month
+            await client.table("aws_daily_logs").delete().eq("billing_month", import_month).execute()
+
+            batch_size = 100
+            for i in range(0, len(daily_rows_to_insert), batch_size):
+                batch = daily_rows_to_insert[i:i + batch_size]
+                await client.table("aws_daily_logs").insert(batch).execute()
+
+            daily_logs_inserted = len(daily_rows_to_insert)
+            logger.info("Inserted %d daily log rows for month %s", daily_logs_inserted, import_month)
 
         await client.table("import_headers").update({
             "records_matched": matched,
@@ -612,7 +729,12 @@ async def import_aws_timesheet(
         user=current_user,
         action="IMPORT",
         entity_type="aws_timesheet_v2",
-        new_values={"month": import_month, "total_rows": len(entries), "matched": matched},
+        new_values={
+            "month": import_month,
+            "total_rows": len(entries),
+            "matched": matched,
+            "daily_logs": daily_logs_inserted,
+        },
     )
 
     return AwsImportV2Result(
@@ -623,6 +745,7 @@ async def import_aws_timesheet(
         entries_inserted=len(rows_to_insert),
         unmatched_emails=sorted(unmatched_emails),
         unmatched_details=aws_unmatched_details,
+        daily_logs_inserted=daily_logs_inserted,
     )
 
 

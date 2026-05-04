@@ -2,13 +2,14 @@
 import io
 import logging
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from fastapi.responses import StreamingResponse
 from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_supabase_admin_async
 from app.reports.flag_classifier import compute_comparison_fields
+from app.utils.date_utils import prorated_target_hours, get_working_days
 from app.reports.defaulters import detect_defaulters
 from app.utils.person_names import format_person_name
 from app.reports.schemas import (
@@ -46,6 +47,78 @@ DAILY_CAP = 8.0
 WEEKLY_CAP = 40.0
 
 
+async def _fetch_job_roles_for_employees(client, employees: list[dict]) -> dict[int, str | None]:
+    """Map employee_id -> job_profile.role_name via candidate -> resource_request -> job_profile.
+
+    Mirrors the join pattern in app.employees.router (see _enrich_employees).
+    Returns an empty mapping if no employees have linked candidates.
+    """
+    job_role_map: dict[int, str | None] = {}
+    candidate_ids = [e["candidate_id"] for e in employees if e.get("candidate_id")]
+    if not candidate_ids:
+        return job_role_map
+
+    cands = await (
+        client.table("candidates")
+        .select("id,request_id")
+        .in_("id", candidate_ids)
+        .execute()
+    )
+    cand_to_req = {c["id"]: c["request_id"] for c in (cands.data or []) if c.get("request_id")}
+    if not cand_to_req:
+        return job_role_map
+
+    rrs = await (
+        client.table("resource_requests")
+        .select("id,job_profile_id")
+        .in_("id", list(cand_to_req.values()))
+        .execute()
+    )
+    req_to_jp = {r["id"]: r["job_profile_id"] for r in (rrs.data or []) if r.get("job_profile_id")}
+    if not req_to_jp:
+        return job_role_map
+
+    jps = await (
+        client.table("job_profiles")
+        .select("id,role_name")
+        .in_("id", list(req_to_jp.values()))
+        .execute()
+    )
+    jp_to_name = {j["id"]: j["role_name"] for j in (jps.data or [])}
+
+    for emp in employees:
+        cid = emp.get("candidate_id")
+        if not cid:
+            continue
+        rid = cand_to_req.get(cid)
+        if not rid:
+            continue
+        jpid = req_to_jp.get(rid)
+        if jpid and jpid in jp_to_name:
+            job_role_map[emp["id"]] = jp_to_name[jpid]
+    return job_role_map
+
+
+@router.get("/month-target")
+async def get_month_target(
+    month: str = Query(..., description="YYYY-MM format", pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Return the system-calculated working-day count and 8h target for a given month.
+    Uses India holiday calendar from date_utils.py — same source as billing engine.
+    Used by BillingConfig UI to display the read-only system target.
+    """
+    year, month_num = int(month[:4]), int(month[5:])
+    import calendar as _cal
+    last_day = _cal.monthrange(year, month_num)[1]
+    month_start = date(year, month_num, 1)
+    month_end = date(year, month_num, last_day)
+    working_days = get_working_days(month_start, month_end)
+    target_hours = working_days * 8.0
+    return {"month": month, "working_days": working_days, "target_hours": target_hours}
+
+
 @router.get("/timesheet-comparison", response_model=ComparisonReport)
 async def get_timesheet_comparison(
     month: str = Query(..., description="YYYY-MM format", pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
@@ -54,12 +127,27 @@ async def get_timesheet_comparison(
     """
     Compare Jira timesheet hours vs AWS ActiveTrack hours for a given month.
     Returns per-employee comparison with flag (green/amber/red).
+    Includes all employees active for any portion of the month (started before month_end, no exit OR exited on/after month_start).
     """
+    from datetime import timedelta
     client = await get_supabase_admin_async()
 
-    # Fetch active employees
-    employees_raw = await client.table("employees").select("*").eq("status", "ACTIVE").execute()
-    employees = employees_raw.data or []
+    # Fetch employees active during the billing month (inclusive date range)
+    # Include anyone who: started before month_end AND (no exit date OR exited on/after month_start)
+    year, mo = int(month[:4]), int(month[5:7])
+    month_start = date(year, mo, 1)
+    # Calculate month_end (last day of month)
+    if mo == 12:
+        month_end = date(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        month_end = date(year, mo + 1, 1) - timedelta(days=1)
+
+    employees_raw = await client.table("employees").select("*").execute()
+    employees = [
+        e for e in (employees_raw.data or [])
+        if e.get("start_date") and date.fromisoformat(e["start_date"]) <= month_end
+        and (not e.get("exit_date") or date.fromisoformat(e["exit_date"]) >= month_start)
+    ]
 
     if not employees:
         return ComparisonReport(
@@ -80,6 +168,8 @@ async def get_timesheet_comparison(
             cid = e.get("candidate_id")
             if cid and cid in cand_vendor:
                 vendor_name_map[e["id"]] = cand_vendor[cid]
+
+    job_role_map = await _fetch_job_roles_for_employees(client, employees)
 
     # Fetch Jira data from jira_timesheet_raw (new table mirroring Excel)
     jira_all: list = []
@@ -175,11 +265,16 @@ async def get_timesheet_comparison(
             jira_billable, aws_total, jira_billable
         )
 
+        # Prefer employees.aws_email; fall back to the matched aws_timesheet_logs_v2 row
+        aws_email = emp.get("aws_email")
+        if not aws_email and aws_logs:
+            aws_email = aws_logs[0].get("aws_email")
+
         comparisons.append(TimesheetComparison(
             employee_id=emp_id,
             rms_name=_display_rms(emp.get("rms_name")),
             jira_username=emp.get("jira_username"),
-            aws_email=emp.get("aws_email"),
+            aws_email=aws_email,
             jira_total_hours=round(total_hours, 2),
             jira_capped_hours=round(billable_hours, 2),
             jira_ooo_days=ooo_days,
@@ -190,6 +285,7 @@ async def get_timesheet_comparison(
             flag=flag,
             source=emp.get("source"),
             vendor_name=vendor_name_map.get(emp_id),
+            job_role=job_role_map.get(emp_id),
         ))
 
     flag_rank = {"red": 0, "amber": 1, "green": 2, "no_aws": 0}
@@ -211,11 +307,25 @@ async def get_compliance_report(
 ):
     """
     Timesheet compliance report — who has/hasn't filled timesheets.
+    Includes all employees active for any portion of the month (started before month_end, no exit OR exited on/after month_start).
     """
+    from datetime import timedelta
     client = await get_supabase_admin_async()
 
-    employees_raw = await client.table("employees").select("*").eq("status", "ACTIVE").execute()
-    employees = employees_raw.data or []
+    # Fetch employees active during the billing month (inclusive date range)
+    year, mo = int(month[:4]), int(month[5:7])
+    month_start = date(year, mo, 1)
+    if mo == 12:
+        month_end = date(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        month_end = date(year, mo + 1, 1) - timedelta(days=1)
+
+    employees_raw = await client.table("employees").select("*").execute()
+    employees = [
+        e for e in (employees_raw.data or [])
+        if e.get("start_date") and date.fromisoformat(e["start_date"]) <= month_end
+        and (not e.get("exit_date") or date.fromisoformat(e["exit_date"]) >= month_start)
+    ]
 
     # Fetch from jira_timesheet_raw (new table) with pagination
     jira_all: list = []
@@ -321,7 +431,7 @@ async def export_comparison(
     report = await get_timesheet_comparison(month=month, current_user=current_user)
 
     output = io.StringIO()
-    output.write("Employee,Jira Username,AWS Email,Payroll,Jira Total Hours,Jira Capped Hours,"
+    output.write("Employee,Jira Username,AWS Email,Payroll,Job Role,Jira Total Hours,Jira Capped Hours,"
                  "OOO Days,Jira Billable Hours,AWS Total Hours,Difference,Difference %,Flag\n")
 
     for c in report.comparisons:
@@ -329,7 +439,7 @@ async def export_comparison(
         diff = str(c.difference) if c.difference is not None else ""
         diff_pct = str(c.difference_pct) if c.difference_pct is not None else ""
         output.write(
-            f'"{c.rms_name}","{c.jira_username or ""}","{c.aws_email or ""}","{c.source or ""}",'
+            f'"{c.rms_name}","{c.jira_username or ""}","{c.aws_email or ""}","{c.source or ""}","{c.job_role or ""}",'
             f'{c.jira_total_hours},{c.jira_capped_hours},{c.jira_ooo_days},'
             f'{c.jira_billable_hours},{aws_hrs},{diff},{diff_pct},{c.flag}\n'
         )
@@ -353,9 +463,19 @@ async def get_defaulters(
     """
     client = await get_supabase_admin_async()
 
-    # Fetch active employees
-    employees_raw = await client.table("employees").select("*").eq("status", "ACTIVE").execute()
-    employees = employees_raw.data or []
+    # Fetch employees active during the billing month (date-range, not live status).
+    # Exited mid-month employees are still defaulters for the period they worked.
+    _d_year, _d_mo = int(month[:4]), int(month[5:7])
+    _d_start = date(_d_year, _d_mo, 1)
+    _d_end = date(_d_year + 1, 1, 1) - timedelta(days=1) if _d_mo == 12 else date(_d_year, _d_mo + 1, 1) - timedelta(days=1)
+
+    employees_raw = await client.table("employees").select("*").execute()
+    employees = [
+        e for e in (employees_raw.data or [])
+        if e.get("start_date")
+        and date.fromisoformat(e["start_date"]) <= _d_end
+        and (not e.get("exit_date") or date.fromisoformat(e["exit_date"]) >= _d_start)
+    ]
 
     # Fetch timesheet logs for the month
     logs_raw = await client.table("timesheet_logs").select("*").eq("import_month", month).execute()
@@ -427,11 +547,21 @@ async def calculate_billing(
         )
     target_billable = float(config["billable_hours"])
 
-    # 2. Fetch active employees
-    emp_res = await client.table("employees").select("*").eq("status", "ACTIVE").execute()
-    employees = emp_res.data or []
+    # 2. Fetch employees active during the billing month (date-range, not live status).
+    # Rationale: exited mid-month employees must appear in billing history (Entry 004, AI_PITFALLS_LEDGER).
+    _year, _mo = int(billing_month[:4]), int(billing_month[5:7])
+    _month_start = date(_year, _mo, 1)
+    _month_end = date(_year + 1, 1, 1) - timedelta(days=1) if _mo == 12 else date(_year, _mo + 1, 1) - timedelta(days=1)
+
+    emp_res = await client.table("employees").select("*").execute()
+    employees = [
+        e for e in (emp_res.data or [])
+        if e.get("start_date")
+        and date.fromisoformat(e["start_date"]) <= _month_end
+        and (not e.get("exit_date") or date.fromisoformat(e["exit_date"]) >= _month_start)
+    ]
     if not employees:
-        raise HTTPException(status_code=400, detail="No active employees found")
+        raise HTTPException(status_code=400, detail="No employees found for the billing period")
     emp_map = {e["id"]: e for e in employees}
 
     # 3. Fetch Jira raw data for this month (paginated to avoid 1000-row limit)
@@ -483,7 +613,8 @@ async def calculate_billing(
         if eid and eid in emp_map:
             aws_by_emp[eid] = entry
 
-    # 5. Compute per employee
+    # 5. Compute per employee — prorated target per person, not a global constant.
+    # B1.4: Pathak (exit 4/24), Bindushree (exit 4/27) receive targets < 176h.
     reports: list[dict] = []
     for emp in employees:
         eid = emp["id"]
@@ -496,8 +627,19 @@ async def calculate_billing(
         if aws_entry:
             aws_hours = round(float(aws_entry.get("work_time_secs", 0)) / 3600.0, 2)
 
+        # Prorate target: working days in employee's active window for this month × 8h
+        emp_exit = date.fromisoformat(emp["exit_date"]) if emp.get("exit_date") else None
+        emp_target = prorated_target_hours(
+            month_start=_month_start,
+            month_end=_month_end,
+            emp_start=date.fromisoformat(emp["start_date"]),
+            emp_exit=emp_exit,
+        )
+        # Fallback to billing_config hours if proration yields 0 (data error guard)
+        billable = emp_target if emp_target > 0 else target_billable
+
         difference, difference_pct, flag = compute_comparison_fields(
-            jira_hours, aws_hours, target_billable
+            jira_hours, aws_hours, billable
         )
 
         reports.append({
@@ -506,7 +648,7 @@ async def calculate_billing(
             "jira_hours": jira_hours,
             "ooo_days": ooo_days,
             "aws_hours": aws_hours,
-            "billable_hours": target_billable,
+            "billable_hours": billable,
             "difference": difference,
             "difference_pct": difference_pct,
             "flag": flag,
@@ -524,6 +666,7 @@ async def calculate_billing(
         await client.table("computed_reports").insert(reports).execute()
 
     # 7. Return with joined employee names
+    calc_job_role_map = await _fetch_job_roles_for_employees(client, employees)
     result_rows: list[ComputedReportRow] = []
     for r in reports:
         emp = emp_map.get(r["employee_id"], {})
@@ -541,6 +684,7 @@ async def calculate_billing(
             jira_username=emp.get("jira_username"),
             aws_email=emp.get("aws_email"),
             source=emp.get("source"),
+            job_role=calc_job_role_map.get(r["employee_id"]),
         ))
 
     # Sort: red first (includes legacy no_aws), then amber, then green
@@ -585,6 +729,8 @@ async def get_computed_reports(
             if cid and cid in cand_vendor:
                 computed_vendor_map[e["id"]] = cand_vendor[cid]
 
+    computed_job_role_map = await _fetch_job_roles_for_employees(client, emp_res.data or [])
+
     result = []
     for r in rows:
         emp = emp_map.get(r["employee_id"], {})
@@ -611,6 +757,7 @@ async def get_computed_reports(
             aws_email=emp.get("aws_email"),
             source=emp.get("source"),
             vendor_name=computed_vendor_map.get(r["employee_id"]),
+            job_role=computed_job_role_map.get(r["employee_id"]),
         ))
 
     flag_order = {"red": 0, "no_aws": 0, "amber": 1, "green": 2}

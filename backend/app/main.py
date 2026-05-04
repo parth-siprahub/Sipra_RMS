@@ -208,6 +208,62 @@ async def readiness_check():
         )
 
 
+# ─── EOD Status Flip Scheduler (Python fallback for pg_cron) ─────────────────
+# Runs daily at 23:59 IST (18:29 UTC) inside the FastAPI process.
+# ONLY active when settings.ENABLE_EOD_SCHEDULER is True (set in .env).
+# When pg_cron is available and scheduled (Migration 015), set this to False
+# to avoid double-execution.
+
+import asyncio as _asyncio
+from datetime import timezone as _tz, datetime as _dt, timedelta as _td
+
+
+async def _eod_status_flip_loop() -> None:  # pragma: no cover
+    """
+    Asyncio background loop: flip employees.status → EXITED where exit_date <= today.
+    Fires daily at 23:59 IST (UTC 18:29). Pure asyncio — no APScheduler required.
+    """
+    IST_OFFSET = _td(hours=5, minutes=30)
+    TARGET_TIME_IST = (18, 29)  # (hour, minute) in IST
+
+    while True:
+        now_utc = _dt.now(_tz.utc)
+        now_ist = now_utc + IST_OFFSET
+        # Next fire: today at 23:59 IST, or tomorrow if already past
+        next_fire_ist = now_ist.replace(
+            hour=TARGET_TIME_IST[0], minute=TARGET_TIME_IST[1], second=0, microsecond=0
+        )
+        if next_fire_ist <= now_ist:
+            next_fire_ist += _td(days=1)
+        sleep_secs = (next_fire_ist - now_ist).total_seconds()
+        logger.info("EOD scheduler: next status flip in %.0fs (at %s IST)", sleep_secs, next_fire_ist.strftime("%Y-%m-%d %H:%M"))
+        await _asyncio.sleep(sleep_secs)
+
+        try:
+            from app.database import get_supabase_admin_async
+            client = await get_supabase_admin_async()
+            today = _dt.now(_tz.utc).strftime("%Y-%m-%d")
+            res = await client.table("employees").select("id,rms_name,exit_date").execute()
+            targets = [
+                e for e in (res.data or [])
+                if e.get("exit_date") and e["exit_date"] <= today
+            ]
+            for emp in targets:
+                await client.table("employees").update({"status": "EXITED"}).eq("id", emp["id"]).execute()
+            logger.info("EOD status flip: flipped %d employees to EXITED", len(targets))
+        except Exception as _exc:
+            logger.error("EOD status flip failed: %s", _exc)
+
+
+@app.on_event("startup")
+async def _start_eod_scheduler() -> None:  # pragma: no cover
+    if getattr(settings, "ENABLE_EOD_SCHEDULER", False):
+        logger.info("EOD status scheduler enabled — starting background loop")
+        _asyncio.create_task(_eod_status_flip_loop())
+    else:
+        logger.debug("EOD status scheduler disabled (ENABLE_EOD_SCHEDULER=False). Use pg_cron (Migration 015).")
+
+
 app.include_router(system_router)
 app.include_router(jd_router, prefix=API_PREFIX)
 app.include_router(auth_router, prefix=API_PREFIX)
